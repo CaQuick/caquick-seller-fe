@@ -92,3 +92,14 @@ jest.mock('stringify-entities', () => ({ stringifyEntities: (value: string) => v
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual<object>('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
+
+/** expo-location: 기본은 권한 허용 + 고정 좌표. spec이 mockResolvedValueOnce 등으로 바꾼다 */
+jest.mock('expo-location', () => ({
+  Accuracy: { Balanced: 3 },
+  requestForegroundPermissionsAsync: jest.fn(() =>
+    Promise.resolve({ status: 'granted', granted: true, canAskAgain: true }),
+  ),
+  getCurrentPositionAsync: jest.fn(() =>
+    Promise.resolve({ coords: { latitude: 37.5326, longitude: 126.6406 }, timestamp: 0 }),
+  ),
+}));

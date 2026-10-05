@@ -56,3 +56,26 @@ export const searchRegionsQueryOptions = (keyword: string) =>
       (await gqlRequest(SellerStoreSearchRegionsDocument, { input: { keyword, limit: 20 } }))
         .searchRegions,
   });
+
+const SellerStoreRegionByLocationDocument = graphql(`
+  query SellerStoreRegionByLocation($input: RegionByLocationInput!) {
+    regionByLocation(input: $input) {
+      group {
+        id
+        name
+      }
+      region {
+        id
+        name
+      }
+    }
+  }
+`);
+
+/** 좌표가 캐시 키에 남지 않게 queryOptions 없이 한 번만 부른다 */
+export async function fetchRegionByLocation(latitude: number, longitude: number) {
+  const data = await gqlRequest(SellerStoreRegionByLocationDocument, {
+    input: { latitude, longitude },
+  });
+  return data.regionByLocation ?? null;
+}

@@ -132,6 +132,14 @@ export type PushPlatform =
   /** iOS(APNs 경유) */
   | 'IOS';
 
+/** 현재 위치(WGS84). */
+export type RegionByLocationInput = {
+  /** 위도. -90~90. */
+  latitude: number;
+  /** 경도. -180~180. */
+  longitude: number;
+};
+
 /** 리뷰 댓글 목록 조회 조건. */
 export type ReviewCommentsInput = {
   /** 이전 페이지 마지막 댓글 id(이후부터 조회). */
@@ -882,6 +890,13 @@ export type SellerStoreSearchRegionsQueryVariables = Exact<{
 
 
 export type SellerStoreSearchRegionsQuery = { searchRegions: Array<{ id: string, name: string, parentName: string | null, level: number }> };
+
+export type SellerStoreRegionByLocationQueryVariables = Exact<{
+  input: RegionByLocationInput;
+}>;
+
+
+export type SellerStoreRegionByLocationQuery = { regionByLocation: { group: { id: string, name: string }, region: { id: string, name: string } } | null };
 
 export type SellerStoreBusinessHoursQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1770,6 +1785,20 @@ export const SellerStoreSearchRegionsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerStoreSearchRegionsQuery, SellerStoreSearchRegionsQueryVariables>;
+export const SellerStoreRegionByLocationDocument = new TypedDocumentString(`
+    query SellerStoreRegionByLocation($input: RegionByLocationInput!) {
+  regionByLocation(input: $input) {
+    group {
+      id
+      name
+    }
+    region {
+      id
+      name
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreRegionByLocationQuery, SellerStoreRegionByLocationQueryVariables>;
 export const SellerStoreBusinessHoursDocument = new TypedDocumentString(`
     query SellerStoreBusinessHours {
   sellerStoreBusinessHours {
