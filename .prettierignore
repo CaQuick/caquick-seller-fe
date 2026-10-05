@@ -1,0 +1,8 @@
+node_modules
+.expo
+coverage
+pnpm-lock.yaml
+src/graphql/generated
+schema/schema.graphql
+expo-env.d.ts
+assets

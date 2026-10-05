@@ -1,0 +1,2 @@
+# push 전 로컬 검증 — CI의 lint·static·test·coverage-report가 나눠 하는 검사를 한 번에. --no-verify 금지
+pnpm validate

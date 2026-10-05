@@ -1,0 +1,70 @@
+# 의존성·산출물
+node_modules/
+.expo/
+dist/
+web-build/
+/coverage
+*.tsbuildinfo
+.pnpm-store
+expo-env.d.ts
+
+# 네이티브 디렉터리는 CNG로 만든다(미커밋)
+/ios
+/android
+.kotlin/
+*.orig.*
+.metro-health-check*
+
+# 서명 자산·시크릿 — public 레포, 절대 커밋하지 않는다
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+credentials.json
+.secrets/
+
+# 로그
+logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+pnpm-debug.log*
+
+# OS·IDE
+.DS_Store
+/.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# 환경 변수 — .env.example·.env.development·.env.production은 비밀값이 없어 커밋한다
+.env
+.env.local
+.env.*.local
+
+# 임시
+.temp
+.tmp
+
+# Claude / Codex (로컬 지침은 커밋하지 않는다)
+.claude/
+CLAUDE.md
+AGENTS.md
+
+# 플랜·작업 문서는 로컬, 가이드만 커밋
+docs/*
+!docs/guide/
+
+# Figma 시안·스펙
+.figma/
+
+# Terraform state
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup

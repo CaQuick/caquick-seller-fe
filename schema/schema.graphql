@@ -1,0 +1,8338 @@
+# 생성 파일 — 수정하지 않는다. caquick-be develop@1bc6527645d94ad8c8a9769694d0939598be7587 의 src/features/**/*.graphql 68개를 경로순으로 합쳤다.
+# 갱신: pnpm schema:pull [ref]
+
+# ---- src/features/audit-log/audit-log.types.graphql ----
+"""
+감사 로그가 가리키는 대상 종류. 판매자 화면(sellerAuditLogs)은 STORE·PRODUCT·ORDER·CONVERSATION·CHANGE_PASSWORD만 노출하고 필터 입력도 그 범위만 받는다.
+"""
+enum AuditTargetType {
+  """
+  매장 설정·콘텐츠.
+  """
+  STORE
+  """
+  상품과 그 하위.
+  """
+  PRODUCT
+  """
+  주문 상태 변경.
+  """
+  ORDER
+  """
+  구매자 문의 대화.
+  """
+  CONVERSATION
+  """
+  비밀번호 변경. targetId는 바꾼 계정 ID.
+  """
+  CHANGE_PASSWORD
+  """
+  계정(관리자·판매자 생성, 정지/복구, 비밀번호 초기화).
+  """
+  ACCOUNT
+  """
+  플랫폼 배너.
+  """
+  BANNER
+  """
+  카테고리 마스터.
+  """
+  CATEGORY
+  """
+  태그 마스터.
+  """
+  TAG
+  """
+  지역 마스터.
+  """
+  REGION
+  """
+  리뷰 강제 삭제.
+  """
+  REVIEW
+  """
+  리뷰 댓글 강제 삭제.
+  """
+  REVIEW_COMMENT
+  """
+  신고 처리.
+  """
+  REVIEW_REPORT
+  """
+  관리자 알림 발송.
+  """
+  NOTIFICATION
+  """
+  검색 진입 화면 키워드 바로가기 칩. 순서 변경은 순서가 바뀐 칩마다 1건씩 남는다.
+  """
+  SEARCH_KEYWORD_CHIP
+}
+
+"""
+감사 로그에 기록된 행위 종류.
+"""
+enum AuditActionType {
+  """
+  생성.
+  """
+  CREATE
+  """
+  수정.
+  """
+  UPDATE
+  """
+  삭제(soft-delete 포함).
+  """
+  DELETE
+  """
+  상태 전이.
+  """
+  STATUS_CHANGE
+}
+
+# ---- src/features/auth/auth-admin-account.graphql ----
+extend type Query {
+  """
+  내 관리자 계정을 조회한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminMe: AdminAccount!
+  """
+  관리자 계정 목록을 최신 생성순으로 조회한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminAdmins(input: CursorInput): AdminAccountConnection!
+}
+
+extend type Mutation {
+  """
+  관리자 계정을 추가한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  username이 이미 쓰이고 있으면 BAD_USER_INPUT. 생성된 계정은 최초 로그인 시 비밀번호 변경이 강제된다.
+  """
+  adminCreateAdmin(input: AdminCreateAdminInput!): AdminAccount!
+  """
+  다른 관리자의 비밀번호를 임시 비밀번호로 초기화한다. 모든 로그인 세션을 폐기하고 다음 로그인 때 변경을 강제한다.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN. 본인 계정이면 FORBIDDEN(본인은 비밀번호 변경을 쓴다).
+  대상이 ADMIN 계정이 아니거나 자격증명이 없으면 NOT_FOUND.
+  """
+  adminResetAdminPassword(input: AdminResetAdminPasswordInput!): Boolean!
+}
+
+"""
+관리자 계정. 로그인 자격증명(username)과 계정 상태를 함께 보여준다.
+"""
+type AdminAccount {
+  """
+  계정 ID.
+  """
+  accountId: ID!
+  """
+  로그인 username. 자격증명이 없는 개발용 계정이면 null.
+  """
+  username: String
+  """
+  이메일. 미등록 시 null.
+  """
+  email: String
+  """
+  이름. 미등록 시 null.
+  """
+  name: String
+  """
+  계정 상태.
+  """
+  status: AccountStatus!
+  """
+  초기 비밀번호 상태. true면 본인이 비밀번호를 바꾸기 전까지 관리자 API가 FORBIDDEN이다.
+  """
+  mustChangePassword: Boolean!
+  """
+  최근 로그인 시각. 로그인 이력이 없으면 null.
+  """
+  lastLoginAt: DateTime
+  createdAt: DateTime!
+}
+
+"""
+관리자 계정 목록 페이지. 최신 생성이 먼저 온다.
+"""
+type AdminAccountConnection {
+  """
+  관리자 계정. 최신 생성이 먼저 온다.
+  """
+  items: [AdminAccount!]!
+  """
+  전체 관리자 수(현재 페이지와 무관).
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+관리자 계정 생성 입력.
+"""
+input AdminCreateAdminInput {
+  """
+  로그인 username. 4~80자, 소문자·숫자·`.`·`_`·`-`만 허용. 이미 쓰이고 있으면 BAD_USER_INPUT.
+  """
+  username: String!
+  """
+  초기 비밀번호. 8~64자(공백만으로는 불가). 최초 로그인 시 변경이 강제되므로 조합 규칙은 없다.
+  """
+  password: String!
+  """
+  이메일. 선택.
+  """
+  email: String
+  """
+  이름. 선택.
+  """
+  name: String
+}
+
+"""
+관리자 비밀번호 초기화 입력.
+"""
+input AdminResetAdminPasswordInput {
+  """
+  대상 관리자 계정 ID. 본인이면 FORBIDDEN.
+  """
+  accountId: ID!
+  """
+  새 임시 비밀번호. 8~64자(공백만으로는 불가). 다음 로그인 때 변경이 강제되므로 조합 규칙은 없다.
+  """
+  newPassword: String!
+}
+
+# ---- src/features/auth/auth-admin-user.graphql ----
+extend type Query {
+  """
+  구매자(USER) 계정 목록을 최신 가입순으로 조회한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminUsers(input: AdminUserListInput): AdminUserConnection!
+  """
+  구매자 계정 1건을 조회한다. USER 계정이 아니거나 없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminUser(accountId: ID!): AdminUser!
+}
+
+extend type Mutation {
+  """
+  계정을 정지한다(USER·SELLER). 정지되면 모든 API 접근이 FORBIDDEN이 되고 refresh 세션이 전부 폐기된다.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN. 대상이 ADMIN 계정이거나 본인이면 FORBIDDEN,
+  탈퇴·미존재 계정이면 NOT_FOUND. 이미 정지된 계정이면 그대로 반환한다(멱등, 감사 기록 없음).
+  """
+  adminSuspendAccount(
+    input: AdminSuspendAccountInput!
+  ): AdminAccountStatusResult!
+  """
+  정지된 계정을 복구한다(USER·SELLER). 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  대상이 ADMIN 계정이면 FORBIDDEN, 탈퇴·미존재 계정이면 NOT_FOUND. 이미 ACTIVE면 그대로 반환한다(멱등).
+  """
+  adminReinstateAccount(accountId: ID!): AdminAccountStatusResult!
+}
+
+"""
+구매자 계정. 프로필·연동 소셜·활동 집계를 함께 보여준다.
+"""
+type AdminUser {
+  """
+  계정 ID.
+  """
+  accountId: ID!
+  """
+  이메일. 미등록 시 null.
+  """
+  email: String
+  """
+  이름. 미등록 시 null.
+  """
+  name: String
+  """
+  계정 상태.
+  """
+  status: AccountStatus!
+  """
+  닉네임. 프로필이 없으면 null.
+  """
+  nickname: String
+  """
+  전화번호. 미등록 시 null.
+  """
+  phoneNumber: String
+  """
+  온보딩 완료 여부.
+  """
+  onboardingCompleted: Boolean!
+  """
+  연동된 소셜 로그인 provider 목록(soft-delete 제외).
+  """
+  identityProviders: [IdentityProvider!]!
+  """
+  주문 수(삭제 제외).
+  """
+  orderCount: Int!
+  """
+  리뷰 수(삭제 제외).
+  """
+  reviewCount: Int!
+  """
+  가입 시각.
+  """
+  createdAt: DateTime!
+}
+
+"""
+구매자 계정 목록 페이지. 최신 가입이 먼저 온다.
+"""
+type AdminUserConnection {
+  """
+  구매자 계정. 최신 가입이 먼저 온다.
+  """
+  items: [AdminUser!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+구매자 목록 조회 조건.
+"""
+input AdminUserListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  닉네임·이메일·이름 부분일치 검색어. 최대 100자. 미지정 시 전체.
+  """
+  keyword: String
+  """
+  계정 상태 필터. 미지정 시 전체.
+  """
+  status: AccountStatus
+}
+
+"""
+계정 정지 입력.
+"""
+input AdminSuspendAccountInput {
+  """
+  대상 계정 ID(USER 또는 SELLER).
+  """
+  accountId: ID!
+  """
+  정지 사유. 감사 로그에 기록된다. 최대 500자.
+  """
+  reason: String!
+}
+
+"""
+계정 상태 변경 결과.
+"""
+type AdminAccountStatusResult {
+  """
+  대상 계정 ID.
+  """
+  accountId: ID!
+  """
+  대상 계정 종류.
+  """
+  accountType: AccountType!
+  """
+  변경 후 상태.
+  """
+  status: AccountStatus!
+}
+
+# ---- src/features/auth/auth-seller-account.graphql ----
+extend type Query {
+  """
+  내 판매자 계정을 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN.
+  초기 비밀번호 상태(mustChangePassword=true)면 다른 판매자 API와 같이 FORBIDDEN이므로, 초기 비밀번호 여부는 refresh 응답의 mustChangePassword로 판단한다.
+  """
+  sellerMe: SellerAccount!
+}
+
+"""
+판매자 본인 계정. 로그인 자격증명·계정 상태·보유 매장 ID를 함께 보여준다. 매장명은 sellerMyStore로 받는다.
+"""
+type SellerAccount {
+  """
+  계정 ID.
+  """
+  accountId: ID!
+  """
+  로그인 username. 자격증명이 없는 개발용 계정이면 null.
+  """
+  username: String
+  """
+  표시 이름. 계정 이름이 있으면 그것, 없으면 사업자명, 둘 다 없으면 null.
+  """
+  displayName: String
+  """
+  보유 매장 ID. 매장이 없거나 삭제됐으면 null.
+  """
+  storeId: ID
+  """
+  초기 비밀번호 상태. true면 본인이 비밀번호를 바꾸기 전까지 판매자 API가 FORBIDDEN이다.
+  """
+  mustChangePassword: Boolean!
+  """
+  계정 상태.
+  """
+  accountStatus: AccountStatus!
+}
+
+# ---- src/features/auth/auth-user-profile.graphql ----
+extend type Query {
+  """
+  현재 로그인한 유저 정보 조회
+  """
+  me: MePayload!
+  """
+  닉네임 중복 확인. 로그인 필수.
+  """
+  checkNicknameAvailability(
+    """
+    검사할 닉네임. 앞뒤 공백을 제거한 뒤 2~20자, 한글·영문·숫자·언더스코어만 허용한다.
+    규칙 위반은 예외가 아니라 available=false와 reason으로 돌려준다.
+    """
+    nickname: String!
+  ): NicknameAvailability!
+}
+
+extend type Mutation {
+  """
+  온보딩 완료 처리(필수 정보 입력). 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  completeOnboarding(input: CompleteOnboardingInput!): MePayload!
+  """
+  프로필 정보 수정. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  updateMyProfile(input: UpdateMyProfileInput!): MePayload!
+  """
+  프로필 이미지 URL 업데이트. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  updateMyProfileImage(input: UpdateMyProfileImageInput!): MePayload!
+  """
+  회원 탈퇴(soft delete). 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  deleteMyAccount: Boolean!
+  """
+  프로필 이미지 업로드용 Presigned URL 발급. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  createProfileImageUploadUrl(
+    input: CreateProfileImageUploadUrlInput!
+  ): UploadUrl!
+}
+
+"""
+현재 로그인한 유저 정보
+"""
+type MePayload {
+  """
+  계정 ID
+  """
+  accountId: ID!
+  """
+  이메일(없을 수 있음)
+  """
+  email: String
+  """
+  이름(없을 수 있음)
+  """
+  name: String
+  """
+  계정 타입
+  """
+  accountType: AccountType!
+  """
+  프로필 정보
+  """
+  profile: UserProfile!
+  """
+  연동된 소셜 로그인 식별자 목록(soft-deleted 제외, 최근 로그인 순)
+  """
+  linkedIdentities: [LinkedIdentity!]!
+}
+
+"""
+소셜 로그인 Provider 종류
+"""
+enum IdentityProvider {
+  """
+  구글 OIDC.
+  """
+  GOOGLE
+  """
+  카카오 OIDC.
+  """
+  KAKAO
+}
+
+"""
+유저 계정에 연동된 소셜 로그인 식별자
+"""
+type LinkedIdentity {
+  """
+  소셜 로그인 Provider
+  """
+  provider: IdentityProvider!
+  """
+  해당 provider로 마지막 로그인한 시각(없을 수 있음)
+  """
+  lastLoginAt: DateTime
+}
+
+"""
+유저 프로필
+"""
+type UserProfile {
+  """
+  닉네임(유니크)
+  """
+  nickname: String!
+  """
+  생년월일
+  """
+  birthDate: DateTime
+  """
+  전화번호
+  """
+  phoneNumber: String
+  """
+  프로필 이미지 URL
+  """
+  profileImageUrl: String
+  """
+  온보딩 완료 시각
+  """
+  onboardingCompletedAt: DateTime
+}
+
+"""
+온보딩 완료 입력
+"""
+input CompleteOnboardingInput {
+  """
+  이름(계정에 없을 때만 저장)
+  """
+  name: String
+  """
+  닉네임(필수)
+  """
+  nickname: String!
+  """
+  생년월일
+  """
+  birthDate: DateTime
+  """
+  전화번호
+  """
+  phoneNumber: String
+}
+
+"""
+프로필 수정 입력
+"""
+input UpdateMyProfileInput {
+  """
+  닉네임
+  """
+  nickname: String
+  """
+  이름(전송 시 trim 후 비어있으면 reject)
+  """
+  name: String
+  """
+  생년월일
+  """
+  birthDate: DateTime
+  """
+  전화번호
+  """
+  phoneNumber: String
+}
+
+"""
+프로필 이미지 수정 입력
+"""
+input UpdateMyProfileImageInput {
+  """
+  프로필 이미지 URL
+  """
+  profileImageUrl: String!
+}
+
+"""
+닉네임 사용 가능 여부
+"""
+type NicknameAvailability {
+  """
+  사용 가능 여부. false면 reason에 사유가 담긴다.
+  """
+  available: Boolean!
+  """
+  미통과 시 이유
+  """
+  reason: String
+}
+
+"""
+프로필 이미지 업로드 URL 발급 입력
+"""
+input CreateProfileImageUploadUrlInput {
+  """
+  업로드할 파일의 MIME 타입(예: image/jpeg).
+  """
+  contentType: String!
+  """
+  업로드할 파일 크기(바이트).
+  """
+  contentLength: Int!
+}
+
+# ---- src/features/auth/auth.types.graphql ----
+"""
+계정 종류. JWT 발급 시 결정되며 접근 가능한 API 영역을 가른다.
+"""
+enum AccountType {
+  """
+  구매자. 주문·찜·리뷰 등 구매자 API를 쓴다.
+  """
+  USER
+  """
+  판매자. 매장 1곳을 보유하며 seller* API를 쓴다.
+  """
+  SELLER
+  """
+  운영자. admin* API를 쓴다.
+  """
+  ADMIN
+}
+
+"""
+계정 상태. ACTIVE가 아니면 로그인·API 접근이 거부된다.
+"""
+enum AccountStatus {
+  """
+  가입 대기. 현재 생성 경로가 없는 예약값이다.
+  """
+  PENDING
+  """
+  정상.
+  """
+  ACTIVE
+  """
+  운영자가 정지한 상태. 모든 API 접근이 FORBIDDEN이고 refresh 세션도 폐기된다.
+  """
+  SUSPENDED
+}
+
+# ---- src/features/conversation/conversation-center.graphql ----
+extend type Query {
+  """알림센터 대화 탭 목록(구매자). 마지막 메시지 최신순. 로그인 필수. 본인 데이터만 대상이 된다."""
+  myConversations(input: CursorInput): MyConversationConnection!
+  """
+  채팅 상세 메시지 목록(최신순 키셋 커서). 구매자 본인 대화만 조회 가능하며,
+  조회 시 last_read_at을 이번에 반환한 최신 메시지의 작성 시각까지 끌어올린다
+  (안읽음 배지 해소 부수효과). 반환할 메시지가 없으면 갱신하지 않는다.
+  로그인 필수.
+  """
+  conversationMessages(conversationId: ID!, input: CursorInput): ConversationMessageConnection!
+}
+
+
+"""대화 목록 응답"""
+type MyConversationConnection {
+  """대화방 카드. 마지막 메시지가 최근인 순으로 온다."""
+  items: [MyConversationItem!]!
+  """전체 대화 수"""
+  totalCount: Int!
+  """다음 페이지 존재 여부."""
+  hasMore: Boolean!
+  """다음 페이지 커서. 없으면 null"""
+  nextCursor: String
+}
+
+"""대화 목록 아이템"""
+type MyConversationItem {
+  """대화 ID"""
+  id: ID!
+  storeId: ID!
+  """매장명."""
+  storeName: String!
+  """매장 프로필(로고) 이미지 URL. 미등록 시 null"""
+  storeProfileImageUrl: String
+  """마지막 메시지 미리보기(HTML 메시지는 태그 제거 plain text)"""
+  lastMessagePreview: String
+  """마지막 메시지 시각. 목록 정렬 기준이다."""
+  lastMessageAt: DateTime!
+  """읽지 않은 수신 메시지 수(매장명 옆 "(3)" 표기용)"""
+  unreadCount: Int!
+}
+
+
+"""채팅 상세 메시지 응답(최신순)"""
+type ConversationMessageConnection {
+  """메시지. 최신순으로 오므로 화면에서는 역순으로 쌓는다."""
+  items: [ConversationMessage!]!
+  """대화 전체 메시지 수"""
+  totalCount: Int!
+  """더 과거 메시지가 남아 있는지."""
+  hasMore: Boolean!
+  """다음(더 과거) 페이지 커서. 없으면 null"""
+  nextCursor: String
+}
+
+# ---- src/features/conversation/conversation-inquiry.graphql ----
+extend type Query {
+  """
+  문의 채팅 진입 컨텍스트(구매자). 매장 프로필·상담시간·치환 완료 인사말·질문 칩을
+  한 번에 내려준다. 아직 대화가 없어도 조회 가능하며 그 경우 conversationId는 null.
+  로그인 필수.
+  """
+  storeInquiryContext(storeId: ID!): StoreInquiryContext!
+}
+
+extend type Mutation {
+  """
+  구매자 텍스트 메시지 전송. 해당 매장과의 대화가 없으면 이 시점에 생성하고,
+  치환 완료된 인사말을 매장 메시지로 먼저 저장한 뒤 유저 메시지를 저장한다.
+  로그인 필수.
+  """
+  sendConversationMessage(input: SendConversationMessageInput!): ConversationMessagesPayload!
+  """
+  질문 칩(FAQ) 전송. 유저 메시지(칩 제목)와 매장 자동응답(FAQ 답변 HTML)을
+  한 트랜잭션으로 저장한다. 첫 전송이면 대화 생성 + 인사말 저장도 함께 수행.
+  로그인 필수.
+  """
+  sendConversationFaqMessage(input: SendConversationFaqMessageInput!): ConversationMessagesPayload!
+}
+
+"""문의 채팅 진입 컨텍스트"""
+type StoreInquiryContext {
+  storeId: ID!
+  """매장명."""
+  storeName: String!
+  """매장 프로필(로고) 이미지 URL. 미등록 시 null"""
+  profileImageUrl: String
+  """요일별 상담시간(영업시간과 동일 정책). FE가 "월/화/수… 10:00~18:00" 형식으로 조합"""
+  businessHours: [InquiryBusinessHour!]!
+  """닉네임·매장명 치환이 끝난 인사말"""
+  greetingMessage: String!
+  """질문 칩 목록(활성 FAQ, 노출 순서대로)"""
+  faqTopics: [InquiryFaqTopic!]!
+  """기존 대화가 있으면 그 ID, 없으면 null"""
+  conversationId: ID
+}
+
+"""요일별 상담시간"""
+type InquiryBusinessHour {
+  """0=일 ~ 6=토"""
+  dayOfWeek: Int!
+  """해당 요일 휴무 여부. true면 openTime·closeTime이 null이다."""
+  isClosed: Boolean!
+  """오픈 시각 "HH:mm". 휴무면 null"""
+  openTime: String
+  """마감 시각 "HH:mm". 휴무면 null"""
+  closeTime: String
+}
+
+"""질문 칩(매장 FAQ)"""
+type InquiryFaqTopic {
+  id: ID!
+  """칩에 노출되는 질문 제목. 전송하면 이 문구가 유저 메시지로 저장된다."""
+  title: String!
+}
+
+"""대화 메시지"""
+type ConversationMessage {
+  id: ID!
+  conversationId: ID!
+  """발신 주체. 말풍선 좌우 배치 기준이다."""
+  senderType: ConversationSenderType!
+  """본문 형식. 읽어야 할 본문 필드를 가리킨다."""
+  bodyFormat: ConversationBodyFormat!
+  """평문 본문. bodyFormat이 TEXT면 이 값을 쓴다."""
+  bodyText: String
+  """서식 본문. bodyFormat이 HTML이면 이 값을 쓴다."""
+  bodyHtml: String
+  """발송 시각. 메시지 스트림 정렬은 id 기준이다."""
+  createdAt: DateTime!
+}
+
+"""메시지 전송 결과. 이번 호출로 저장된 메시지들을 생성 순으로 담는다(첫 전송이면 인사말 포함)"""
+type ConversationMessagesPayload {
+  """대화방 ID. 첫 전송이면 이번에 생성된 대화방 ID다."""
+  conversationId: ID!
+  """이번 호출로 저장된 메시지. 생성 순이며 첫 전송이면 인사말이 맨 앞에 온다."""
+  messages: [ConversationMessage!]!
+}
+
+"""구매자 텍스트 메시지 전송 입력"""
+input SendConversationMessageInput {
+  """문의할 매장 ID. 대화방이 없으면 이 호출에서 생성된다."""
+  storeId: ID!
+  """보낼 평문 메시지."""
+  bodyText: String!
+}
+
+"""질문 칩(FAQ) 전송 입력"""
+input SendConversationFaqMessageInput {
+  """문의할 매장 ID. 대화방이 없으면 이 호출에서 생성된다."""
+  storeId: ID!
+  """선택한 질문 칩 ID. storeInquiryContext.faqTopics가 준 값을 쓴다."""
+  faqTopicId: ID!
+}
+
+# ---- src/features/conversation/conversation-seller.graphql ----
+extend type Query {
+  """
+  내 매장 대화방 목록을 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerConversations(input: CursorInput): SellerConversationConnection!
+  """
+  대화방 메시지 목록을 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerConversationMessages(
+    conversationId: ID!
+    input: CursorInput
+  ): SellerConversationMessageConnection!
+}
+
+extend type Mutation {
+  """
+  판매자 메시지를 발송한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerSendConversationMessage(
+    input: SellerSendConversationMessageInput!
+  ): SellerConversationMessage!
+  """
+  대화방을 판매자가 읽었다고 표시한다. 호출 시점에 존재하는 가장 최근 메시지의 작성 시각까지 sellerLastReadAt을
+  전진시키며 과거로 되돌리지 않는다(반복·동시 호출 안전). 메시지가 없으면 변경 없이 현재 상태를 돌려준다.
+  조회만으로는 읽음 처리되지 않으므로 앱이 상세 진입 시 호출한다. 판매자 답장은 서버가 마커를 함께 전진시킨다.
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않거나 내 매장의 대화가 아니면 NOT_FOUND.
+  """
+  sellerMarkConversationRead(conversationId: ID!): SellerConversation!
+}
+
+"""
+구매자 1명과의 대화방. 매장당 구매자별로 하나씩 생긴다.
+"""
+type SellerConversation {
+  id: ID!
+  """
+  대화 상대인 구매자 계정 ID.
+  """
+  accountId: ID!
+  storeId: ID!
+  """
+  대화 상대인 구매자의 표시명. 대화 생성 시점 스냅샷이라 이후 닉네임 변경·탈퇴가 반영되지 않는다.
+  스냅샷 도입 이전 대화 중 복원하지 못한 건은 null.
+  """
+  buyerNickname: String
+  """
+  마지막 메시지 미리보기(HTML은 태그 제거). 메시지가 없으면 null.
+  """
+  lastMessagePreview: String
+  """
+  마지막 메시지 시각. 메시지가 없으면 null. 목록 정렬 기준은 이 값이 아니라 updated_at이다.
+  """
+  lastMessageAt: DateTime
+  """
+  구매자가 이 대화방을 마지막으로 읽은 시각(구매자 조회 시 전진). 읽은 적이 없으면 null.
+  """
+  lastReadAt: DateTime
+  """
+  판매자가 마지막으로 읽은 시각. sellerMarkConversationRead 호출과 판매자 답장이 전진시킨다. 읽은 적이 없으면 null.
+  """
+  sellerLastReadAt: DateTime
+  """
+  판매자 기준 읽지 않은 구매자 메시지 수(senderType USER이고 sellerLastReadAt 이후 작성). 0이면 답변 필요 대상이 아니다.
+  """
+  unreadCount: Int!
+  updatedAt: DateTime!
+}
+
+"""
+대화방 목록 페이지. 최근에 갱신된(updated_at 기준) 대화방이 먼저 온다.
+"""
+type SellerConversationConnection {
+  """
+  대화방. 최근에 갱신된 순으로 온다.
+  """
+  items: [SellerConversation!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서(불투명 토큰). null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+대화 메시지 1건. bodyFormat이 읽어야 할 본문 필드를 가리킨다.
+발송 시 다른 형식의 본문을 함께 넘기면 그대로 저장되므로, 두 필드가 모두 채워져
+있을 수 있다 — 표시할 본문은 bodyFormat으로 고른다.
+"""
+type SellerConversationMessage {
+  id: ID!
+  conversationId: ID!
+  """
+  발신 주체. 말풍선 좌우 배치 기준이다.
+  """
+  senderType: ConversationSenderType!
+  """
+  보낸 계정 ID. 사람이 보낸 메시지에만 채워진다.
+  시스템 메시지는 물론, 인사말·FAQ 자동응답처럼 서버가 만든 STORE 메시지도 null이다.
+  """
+  senderAccountId: ID
+  """
+  본문 형식. 읽어야 할 본문 필드를 가리킨다(다른 쪽에도 값이 남아 있을 수 있다).
+  """
+  bodyFormat: ConversationBodyFormat!
+  """
+  평문 본문. bodyFormat이 TEXT면 이 값을 쓴다.
+  """
+  bodyText: String
+  """
+  서식 본문. bodyFormat이 HTML이면 이 값을 쓴다.
+  """
+  bodyHtml: String
+  """
+  발송 시각.
+  """
+  createdAt: DateTime!
+}
+
+"""
+대화 메시지 목록 페이지. 최신 메시지가 먼저 온다.
+"""
+type SellerConversationMessageConnection {
+  """
+  메시지. 최신 메시지가 먼저 온다.
+  """
+  items: [SellerConversationMessage!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+판매자 메시지 발송 입력. bodyFormat에 맞는 본문 필드가 비어 있으면 BAD_USER_INPUT.
+내 매장의 대화방이 아니면 NOT_FOUND.
+"""
+input SellerSendConversationMessageInput {
+  conversationId: ID!
+  """
+  본문 형식. 이 값에 해당하는 본문 필드가 필수다(다른 쪽을 함께 넘기면 그대로 저장된다).
+  """
+  bodyFormat: ConversationBodyFormat!
+  """
+  평문 본문(최대 2000자). bodyFormat이 TEXT면 필수.
+  """
+  bodyText: String
+  """
+  서식 본문(최대 100000자). bodyFormat이 HTML이면 필수.
+  """
+  bodyHtml: String
+}
+
+# ---- src/features/conversation/conversation-subscription.graphql ----
+extend type Subscription {
+  """
+  대화방 신규 메시지 실시간 구독. 구매자(대화 소유자)와 판매자(해당 매장
+  소유자)만 구독할 수 있다. 인증은 graphql-ws connectionParams.authorization.
+  """
+  conversationMessageAdded(conversationId: ID!): ConversationMessage!
+  """구매자 대화 목록/배지 갱신 이벤트(새 메시지 도착 시). 로그인 필수. 본인 데이터만 대상이 된다."""
+  myConversationUpdated: ConversationListUpdate!
+  """
+판매자 대화 목록 갱신 이벤트(고객 메시지 도착 시).
+삭제되지 않은 매장을 보유한 판매자만 구독할 수 있다. 매장이 없거나 삭제됐으면 NOT_FOUND.
+비활성(is_active=false) 매장은 구독이 유지된다 — 노출만 꺼진 사이에도 고객 문의는 받아야 한다.
+"""
+  sellerConversationUpdated: SellerConversationListUpdate!
+}
+
+"""
+구매자 대화 목록 갱신 이벤트.
+이벤트 간 도착 순서는 보장되지 않는다 — 구독자는 (lastMessageAt, lastReadAt)을
+사전식으로 비교해 이미 표시 중인 상태보다 오래된 이벤트를 폐기해야 한다.
+읽음 처리는 lastReadAt만 전진시키므로, 읽음 이후 도착한 지연 이벤트도 이 비교로
+걸러진다(메시지 스트림은 id 기준).
+"""
+type ConversationListUpdate {
+  conversationId: ID!
+  storeId: ID!
+  """매장명."""
+  storeName: String!
+  """마지막 메시지 미리보기(HTML은 태그 제거)"""
+  lastMessagePreview: String
+  """마지막 메시지 시각. 폐기 규칙의 1차 비교 키다."""
+  lastMessageAt: DateTime!
+  """이벤트 스냅샷 시점의 구매자 마지막 읽음 시각(폐기 규칙 비교용)"""
+  lastReadAt: DateTime
+  """이벤트 시점의 안읽은 수신 메시지 수"""
+  unreadCount: Int!
+}
+
+"""
+판매자 대화 목록 갱신 이벤트(구매자 메시지 도착·판매자 답장). 도착 순서 비보장 — (lastMessageAt, sellerLastReadAt)
+사전식 비교로 폐기한다. 읽음 mutation은 이벤트를 내지 않으므로 로컬 읽음 처리 뒤 도착한 이벤트의 unreadCount는
+로컬 sellerLastReadAt이 더 크면 0으로 본다.
+"""
+type SellerConversationListUpdate {
+  conversationId: ID!
+  """대화 상대인 구매자 계정 ID."""
+  accountId: ID!
+  """대화 상대 구매자 표시명(대화 생성 시점 스냅샷). 복원 불가 건은 null."""
+  buyerNickname: String
+  """마지막 메시지 미리보기(HTML은 태그 제거)"""
+  lastMessagePreview: String
+  """마지막 메시지 시각. 폐기 규칙의 1차 비교 키다."""
+  lastMessageAt: DateTime!
+  """이벤트 스냅샷 시점의 판매자 마지막 읽음 시각(폐기 규칙 비교용)."""
+  sellerLastReadAt: DateTime
+  """이벤트 시점의 판매자 기준 미읽음 구매자 메시지 수."""
+  unreadCount: Int!
+}
+
+# ---- src/features/conversation/conversation.types.graphql ----
+"""대화 메시지 발신자 유형. 구매자·판매자 API가 공용으로 쓴다."""
+enum ConversationSenderType {
+  """구매자가 보낸 메시지."""
+  USER
+  """판매자(매장)가 보낸 메시지. FAQ 질문 칩에 대한 자동응답도 이 값으로 저장된다."""
+  STORE
+  """시스템이 발신한 메시지."""
+  SYSTEM
+}
+
+"""대화 메시지 본문 형식. 구매자·판매자 API가 공용으로 쓴다."""
+enum ConversationBodyFormat {
+  """평문. 목록 미리보기에도 원문이 그대로 쓰인다."""
+  TEXT
+  """
+  서식이 있는 본문(FAQ 답변 등). 목록 미리보기에서는 태그를 제거해 한 줄로 만든다.
+  서버 측 sanitize는 아직 적용돼 있지 않다.
+  """
+  HTML
+}
+
+# ---- src/features/core/pagination.graphql ----
+"""커서 페이지네이션 공통 입력. 필터가 필요한 목록은 같은 두 필드를 가진 전용 input을 쓴다."""
+input CursorInput {
+  """페이지 크기. 1~100, 기본 20. 벗어나면 BAD_USER_INPUT."""
+  limit: Int = 20
+  """이전 페이지의 nextCursor. 불투명 토큰이라 정렬 기준이 바뀌면 무효. 형식이 어긋나면 BAD_USER_INPUT."""
+  cursor: String
+}
+
+# ---- src/features/core/root.graphql ----
+"""
+ISO 8601 DateTime 스칼라
+"""
+scalar DateTime
+
+"""
+에러 응답 규약: `errors[].extensions.code`는 에러 카탈로그 코드(예: STORE_NOT_FOUND),
+`extensions.classification`은 HTTP 상태 분류(BAD_USER_INPUT / UNAUTHENTICATED / FORBIDDEN / NOT_FOUND / CONFLICT / INTERNAL_SERVER_ERROR).
+각 필드 설명의 FORBIDDEN·NOT_FOUND·BAD_USER_INPUT 언급은 `classification` 값이다.
+"""
+type Query {
+  """스키마 루트 유지를 위한 no-op 필드"""
+  _queryNoop: Boolean
+}
+
+type Mutation {
+  """스키마 루트 유지를 위한 no-op 필드"""
+  _noop: Boolean
+}
+
+type Subscription {
+  """스키마 루트 유지를 위한 no-op 필드"""
+  _subscriptionNoop: Boolean
+}
+
+# ---- src/features/core/upload.graphql ----
+"""발급된 업로드 URL. uploadUrl로 직접 PUT한 뒤 publicUrl을 저장 입력의 URL 필드에 그대로 넘긴다."""
+type UploadUrl {
+  """파일을 PUT할 Presigned URL. 만료 전에 써야 한다."""
+  uploadUrl: String!
+  """업로드 완료 후 접근 가능한 URL. 발급한 계정·용도로만 저장이 허용된다."""
+  publicUrl: String!
+  """스토리지 객체 키."""
+  key: String!
+  """uploadUrl 만료까지 남은 시간(초)."""
+  expiresInSeconds: Int!
+}
+
+# ---- src/features/dashboard/dashboard-admin-audit.graphql ----
+extend type Query {
+  """
+  감사 로그를 전역으로 최신순 조회한다(판매자·관리자 조작 전부). 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminAuditLogs(input: AdminAuditLogListInput): AdminAuditLogConnection!
+}
+
+"""
+감사 로그 1건. 누적만 되고 수정·삭제되지 않는다.
+"""
+type AdminAuditLog {
+  id: ID!
+  """
+  조작한 계정 ID.
+  """
+  actorAccountId: ID!
+  """
+  조작한 계정 종류. 계정이 지워졌으면 null.
+  """
+  actorAccountType: AccountType
+  """
+  조작한 계정의 현재 라벨 `이름(아이디)`. 한쪽만 있으면 그 값, 둘 다 없거나 계정이 지워졌으면 null.
+  """
+  actorLabel: String
+  """
+  관련 매장 ID. 매장과 무관한 조작이면 null.
+  """
+  storeId: ID
+  """
+  조작 대상 종류.
+  """
+  targetType: AuditTargetType!
+  """
+  대상 리소스 ID.
+  """
+  targetId: ID!
+  """
+  기록된 행위 종류.
+  """
+  action: AuditActionType!
+  """
+  변경 전 값(JSON 문자열). 없으면 null.
+  """
+  beforeJson: String
+  """
+  변경 후 값(JSON 문자열). 없으면 null.
+  """
+  afterJson: String
+  """
+  요청 IP. 수집하지 못했으면 null.
+  """
+  ipAddress: String
+  """
+  요청 User-Agent. 수집하지 못했으면 null.
+  """
+  userAgent: String
+  """
+  기록 시각.
+  """
+  createdAt: DateTime!
+}
+
+"""
+감사 로그 목록 페이지. 최신 기록이 먼저 온다.
+"""
+type AdminAuditLogConnection {
+  """
+  감사 로그. 최신 기록이 먼저 온다.
+  """
+  items: [AdminAuditLog!]!
+  """
+  조건에 맞는 전체 건수.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+감사 로그 조회 조건. 모든 필터는 AND로 결합된다.
+"""
+input AdminAuditLogListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  조작한 계정 ID 필터.
+  """
+  actorAccountId: ID
+  """
+  관련 매장 ID 필터.
+  """
+  storeId: ID
+  """
+  대상 종류 필터.
+  """
+  targetType: AuditTargetType
+  """
+  대상 ID 필터(targetType과 함께 쓰면 특정 리소스의 이력).
+  """
+  targetId: ID
+  """
+  행위 종류 필터.
+  """
+  action: AuditActionType
+  """
+  기록 시각 하한(이상).
+  """
+  fromCreatedAt: DateTime
+  """
+  기록 시각 상한(이하).
+  """
+  toCreatedAt: DateTime
+}
+
+# ---- src/features/dashboard/dashboard-admin.graphql ----
+extend type Query {
+  """
+  기간별 운영 지표를 요청 시점에 집계한다(스냅샷 테이블 없음). 기간은 created_at 기준 UTC이며 클라이언트가
+  KST 경계를 환산해 넘긴다. from ≤ to, 최대 366일이 아니면 BAD_USER_INPUT. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminDashboardSummary(
+    input: AdminDashboardSummaryInput!
+  ): AdminDashboardSummary!
+  """
+  인기 검색어 스냅샷(시간 단위 크론 산출)을 조회한다. rankedAt 미지정 시 최신 스냅샷. 스냅샷이 없으면 rankedAt null·빈 목록.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminSearchKeywordSnapshot(
+    input: AdminSearchKeywordSnapshotInput
+  ): AdminSearchKeywordSnapshot!
+}
+
+"""
+집계 기간 입력.
+"""
+input AdminDashboardSummaryInput {
+  """
+  집계 시작(이상).
+  """
+  from: DateTime!
+  """
+  집계 종료(이하).
+  """
+  to: DateTime!
+}
+
+"""
+기간별 운영 지표.
+"""
+type AdminDashboardSummary {
+  """
+  집계 시작.
+  """
+  from: DateTime!
+  """
+  집계 종료.
+  """
+  to: DateTime!
+  """
+  기간 내 가입한 구매자 수(탈퇴 제외).
+  """
+  newUserCount: Int!
+  """
+  기간 내 등록된 판매자 수(탈퇴 제외).
+  """
+  newSellerCount: Int!
+  """
+  기간 내 생성된 주문의 상태별 건수.
+  """
+  orderCounts: AdminOrderStatusCounts!
+  """
+  기간 내 생성된 주문의 최종 결제 금액 합(원). 취소 주문은 제외.
+  Int(32비트)를 넘을 수 있어 Float로 내리지만 값은 항상 정수다.
+  """
+  orderAmountSum: Float!
+  """
+  현재 노출 중인 매장 수(기간 무관).
+  """
+  activeStoreCount: Int!
+  """
+  현재 노출 중인 상품 수(기간 무관, 매장 노출 여부는 보지 않음).
+  """
+  activeProductCount: Int!
+  """
+  현재 미처리 신고 수(기간 무관).
+  """
+  pendingReportCount: Int!
+}
+
+"""
+주문 상태별 건수.
+"""
+type AdminOrderStatusCounts {
+  """
+  접수(SUBMITTED).
+  """
+  submitted: Int!
+  """
+  확인(CONFIRMED).
+  """
+  confirmed: Int!
+  """
+  제작 완료(MADE).
+  """
+  made: Int!
+  """
+  픽업 완료(PICKED_UP).
+  """
+  pickedUp: Int!
+  """
+  취소(CANCELED).
+  """
+  canceled: Int!
+}
+
+"""
+인기 검색어 스냅샷 조회 입력.
+"""
+input AdminSearchKeywordSnapshotInput {
+  """
+  스냅샷 시각(정각). 미지정 시 최신.
+  """
+  rankedAt: DateTime
+  """
+  가져올 순위 수. 기본 20, 1~100.
+  """
+  limit: Int = 20
+}
+
+"""
+인기 검색어 스냅샷.
+"""
+type AdminSearchKeywordSnapshot {
+  """
+  스냅샷 시각. 스냅샷이 없으면 null.
+  """
+  rankedAt: DateTime
+  """
+  순위별 검색어.
+  """
+  items: [AdminSearchKeywordRank!]!
+}
+
+"""
+검색어 순위 1건.
+"""
+type AdminSearchKeywordRank {
+  """
+  순위(1부터).
+  """
+  rank: Int!
+  """
+  검색어.
+  """
+  keyword: String!
+  """
+  집계 창 안의 검색 횟수.
+  """
+  searchCount: Int!
+}
+
+# ---- src/features/dashboard/dashboard-seller.graphql ----
+extend type Query {
+  """
+  판매자 홈 지표를 요청 시점에 집계한다(스냅샷 테이블 없음). 날짜는 KST 달력일이며 생략하면 서버의 오늘(KST).
+  형식이 YYYY-MM-DD가 아니거나 존재하지 않는 날짜면 BAD_USER_INPUT. 판매자 로그인 필수.
+  SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerDashboard(input: SellerDashboardInput): SellerDashboard!
+}
+
+"""
+판매자 홈 집계 조건.
+"""
+input SellerDashboardInput {
+  """
+  집계 기준 날짜(KST, YYYY-MM-DD). 생략하면 오늘.
+  """
+  date: String
+}
+
+"""
+판매자 홈 지표. 금액은 원 단위 정수다.
+"""
+type SellerDashboard {
+  """
+  집계 기준 날짜(KST, YYYY-MM-DD).
+  """
+  date: String!
+  """
+  집계 시점(서버 시각). 화면의 'N시 기준' 표기용이며 date가 오늘이 아니어도 현재 시각이다.
+  """
+  asOf: DateTime!
+  """
+  접수(SUBMITTED) 상태로 남아 있는 주문 수. 날짜와 무관하게 전체를 센다.
+  """
+  newOrderCount: Int!
+  """
+  기준일에 픽업 예정인 주문의 건수·금액. 취소 주문은 제외. 시안의 '오늘 매출 / 정산예정'에 해당한다.
+  """
+  pickupDay: SellerDashboardOrderMetrics!
+  """
+  기준일에 생성된 주문의 건수·금액. 취소 주문은 제외. 접수 추세 표기('+N')용.
+  """
+  createdDay: SellerDashboardOrderMetrics!
+  """
+  기준일의 제작 수량 설정값. 설정이 없으면 null(무제한).
+  """
+  capacity: Int
+  """
+  기준일의 남은 제작 수량 = 설정값 − 기준일 픽업 주문의 수량 합(취소 제외). 음수가 되면 0으로 자른다.
+  설정이 없으면 null.
+  """
+  remainingCapacity: Int
+  """
+  기준일 픽업 주문의 제작 수량 합(취소 제외). capacity 유무와 무관하게 센다.
+  """
+  bookedQuantity: Int!
+  """
+  노출 중(is_active)인 내 상품 수. 매장 노출 여부와 무관하다.
+  """
+  activeProductCount: Int!
+  """
+  답변이 필요한 대화 수 = 판매자 기준 읽지 않은 구매자 메시지가 있는 대화 수.
+  """
+  unansweredConversationCount: Int!
+}
+
+"""
+기간 내 주문 건수와 결제 금액 합.
+"""
+type SellerDashboardOrderMetrics {
+  """
+  주문 건수.
+  """
+  orderCount: Int!
+  """
+  최종 결제 금액 합(원). Int(32비트)를 넘을 수 있어 Float로 내리지만 값은 항상 정수다.
+  """
+  salesAmount: Float!
+}
+
+# ---- src/features/mypage/mypage-overview.graphql ----
+extend type Query {
+  """
+  마이페이지 메인 화면 집계 데이터. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  myPageOverview: MyPageOverview!
+}
+
+"""
+마이페이지 메인 집계
+"""
+type MyPageOverview {
+  """
+  상단 카운트 카드
+  """
+  counts: MyPageCounts!
+  """
+  진행중인 주문 요약 (최근 3개월, 최대 5건)
+  """
+  ongoingOrders: [OngoingOrderSummary!]!
+  """
+  최근 본 상품 (최대 20건)
+  """
+  recentViewedProducts: [RecentViewedProduct!]!
+}
+
+"""
+마이페이지 상단 카운트 카드.
+"""
+type MyPageCounts {
+  """
+  상품 찜 수
+  """
+  wishlistCount: Int!
+  """
+  내가 작성한 리뷰 수
+  """
+  myReviewCount: Int!
+}
+
+"""
+진행중 주문 요약 카드. 픽업 완료·취소는 제외된다.
+"""
+type OngoingOrderSummary {
+  orderId: ID!
+  """
+  주문번호.
+  """
+  orderNumber: String!
+  """
+  현재 주문 상태.
+  """
+  status: OrderStatusType!
+  """
+  주문 생성 시각.
+  """
+  createdAt: DateTime!
+  """
+  픽업 예정 일시.
+  """
+  pickupAt: DateTime!
+  """
+  첫 번째 OrderItem 기준 대표 상품명
+  """
+  representativeProductName: String!
+  """
+  첫 번째 OrderItem 기준 대표 이미지 URL
+  """
+  representativeProductImageUrl: String
+  """
+  총 가격
+  """
+  totalPrice: Int!
+}
+
+"""
+최근 본 상품 항목. 공용 상품 카드 + 마지막으로 본 시각.
+"""
+type RecentViewedProduct {
+  """
+  상품 카드.
+  """
+  product: ProductCard!
+  """
+  마지막으로 본 시각. 목록 정렬 기준이다.
+  """
+  viewedAt: DateTime!
+}
+
+# ---- src/features/mypage/mypage-recent-view.graphql ----
+extend type Query {
+  """
+  최근 본 상품 목록 조회. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  myRecentViewedProducts(
+    input: MyRecentViewedProductsInput
+  ): RecentViewedProductConnection!
+}
+
+extend type Mutation {
+  """
+  상품 상세 진입 시 호출하여 최근 본 상품에 기록. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  recordProductView(productId: ID!): Boolean!
+  """
+  최근 본 상품 단건 삭제. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  deleteRecentViewedProduct(productId: ID!): Boolean!
+  """
+  최근 본 상품 전체 삭제. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  clearRecentViewedProducts: Boolean!
+}
+
+"""
+최근 본 상품 목록 조회 조건. 커서가 아니라 오프셋 방식이다.
+"""
+input MyRecentViewedProductsInput {
+  """
+  건너뛸 개수. 기본 0.
+  """
+  offset: Int = 0
+  """
+  한 번에 가져올 개수. 기본 20, 1~50만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+}
+
+"""
+최근 본 상품 목록. 최근에 본 상품이 먼저 온다.
+"""
+type RecentViewedProductConnection {
+  """
+  최근 본 상품 카드. 최근에 본 순으로 온다.
+  """
+  items: [RecentViewedProduct!]!
+  """
+  전체 기록 수. offset·limit과 무관한 총계다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. offset+limit이 totalCount에 못 미치면 true.
+  """
+  hasMore: Boolean!
+}
+
+# ---- src/features/mypage/mypage-review.graphql ----
+extend type Query {
+  """
+  내가 작성한 리뷰 목록. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  myReviews(input: MyReviewsInput): MyReviewConnection!
+  """
+  리뷰 작성 가능한 주문 아이템 목록(마이페이지 '리뷰 남기기' 탭). 픽업 완료 + 활성 리뷰 미존재. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  myReviewableOrderItems(
+    input: MyReviewableOrderItemsInput
+  ): MyReviewableOrderItemConnection!
+  """
+  주문 아이템에 대한 리뷰 작성 가능 여부 및 기존 리뷰. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  myReviewForOrderItem(orderItemId: ID!): MyReviewOrNull!
+}
+
+"""
+리뷰 작성 가능 목록 조회 조건. 커서가 아니라 오프셋 방식이다.
+"""
+input MyReviewableOrderItemsInput {
+  """
+  건너뛸 개수. 기본 0.
+  """
+  offset: Int = 0
+  """
+  한 번에 가져올 개수. 기본 20, 1~50만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+}
+
+"""
+리뷰 작성 가능한 주문 품목 목록. 픽업 완료가 최근인 순으로 온다.
+"""
+type MyReviewableOrderItemConnection {
+  """
+  리뷰 작성 가능한 주문 품목. 픽업 완료가 최근인 순으로 온다.
+  """
+  items: [MyReviewableOrderItem!]!
+  """
+  '리뷰 남기기 N' 탭 카운트
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부.
+  """
+  hasMore: Boolean!
+}
+
+"""
+리뷰 작성 가능한 주문 아이템 카드. writeReview 입력에 orderItemId를 그대로 사용한다.
+"""
+type MyReviewableOrderItem {
+  orderItemId: ID!
+  productId: ID!
+  """
+  케이크명(주문 시점 스냅샷)
+  """
+  productName: String!
+  """
+  대표 상품 이미지. 없으면 null.
+  """
+  productImageUrl: String
+  """
+  매장명.
+  """
+  storeName: String!
+  """
+  매장 위치 표기(예: 인천 청라동). 없으면 null.
+  """
+  regionLabel: String
+  """
+  픽업 완료 시각(최신 픽업 순 정렬 기준).
+  """
+  pickedUpAt: DateTime
+}
+
+extend type Mutation {
+  """
+  리뷰 미디어 업로드용 Presigned URL 발급. 로그인 필수.
+  """
+  createReviewMediaUploadUrl(
+    input: CreateReviewMediaUploadUrlInput!
+  ): UploadUrl!
+  """
+  리뷰 작성. 로그인 필수.
+  """
+  writeReview(input: WriteReviewInput!): MyReview!
+  """
+  내 리뷰 삭제(soft). 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  deleteMyReview(reviewId: ID!): Boolean!
+}
+
+"""
+내 리뷰 목록 조회 조건. 커서가 아니라 오프셋 방식이다.
+"""
+input MyReviewsInput {
+  """
+  건너뛸 개수. 기본 0.
+  """
+  offset: Int = 0
+  """
+  한 번에 가져올 개수. 기본 20, 1~50만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+}
+
+"""
+내가 쓴 리뷰 목록. 최신순.
+"""
+type MyReviewConnection {
+  """
+  내가 쓴 리뷰. 최신순으로 온다.
+  """
+  items: [MyReview!]!
+  """
+  전체 리뷰 수. offset·limit과 무관한 총계다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부.
+  """
+  hasMore: Boolean!
+}
+
+"""
+내가 쓴 리뷰 1건.
+"""
+type MyReview {
+  reviewId: ID!
+  """
+  이 리뷰가 달린 주문 품목 ID.
+  """
+  orderItemId: ID!
+  productId: ID!
+  """
+  상품명(주문 시점 스냅샷).
+  """
+  productName: String!
+  """
+  대표 상품 이미지. 없으면 null.
+  """
+  productImageUrl: String
+  """
+  매장명.
+  """
+  storeName: String!
+  """
+  별점. 1.0~5.0, 0.5 단위.
+  """
+  rating: Float!
+  """
+  리뷰 본문. 삭제된 리뷰 등으로 본문이 없으면 null.
+  """
+  content: String
+  """
+  첨부 미디어. 없으면 빈 배열.
+  """
+  media: [ReviewMedia!]!
+  """
+  작성 시각.
+  """
+  createdAt: DateTime!
+}
+
+"""
+특정 주문 품목에 대한 내 리뷰 조회 결과. 아직 안 썼으면 review가 null이다.
+"""
+type MyReviewOrNull {
+  """
+  작성한 리뷰. 없으면 null.
+  """
+  review: MyReview
+  """
+  지금 리뷰를 쓸 수 있는지.
+  """
+  canWrite: Boolean!
+  """
+  쓸 수 없는 사유 문구. canWrite가 true면 null이다(예: 이미 작성함, 픽업 미완료).
+  """
+  reasonIfCannotWrite: String
+}
+
+"""
+리뷰 미디어 업로드용 Presigned URL 발급 입력.
+"""
+input CreateReviewMediaUploadUrlInput {
+  """
+  업로드할 미디어 종류.
+  """
+  mediaType: ReviewMediaType!
+  """
+  업로드할 파일의 MIME 타입(예: image/jpeg).
+  """
+  contentType: String!
+  """
+  업로드할 파일 크기(바이트).
+  """
+  contentLength: Int!
+}
+
+"""
+리뷰 작성 입력. 픽업 완료(PICKED_UP)된 주문 품목에만 쓸 수 있고, 품목당 1건이다.
+미디어는 이미지 최대 10장과 영상 1개를 각각 셈하며, 둘을 섞어 최대 11개까지 넣을 수 있다.
+"""
+input WriteReviewInput {
+  """
+  리뷰 대상 주문 품목 ID. myReviewableOrderItems가 준 값을 그대로 쓴다.
+  """
+  orderItemId: ID!
+  """
+  별점 1.0 ~ 5.0 (0.5 단위)
+  """
+  rating: Float!
+  """
+  최소 20자, 최대 1000자
+  """
+  content: String!
+  """
+  첨부 미디어. 생략하면 텍스트만 등록된다.
+  """
+  media: [WriteReviewMediaInput!]
+}
+
+"""
+리뷰 첨부 미디어 입력. createReviewMediaUploadUrl로 먼저 업로드한 뒤 그 결과를 넘긴다.
+"""
+input WriteReviewMediaInput {
+  """
+  미디어 종류.
+  """
+  mediaType: ReviewMediaType!
+  """
+  createReviewMediaUploadUrl이 이 계정·mediaType으로 발급한 publicUrl. 다른 URL은 BAD_USER_INPUT.
+  """
+  mediaUrl: String!
+  """
+  동영상 대표 프레임 URL. 제공하면 IMAGE 용도로 발급된 publicUrl이어야 한다.
+  """
+  thumbnailUrl: String
+  """
+  노출 순서. 서버는 이 값을 쓰지 않고 배열에 담긴 순서를 그대로 저장한다.
+  """
+  sortOrder: Int!
+}
+
+# ---- src/features/mypage/mypage-viewer-counts.graphql ----
+extend type Query {
+  """
+  상단/하단 공통 UI용 카운트 정보 조회. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  viewerCounts: ViewerCounts!
+}
+
+"""
+뷰어 카운트 정보
+"""
+type ViewerCounts {
+  """
+  읽지 않은 알림 수
+  """
+  unreadNotificationCount: Int!
+  """
+  위시리스트 아이템 수
+  """
+  wishlistCount: Int!
+}
+
+# ---- src/features/mypage/mypage-wishlist.graphql ----
+extend type Query {
+  """
+  내 찜 목록. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  myWishlist(input: MyWishlistInput): MyWishlistConnection!
+  """
+  찜 상품의 매장별 그룹 목록 (찜 상품 수 desc, 동점 시 최근 찜 순). 로그인 필요.
+  """
+  myWishlistStoreGroups(
+    input: MyWishlistStoreGroupsInput
+  ): MyWishlistStoreGroupsConnection!
+}
+
+extend type Mutation {
+  """
+  찜 추가 (멱등: 이미 있어도 true 반환, soft-delete된 항목은 복원). 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  addToWishlist(productId: ID!): Boolean!
+  """
+  찜 해제 (멱등: 이미 없어도 true 반환). 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  removeFromWishlist(productId: ID!): Boolean!
+}
+
+"""
+찜한 상품 목록 조회 조건. 커서가 아니라 오프셋 방식이다.
+"""
+input MyWishlistInput {
+  """
+  건너뛸 개수. 기본 0.
+  """
+  offset: Int = 0
+  """
+  한 번에 가져올 개수. 기본 20, 1~50만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  특정 매장의 찜 상품만 조회(매장별 보기 → 매장 선택 화면).
+  """
+  storeId: ID
+}
+
+"""
+찜한 상품 목록. 최근 찜한 순으로 온다.
+"""
+type MyWishlistConnection {
+  """
+  찜한 상품 항목. 최근 찜한 순으로 온다.
+  """
+  items: [WishlistItem!]!
+  """
+  전체 찜 상품 수(storeId 필터 적용 후). offset·limit과 무관하다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부.
+  """
+  hasMore: Boolean!
+}
+
+"""
+찜한 상품 항목. 공용 상품 카드 + 찜 시각. isWishlisted는 항상 true다.
+"""
+type WishlistItem {
+  """
+  상품 카드.
+  """
+  product: ProductCard!
+  """
+  찜한 시각. 목록 정렬 기준이다.
+  """
+  addedAt: DateTime!
+}
+
+"""
+매장별 보기 목록 조회 조건.
+"""
+input MyWishlistStoreGroupsInput {
+  """
+  건너뛸 개수. 기본 0.
+  """
+  offset: Int = 0
+  """
+  한 번에 가져올 개수. 기본 20, 1~50만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+}
+
+"""
+매장별 보기 목록.
+"""
+type MyWishlistStoreGroupsConnection {
+  """
+  매장별 보기 행. 찜한 상품 수 내림차순이고, 같으면 최근에 찜한 매장이 먼저 온다.
+  """
+  items: [WishlistStoreGroup!]!
+  """
+  찜 상품을 가진 매장 수.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부.
+  """
+  hasMore: Boolean!
+}
+
+"""
+매장별 보기 행(매장 + 찜 상품 수)
+"""
+type WishlistStoreGroup {
+  storeId: ID!
+  """
+  매장명.
+  """
+  storeName: String!
+  """
+  매장 프로필(로고) 이미지. 미등록 시 null.
+  """
+  profileImageUrl: String
+  """
+  이 매장에서 찜한 상품 수.
+  """
+  wishlistedProductCount: Int!
+}
+
+# ---- src/features/notification/notification-admin.graphql ----
+extend type Query {
+  """
+  관리자 알림 발송 이력. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  최신 요청이 먼저 오고, 커서 형식이 어긋나면 INVALID_CURSOR.
+  """
+  adminNotificationBroadcasts(
+    input: AdminNotificationBroadcastListInput
+  ): AdminNotificationBroadcastConnection!
+  """
+  알림 발송 이력 1건. 없으면 null. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminNotificationBroadcast(broadcastId: ID!): AdminNotificationBroadcast
+}
+
+extend type Mutation {
+  """
+  운영 공지(SYSTEM)·마케팅(MARKETING) 알림을 보낸다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  대상은 요청 시점에 확정하고(ALL_USERS는 활성 USER 전체, ACCOUNT_IDS는 accountIds 최대 500 중 활성 USER)
+  발송 요청 1건을 적재한다 — 실제 알림 저장은 백그라운드 소비자가 1,000건 단위로 한다.
+  같은 관리자가 같은 idempotencyKey로 다시 부르면 새로 발송하지 않고 처음 응답을 그대로 돌려준다.
+  활성 USER가 아닌 ID는 skippedAccountIds로 돌려준다.
+  """
+  adminSendNotification(
+    input: AdminSendNotificationInput!
+  ): AdminSendNotificationResult!
+}
+
+"""
+관리자가 보낼 수 있는 알림 분류. 주문·리뷰 이벤트 알림은 시스템이 만든다.
+"""
+enum AdminNotificationType {
+  """
+  운영 공지.
+  """
+  SYSTEM
+  """
+  마케팅.
+  """
+  MARKETING
+}
+
+"""
+발송 대상 지정 방식.
+"""
+enum AdminNotificationTargetKind {
+  """
+  활성(ACTIVE·미탈퇴) USER 전체.
+  """
+  ALL_USERS
+  """
+  accountIds로 지정한 계정.
+  """
+  ACCOUNT_IDS
+}
+
+"""
+알림 발송 입력.
+"""
+input AdminSendNotificationInput {
+  """
+  알림 분류.
+  """
+  type: AdminNotificationType!
+  """
+  제목. 1~200자.
+  """
+  title: String!
+  """
+  본문. 1~2000자.
+  """
+  body: String!
+  """
+  발송 요청 멱등 키. 8~64자, 공백 불가. 같은 관리자·같은 키의 재요청은 처음 결과를 재생한다(중복 발송 없음).
+  """
+  idempotencyKey: String!
+  """
+  대상 지정 방식.
+  """
+  targetKind: AdminNotificationTargetKind!
+  """
+  targetKind가 ACCOUNT_IDS일 때 대상 계정 ID. 1~500개, 중복은 한 번으로 센다. ALL_USERS면 무시된다.
+  """
+  accountIds: [ID!]
+}
+
+"""
+알림 발송 결과.
+"""
+type AdminSendNotificationResult {
+  """
+  요청 시점에 대상으로 확정된 활성 USER 수. 저장은 백그라운드 소비자가 하므로 조회 시점에는 아직 일부가 없을 수 있고,
+  요청 이후 정지·탈퇴한 계정은 발송에서 제외되므로 실제 저장 건수는 이보다 적을 수 있다.
+  """
+  sentCount: Int!
+  """
+  대상에서 빠진 계정 ID(활성 USER가 아니거나 없음). ALL_USERS면 빈 배열.
+  """
+  skippedAccountIds: [ID!]!
+  """
+  이 발송 요청의 이력 ID(adminNotificationBroadcasts 항목의 id). 같은 키의 재요청은 처음 요청의 이력 ID를 돌려준다.
+  """
+  broadcastId: ID!
+}
+
+"""
+발송 진행 상태. 조회 시각 기준으로 계산한다.
+"""
+enum AdminNotificationBroadcastStatus {
+  """
+  저장 중. 요청 뒤 30분이 지나지 않았고 완료 기록이 없다.
+  """
+  IN_PROGRESS
+  """
+  대상 전원에 대한 저장을 마쳤다.
+  """
+  COMPLETED
+  """
+  요청 뒤 30분이 지나도 완료 기록이 없다(처리 실패 가능성, 운영 확인 필요).
+  """
+  DELAYED
+}
+
+"""
+알림 발송 이력 1건(발송 요청 1건).
+"""
+type AdminNotificationBroadcast {
+  id: ID!
+  """
+  알림 분류.
+  """
+  type: AdminNotificationType!
+  """
+  제목.
+  """
+  title: String!
+  """
+  본문.
+  """
+  body: String!
+  """
+  대상 지정 방식.
+  """
+  targetKind: AdminNotificationTargetKind!
+  """
+  요청 시점에 대상으로 확정된 활성 USER 수(발송 응답의 sentCount).
+  """
+  targetCount: Int!
+  """
+  대상에서 빠진 계정 수.
+  """
+  skippedCount: Int!
+  """
+  실제 저장된 알림 수. 진행 중이면 지금까지 저장된 수이고, 요청 뒤 정지·탈퇴한 계정은 빠지므로 targetCount보다 적을 수 있다.
+  """
+  deliveredCount: Int!
+  """
+  진행 상태.
+  """
+  status: AdminNotificationBroadcastStatus!
+  """
+  발송한 관리자 계정 ID.
+  """
+  actorAccountId: ID!
+  """
+  발송한 관리자 표시 라벨(발송 시점 스냅샷). 이름(아이디) 형식이고 한쪽만 있으면 그 값, 둘 다 없으면 null.
+  """
+  actorLabel: String
+  """
+  요청 시각.
+  """
+  requestedAt: DateTime!
+  """
+  저장을 마친 시각. 미완료면 null.
+  """
+  completedAt: DateTime
+  """
+  ACCOUNT_IDS 발송의 대상 계정 ID(최대 500). ALL_USERS면 빈 배열.
+  """
+  targetAccountIds: [ID!]!
+  """
+  대상에서 빠진 계정 ID(최대 500). ALL_USERS면 빈 배열.
+  """
+  skippedAccountIds: [ID!]!
+}
+
+"""
+알림 발송 이력 목록.
+"""
+type AdminNotificationBroadcastConnection {
+  """
+  발송 이력. 최신 요청이 먼저 온다.
+  """
+  items: [AdminNotificationBroadcast!]!
+  """
+  조건에 맞는 전체 건수.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+알림 발송 이력 조회 조건. 모든 필터는 AND로 결합된다.
+"""
+input AdminNotificationBroadcastListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  알림 분류 필터.
+  """
+  type: AdminNotificationType
+  """
+  대상 지정 방식 필터.
+  """
+  targetKind: AdminNotificationTargetKind
+}
+
+# ---- src/features/notification/notification-my.graphql ----
+extend type Query {
+  """
+  알림 목록 조회. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  myNotifications(input: MyNotificationsInput): NotificationConnection!
+}
+
+extend type Mutation {
+  """
+  특정 알림 읽음 처리. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  markNotificationRead(notificationId: ID!): Boolean!
+  """
+  전체 알림 읽음 처리. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  markAllNotificationsRead: Boolean!
+}
+
+"""
+알림 목록 조회 입력
+"""
+input MyNotificationsInput {
+  """
+  읽지 않은 알림만 조회
+  """
+  unreadOnly: Boolean = false
+  """
+  이전 응답의 nextCursor(불투명 토큰). 미지정 시 첫 페이지
+  """
+  cursor: String
+  """
+  조회 개수(최대 50)
+  """
+  limit: Int = 20
+}
+
+"""
+알림 목록 응답. 최근 3개월 내 알림만 노출한다.
+"""
+type NotificationConnection {
+  """
+  알림 아이템 목록
+  """
+  items: [NotificationItem!]!
+  """
+  전체 개수(3개월 내 기준)
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. 없으면 null
+  """
+  nextCursor: String
+}
+
+"""
+알림 아이템
+"""
+type NotificationItem {
+  """
+  알림 ID
+  """
+  id: ID!
+  """
+  알림 타입
+  """
+  type: NotificationType!
+  """
+  알림 이벤트(아이콘·라벨 매핑용). 이벤트 없는 일반 알림은 null
+  """
+  event: NotificationEvent
+  """
+  제목
+  """
+  title: String!
+  """
+  내용
+  """
+  body: String!
+  """
+  연관 주문 ID(딥링크용)
+  """
+  orderId: ID
+  """
+  연관 매장 ID(딥링크용)
+  """
+  storeId: ID
+  """
+  연관 상품 ID(딥링크용)
+  """
+  productId: ID
+  """
+  연관 리뷰 ID(리뷰 보러가기 딥링크용)
+  """
+  reviewId: ID
+  """
+  서브라인 조립용 매장명. 연관 매장이 없으면 null
+  """
+  storeName: String
+  """
+  서브라인 조립용 상품명(주문 알림은 주문 시점 스냅샷). 없으면 null
+  """
+  productName: String
+  """
+  읽음 처리 시각
+  """
+  readAt: DateTime
+  """
+  생성 시각
+  """
+  createdAt: DateTime!
+}
+
+# ---- src/features/notification/notification-seller-push.graphql ----
+extend type Mutation {
+  """
+  판매자 앱 디바이스의 Expo 푸시 토큰을 등록한다. 판매자 로그인 필수(SELLER 아니면 FORBIDDEN, 매장 없으면 NOT_FOUND).
+  같은 토큰을 다시 보내면 마지막 확인 시각만 갱신되고, 다른 판매자가 쓰던 토큰이면 현재 로그인 판매자가 가져간다(앱 재설치·계정 전환).
+  해제됐던 토큰은 다시 활성화된다. 토큰이 Expo 형식이 아니면 BAD_REQUEST(INVALID_PUSH_TOKEN).
+  앱 시작·로그인마다 호출해도 된다(멱등).
+  """
+  sellerRegisterPushToken(input: SellerRegisterPushTokenInput!): Boolean!
+  """
+  푸시 토큰을 해제한다(로그아웃). 판매자 로그인 필수(SELLER 아니면 FORBIDDEN).
+  매장 컨텍스트를 보지 않으므로 매장이 없는 판매자도 해제할 수 있다.
+  본인이 등록한 토큰만 해제되며, 없거나 남의 토큰이면 아무 일도 하지 않고 true다.
+  """
+  sellerUnregisterPushToken(input: SellerUnregisterPushTokenInput!): Boolean!
+}
+
+"""
+푸시 토큰 등록 입력
+"""
+input SellerRegisterPushTokenInput {
+  """
+  Expo 푸시 토큰. ExponentPushToken[...] 또는 ExpoPushToken[...] 형식, 최대 200자
+  """
+  token: String!
+  """
+  디바이스 플랫폼
+  """
+  platform: PushPlatform!
+  """
+  앱이 부여한 디바이스 식별자(선택, 최대 128자). 같은 기기의 토큰 교체 추적용이며 서버 로직은 토큰만 본다
+  """
+  deviceId: String
+}
+
+"""
+푸시 토큰 해제 입력
+"""
+input SellerUnregisterPushTokenInput {
+  """
+  해제할 Expo 푸시 토큰
+  """
+  token: String!
+}
+
+"""
+푸시 디바이스 플랫폼
+"""
+enum PushPlatform {
+  """
+  iOS(APNs 경유)
+  """
+  IOS
+  """
+  Android(FCM 경유)
+  """
+  ANDROID
+}
+
+# ---- src/features/notification/notification.types.graphql ----
+"""
+알림 분류. 알림센터 목록의 그룹 기준이다.
+"""
+enum NotificationType {
+  """
+  주문 상태 변경 알림. ORDER_CONFIRMED·ORDER_MADE·ORDER_PICKED_UP 이벤트가 여기 속한다.
+  """
+  ORDER_STATUS
+  """
+  내 리뷰에 좋아요가 달린 알림. REVIEW_LIKED 이벤트가 여기 속한다.
+  """
+  REVIEW_LIKE
+  """
+  운영 공지. 현재 생성 경로가 없는 예약된 분류다.
+  """
+  SYSTEM
+  """
+  마케팅 알림. 현재 생성 경로가 없는 예약된 분류다.
+  """
+  MARKETING
+}
+
+"""
+알림 이벤트. 알림센터의 아이콘·라벨 매핑 기준 (figma notification-center)
+"""
+enum NotificationEvent {
+  """
+  다른 사용자가 내 리뷰에 좋아요를 눌렀다. type은 REVIEW_LIKE.
+  """
+  REVIEW_LIKED
+  """
+  판매자가 주문을 확인·수락했다. type은 ORDER_STATUS.
+  """
+  ORDER_CONFIRMED
+  """
+  판매자가 제작을 완료했다. type은 ORDER_STATUS.
+  """
+  ORDER_MADE
+  """
+  픽업이 완료됐다. type은 ORDER_STATUS.
+  """
+  ORDER_PICKED_UP
+  """
+  주문이 취소됐다(판매자 또는 운영자). type은 ORDER_STATUS.
+  """
+  ORDER_CANCELED
+}
+
+# ---- src/features/order/order-admin.graphql ----
+extend type Query {
+  """
+  주문 목록을 최신순으로 조회한다(전 매장). 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminOrders(input: AdminOrderListInput): AdminOrderConnection!
+  """
+  주문 상세를 전체 품목·구매자 요약·상태 이력과 함께 조회한다. 없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminOrder(orderId: ID!): AdminOrderDetail!
+}
+
+extend type Mutation {
+  """
+  주문을 강제 취소한다. 전이 규칙은 판매자 취소와 같다 — SUBMITTED·CONFIRMED·MADE에서만 가능하고
+  PICKED_UP·CANCELED면 BAD_USER_INPUT. 사유(note)는 필수이며 상태 이력에 '[관리자]' 접두로 기록된다.
+  구매자에게 ORDER_CANCELED 알림이 간다. 없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminCancelOrder(input: AdminCancelOrderInput!): AdminOrderSummary!
+}
+
+"""
+주문 요약(관리자 시점). 매장 ID·매장명은 첫 품목 기준이다(주문은 단일 매장 구조).
+"""
+type AdminOrderSummary {
+  id: ID!
+  """
+  주문번호.
+  """
+  orderNumber: String!
+  """
+  구매자 계정 ID.
+  """
+  accountId: ID!
+  """
+  주문 품목이 속한 매장 ID. 품목이 없으면 null.
+  """
+  storeId: ID
+  """
+  주문 시점의 매장명(첫 품목 스냅샷). 품목이 없으면 null.
+  """
+  storeName: String
+  """
+  현재 주문 상태.
+  """
+  status: OrderStatusType!
+  """
+  픽업 예정 일시.
+  """
+  pickupAt: DateTime!
+  """
+  주문자 이름.
+  """
+  buyerName: String!
+  """
+  주문자 연락처.
+  """
+  buyerPhone: String!
+  """
+  최종 결제 금액(원).
+  """
+  totalPrice: Int!
+  """
+  주문 생성 시각.
+  """
+  createdAt: DateTime!
+  """
+  첫 품목의 상품명(주문 시점 스냅샷). 이후 상품명이 바뀌어도 유지된다. 품목이 없으면 null.
+  """
+  firstItemName: String
+  """
+  첫 품목의 상품 대표 이미지 URL(주문 시점 스냅샷). 주문 당시 이미지가 없었거나 품목이 없으면 null.
+  """
+  firstItemImageUrl: String
+}
+
+"""
+주문 목록 페이지. 최신 주문이 먼저 온다.
+"""
+type AdminOrderConnection {
+  """
+  주문. 최신 주문이 먼저 온다.
+  """
+  items: [AdminOrderSummary!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+주문한 구매자 요약.
+"""
+type AdminOrderBuyer {
+  """
+  계정 ID.
+  """
+  accountId: ID!
+  """
+  이메일. 미등록 시 null.
+  """
+  email: String
+  """
+  닉네임. 탈퇴(프로필 삭제)면 null.
+  """
+  nickname: String
+  """
+  계정 상태.
+  """
+  status: AccountStatus!
+}
+
+"""
+주문 상세(관리자 시점). 모든 품목이 담긴다.
+"""
+type AdminOrderDetail {
+  id: ID!
+  """
+  주문번호.
+  """
+  orderNumber: String!
+  """
+  구매자 요약.
+  """
+  buyer: AdminOrderBuyer!
+  """
+  현재 주문 상태.
+  """
+  status: OrderStatusType!
+  """
+  픽업 예정 일시.
+  """
+  pickupAt: DateTime!
+  """
+  주문자 이름.
+  """
+  buyerName: String!
+  """
+  주문자 연락처.
+  """
+  buyerPhone: String!
+  """
+  할인 전 품목 합계(원).
+  """
+  subtotalPrice: Int!
+  """
+  할인 금액(원).
+  """
+  discountPrice: Int!
+  """
+  최종 결제 금액(원).
+  """
+  totalPrice: Int!
+  """
+  SUBMITTED 도달 시각.
+  """
+  submittedAt: DateTime
+  """
+  CONFIRMED 도달 시각. 미도달 시 null.
+  """
+  confirmedAt: DateTime
+  """
+  MADE 도달 시각. 미도달 시 null.
+  """
+  madeAt: DateTime
+  """
+  PICKED_UP 도달 시각. 미도달 시 null.
+  """
+  pickedUpAt: DateTime
+  """
+  CANCELED 도달 시각. 취소되지 않았으면 null.
+  """
+  canceledAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  """
+  주문 품목 전체.
+  """
+  items: [OrderItemDetail!]!
+  """
+  상태 변경 이력. 최신순.
+  """
+  statusHistories: [OrderStatusHistory!]!
+}
+
+"""
+주문 목록 조회 조건. 모든 필터는 AND로 결합된다.
+"""
+input AdminOrderListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  주문번호·주문자 이름·연락처 부분일치 검색. 최대 100자.
+  """
+  keyword: String
+  """
+  주문 상태 필터. 미지정 시 전체.
+  """
+  status: OrderStatusType
+  """
+  매장 ID 필터(품목 기준). 미지정 시 전체.
+  """
+  storeId: ID
+  """
+  구매자 계정 ID 필터. 미지정 시 전체.
+  """
+  accountId: ID
+  """
+  주문 생성 시각 하한(이상).
+  """
+  fromCreatedAt: DateTime
+  """
+  주문 생성 시각 상한(이하).
+  """
+  toCreatedAt: DateTime
+}
+
+"""
+주문 강제 취소 입력.
+"""
+input AdminCancelOrderInput {
+  orderId: ID!
+  """
+  취소 사유. 필수. 최대 494자('[관리자] ' 접두를 붙여 500자 이내로 이력에 남는다). 감사 로그에도 기록된다.
+  """
+  note: String!
+}
+
+# ---- src/features/order/order-checkout.graphql ----
+extend type Mutation {
+  """주문 생성(구매자). 옵션·픽업 일시를 서버가 재검증하고 가격을 스냅샷한다. 로그인 필수."""
+  createOrder(input: CreateOrderInput!): CreateOrderOutput!
+}
+
+"""주문 생성 입력. 커스텀 필드는 커스텀 스펙 확정 후 optional로 확장 예정."""
+input CreateOrderInput {
+  """
+  클라이언트 생성 멱등 키(8~64자). 체크아웃 진입 시 새로 만들고 재시도에는
+  같은 키를 재사용한다. 같은 키의 재요청은 새 주문을 만들지 않고 기존 주문을 반환한다.
+  """
+  idempotencyKey: String!
+  productId: ID!
+  """선택한 옵션 아이템 ID 목록. 그룹 규칙(필수/min/max)을 서버가 검증한다."""
+  optionItemIds: [ID!]!
+  """픽업 일시. 매장 정책(영업시간·휴무·capacity·리드타임·슬롯 정렬) 재검증."""
+  pickupAt: DateTime!
+  """주문 수량. 기본 1."""
+  quantity: Int = 1
+  """미입력 시 프로필 닉네임 사용."""
+  buyerName: String
+  """미입력 시 프로필 전화번호 사용. 둘 다 없으면 거절."""
+  buyerPhone: String
+}
+
+"""주문 생성 결과 요약. 상세는 myOrder로 재조회."""
+type CreateOrderOutput {
+  orderId: ID!
+  """주문번호. 화면·문의에 쓰는 식별자."""
+  orderNumber: String!
+  """
+  주문 상태. 새로 생성된 경우 SUBMITTED다. 같은 idempotencyKey로 재시도하면 기존
+  주문을 그대로 돌려주므로 그 사이 진행된 상태(CONFIRMED·MADE·PICKED_UP 등)일 수 있다.
+  """
+  status: OrderStatusType!
+  """확정된 픽업 일시. 서버가 매장 정책으로 재검증한 값이다."""
+  pickupAt: DateTime!
+  """서버가 스냅샷한 최종 결제 금액(원). 클라이언트 계산값이 아니다."""
+  totalPrice: Int!
+}
+
+# ---- src/features/order/order-my.graphql ----
+extend type Query {
+  """
+  내 주문 목록 조회. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  myOrders(input: MyOrdersInput): MyOrderConnection!
+  """
+  내 주문 상세 조회. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  myOrder(orderId: ID!): MyOrderDetail!
+}
+
+"""
+내 주문 조회 입력
+"""
+input MyOrdersInput {
+  """
+  상태 필터 (복수 선택 가능). 미지정 시 전체
+  """
+  statuses: [OrderStatusType!]
+  """
+  건너뛸 개수. 기본 0.
+  """
+  offset: Int = 0
+  """
+  한 번에 가져올 개수. 기본 20, 1~50만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+}
+
+"""
+주문 목록 응답
+"""
+type MyOrderConnection {
+  """
+  주문 카드. 최신 주문이 먼저 온다.
+  """
+  items: [MyOrderSummary!]!
+  """
+  전체 주문 수. 상태 필터를 적용한 뒤의 총계이며 offset·limit과 무관하다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부.
+  """
+  hasMore: Boolean!
+}
+
+"""
+유저 주문 목록 카드
+"""
+type MyOrderSummary {
+  orderId: ID!
+  """
+  주문번호. 화면·문의에 쓰는 식별자.
+  """
+  orderNumber: String!
+  """
+  현재 주문 상태.
+  """
+  status: OrderStatusType!
+  """
+  주문 생성 시각.
+  """
+  createdAt: DateTime!
+  """
+  픽업 예정 일시.
+  """
+  pickupAt: DateTime!
+  """
+  대표 상품명 (첫 OrderItem 기준)
+  """
+  representativeProductName: String!
+  """
+  대표 상품 이미지 URL
+  """
+  representativeProductImageUrl: String
+  """
+  주문에 포함된 추가 상품 종류 수 (첫 아이템 제외)
+  """
+  additionalItemCount: Int!
+  """
+  총 가격
+  """
+  totalPrice: Int!
+  """
+  매장명
+  """
+  storeName: String!
+  """
+  주문 내 OrderItem 중 리뷰 작성 가능한 것이 1건이라도 있는지 (PICKED_UP + 활성 리뷰 미존재)
+  """
+  hasReviewableItem: Boolean!
+}
+
+"""
+주문 상세
+"""
+type MyOrderDetail {
+  orderId: ID!
+  """
+  주문번호.
+  """
+  orderNumber: String!
+  """
+  현재 주문 상태.
+  """
+  status: OrderStatusType!
+  """
+  주문 생성 시각.
+  """
+  createdAt: DateTime!
+  """
+  픽업 예정 일시.
+  """
+  pickupAt: DateTime!
+
+  """
+  주문자 이름.
+  """
+  buyerName: String!
+  """
+  주문자 연락처.
+  """
+  buyerPhone: String!
+
+  """
+  할인 전 품목 합계(원).
+  """
+  subtotalPrice: Int!
+  """
+  할인 금액(원). 할인이 없으면 0.
+  """
+  discountPrice: Int!
+  """
+  최종 결제 금액(원) = subtotalPrice - discountPrice.
+  """
+  totalPrice: Int!
+
+  """
+  상태 스테퍼용 타임스탬프. 아직 그 상태를 거치지 않았으면 null이다.
+  """
+  submittedAt: DateTime
+  """
+  CONFIRMED 도달 시각. 미도달 시 null.
+  """
+  confirmedAt: DateTime
+  """
+  MADE(제작 완료) 도달 시각. 미도달 시 null.
+  """
+  madeAt: DateTime
+  """
+  PICKED_UP 도달 시각. 미도달 시 null.
+  """
+  pickedUpAt: DateTime
+  """
+  CANCELED 도달 시각. 취소되지 않았으면 null.
+  """
+  canceledAt: DateTime
+
+  """
+  상태 변경 이력. 오래된 순이다(판매자 주문 상세는 최신순 — 방향이 반대다).
+  """
+  statusHistories: [OrderStatusHistory!]!
+  """
+  주문 아이템 목록
+  """
+  items: [MyOrderItem!]!
+  """
+  판매자 정보 (단일 매장 전제)
+  """
+  store: MyOrderStoreInfo!
+}
+
+"""
+구매자 주문 품목. 공용 품목 스냅샷 + 구매자 전용 필드(대표 이미지·리뷰 가능 여부).
+"""
+type MyOrderItem {
+  """
+  품목 스냅샷(가격·옵션·커스텀).
+  """
+  item: OrderItemDetail!
+  """
+  대표 상품 이미지 URL. 주문 당시 스냅샷이 아니라 현재 상품의 첫 이미지를 읽는다 —
+  판매자가 이미지를 바꾸거나 지우면 값이 달라지거나 null이 된다.
+  """
+  representativeImageUrl: String
+  """
+  이 품목에 내가 남긴 활성 리뷰가 있는지.
+  """
+  hasMyReview: Boolean!
+  """
+  리뷰 작성 가능 여부. 주문이 PICKED_UP이고 활성 리뷰가 없을 때 true.
+  """
+  canWriteReview: Boolean!
+}
+
+"""
+픽업할 매장 정보. 주문은 단일 매장 전제라 1건이다.
+"""
+type MyOrderStoreInfo {
+  storeId: ID!
+  """
+  매장명.
+  """
+  storeName: String!
+  """
+  매장 대표 연락처.
+  """
+  storePhone: String!
+  """
+  전체 주소 문자열.
+  """
+  addressFull: String!
+  """
+  시·도 단위. 매핑되지 않았으면 null.
+  """
+  addressCity: String
+  """
+  시·군·구 단위. 매핑되지 않았으면 null.
+  """
+  addressDistrict: String
+  """
+  읍·면·동 단위. 매핑되지 않았으면 null.
+  """
+  addressNeighborhood: String
+  """
+  위도. 좌표 미등록 시 null.
+  """
+  latitude: Float
+  """
+  경도. 좌표 미등록 시 null.
+  """
+  longitude: Float
+  """
+  영업시간 평문
+  """
+  businessHoursText: String
+  """
+  매장 홈페이지·SNS URL. 미등록 시 null.
+  """
+  websiteUrl: String
+}
+
+# ---- src/features/order/order-seller.graphql ----
+extend type Query {
+  """
+  내 매장 주문 목록을 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerOrderList(input: SellerOrderListInput): SellerOrderConnection!
+  """
+  내 매장 주문 상세를 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerOrder(orderId: ID!): SellerOrderDetail!
+}
+
+extend type Mutation {
+  """
+  주문 상태를 변경한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerUpdateOrderStatus(
+    input: SellerUpdateOrderStatusInput!
+  ): SellerOrderSummary!
+}
+
+"""
+주문 목록 카드. 상세는 sellerOrder로 재조회한다.
+"""
+type SellerOrderSummary {
+  id: ID!
+  """
+  주문번호. 구매자에게 노출되는 식별자이며 검색(search) 대상이다.
+  """
+  orderNumber: String!
+  """
+  현재 주문 상태.
+  """
+  status: OrderStatusType!
+  """
+  픽업 예정 일시.
+  """
+  pickupAt: DateTime!
+  """
+  주문자 이름. 구매자가 주문 시 입력했거나 프로필 닉네임에서 온 값.
+  """
+  buyerName: String!
+  """
+  주문자 연락처.
+  """
+  buyerPhone: String!
+  """
+  할인 반영 후 최종 결제 금액(원).
+  """
+  totalPrice: Int!
+  """
+  주문 생성 시각. 목록 정렬 기준이다.
+  """
+  createdAt: DateTime!
+  """
+  내 매장 첫 품목의 상품명(주문 시점 스냅샷). 이후 상품명이 바뀌어도 유지된다. 활성 품목이 없으면 null.
+  """
+  firstItemName: String
+  """
+  내 매장 첫 품목의 상품 대표 이미지 URL(주문 시점 스냅샷). 주문 당시 이미지가 없었으면 null.
+  """
+  firstItemImageUrl: String
+}
+
+"""
+주문 목록 페이지. 최신 주문이 먼저 온다.
+"""
+type SellerOrderConnection {
+  """
+  주문 카드. 최신 주문이 먼저 온다.
+  """
+  items: [SellerOrderSummary!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다. 불투명 토큰이라 값의 형식에 의존하지 않는다.
+  """
+  nextCursor: String
+}
+
+"""
+주문 목록 조회 조건. 모든 필터는 AND로 결합되고, 미지정 필터는 적용되지 않는다.
+"""
+input SellerOrderListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  주문 상태 필터. 미지정 시 전체 상태.
+  """
+  status: OrderStatusType
+  """
+  주문 생성 시각 하한(이상).
+  """
+  fromCreatedAt: DateTime
+  """
+  주문 생성 시각 상한(이하).
+  """
+  toCreatedAt: DateTime
+  """
+  픽업 일시 하한(이상).
+  """
+  fromPickupAt: DateTime
+  """
+  픽업 일시 상한(이하).
+  """
+  toPickupAt: DateTime
+  """
+  주문번호·주문자 이름·연락처 부분일치 검색. 셋 중 하나라도 맞으면 포함된다.
+  """
+  search: String
+}
+
+"""
+주문 상세. items에는 내 매장 품목만 담긴다.
+"""
+type SellerOrderDetail {
+  id: ID!
+  """
+  주문번호.
+  """
+  orderNumber: String!
+  """
+  주문한 구매자 계정 ID.
+  """
+  accountId: ID!
+  """
+  현재 주문 상태.
+  """
+  status: OrderStatusType!
+  """
+  픽업 예정 일시.
+  """
+  pickupAt: DateTime!
+  """
+  주문자 이름.
+  """
+  buyerName: String!
+  """
+  주문자 연락처.
+  """
+  buyerPhone: String!
+  """
+  할인 전 품목 합계(원).
+  """
+  subtotalPrice: Int!
+  """
+  할인 금액(원). 할인이 없으면 0.
+  """
+  discountPrice: Int!
+  """
+  최종 결제 금액(원) = subtotalPrice - discountPrice.
+  """
+  totalPrice: Int!
+  """
+  각 상태에 도달한 시각. 아직 그 상태를 거치지 않았으면 null이다.
+  """
+  submittedAt: DateTime
+  """
+  CONFIRMED 도달 시각. 미도달 시 null.
+  """
+  confirmedAt: DateTime
+  """
+  MADE(제작 완료) 도달 시각. 미도달 시 null.
+  """
+  madeAt: DateTime
+  """
+  PICKED_UP 도달 시각. 미도달 시 null.
+  """
+  pickedUpAt: DateTime
+  """
+  CANCELED 도달 시각. 취소되지 않았으면 null.
+  """
+  canceledAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  """
+  내 매장에 속한 주문 품목만 포함된다. 다른 매장 품목은 내려오지 않는다.
+  """
+  items: [OrderItemDetail!]!
+  """
+  상태 변경 이력. 최신순.
+  """
+  statusHistories: [OrderStatusHistory!]!
+}
+
+"""
+주문 상태 변경 입력. 전이 규칙은 OrderStatusType 설명을 따르며, 규칙에 어긋나면
+BAD_USER_INPUT으로 거절된다.
+"""
+input SellerUpdateOrderStatusInput {
+  orderId: ID!
+  """
+  변경할 상태. 현재 상태에서 진입 가능한 값이어야 한다.
+  """
+  toStatus: OrderStatusType!
+  """
+  변경 사유 메모. toStatus가 CANCELED면 필수이고, 없으면 BAD_USER_INPUT.
+  """
+  note: String
+}
+
+# ---- src/features/order/order-subscription.graphql ----
+extend type Subscription {
+  """
+  내 매장 주문 생성·상태 변경 이벤트. 판매자 로그인 필수(SELLER 아니면 FORBIDDEN).
+  삭제되지 않은 매장을 보유한 판매자만 구독할 수 있다 — 매장이 없거나 삭제됐으면 NOT_FOUND.
+  비활성(is_active=false) 매장도 구독은 유지된다. 인증은 graphql-ws connectionParams.authorization.
+  구매자 주문 생성(SUBMITTED)·판매자 상태 변경·관리자 강제 취소가 모두 여기로 온다.
+  """
+  sellerOrderUpdated: SellerOrderUpdate!
+}
+
+"""
+판매자 주문 갱신 이벤트. 발행 시점 주문 행의 스냅샷이다.
+이벤트 간 도착 순서는 보장되지 않는다 — 구독자는 같은 orderId의 더 오래된 updatedAt 이벤트는 폐기한다.
+전달 누락 가능(Redis 장애 시 발행 생략)하므로 폴백은 sellerOrderList 재조회다.
+"""
+type SellerOrderUpdate {
+  orderId: ID!
+  """주문번호."""
+  orderNumber: String!
+  """이벤트 시점의 주문 상태."""
+  status: OrderStatusType!
+  """픽업 예정 일시."""
+  pickupAt: DateTime!
+  """주문자 이름(주문 시점 값)."""
+  buyerName: String!
+  """할인 반영 후 최종 결제 금액(원)."""
+  totalPrice: Int!
+  """첫 품목의 상품명(주문 시점 스냅샷). 주문은 단일 상품 구조다."""
+  productName: String!
+  """주문 행의 updated_at. 폐기 규칙의 비교 키다."""
+  updatedAt: DateTime!
+}
+
+# ---- src/features/order/order.types.graphql ----
+"""
+주문 상태. 구매자·판매자 API가 공용으로 쓴다.
+
+전이는 `SUBMITTED → CONFIRMED → MADE → PICKED_UP` 한 방향이며 각 단계는 직전
+상태에서만 진입할 수 있다. `CANCELED`는 `PICKED_UP` 이전 세 상태에서만 가능하고,
+어떤 상태에서도 `SUBMITTED`로 되돌아갈 수 없다.
+"""
+enum OrderStatusType {
+  """구매자가 주문을 넣은 직후의 초기 상태. 판매자 확인 대기."""
+  SUBMITTED
+  """판매자가 주문을 확인·수락한 상태. 제작 대기."""
+  CONFIRMED
+  """판매자가 제작을 완료해 픽업을 기다리는 상태. "주문 생성됨"이 아니다."""
+  MADE
+  """구매자가 수령을 마친 종료 상태. 이후 상태 변경 불가."""
+  PICKED_UP
+  """취소된 종료 상태. 취소 처리에는 사유(note)가 필수다."""
+  CANCELED
+}
+
+"""주문 상태 변경 이력 1건. 구매자·판매자·관리자 주문 상세가 공용으로 쓴다."""
+type OrderStatusHistory {
+  id: ID!
+  """변경 전 상태. 최초 생성 이력이면 null."""
+  fromStatus: OrderStatusType
+  """변경 후 상태."""
+  toStatus: OrderStatusType!
+  """변경 시각."""
+  changedAt: DateTime!
+  """변경 사유 메모. 취소(CANCELED) 전이에는 필수로 기록된다(관리자 취소는 '[관리자]' 접두)."""
+  note: String
+}
+
+"""
+주문 품목 1건. 구매자·판매자·관리자 주문 상세가 공용으로 쓴다.
+가격·옵션·커스텀은 전부 주문 시점 스냅샷이라 이후 상품·옵션이 바뀌거나 삭제돼도 변하지 않는다.
+"""
+type OrderItemDetail {
+  id: ID!
+  storeId: ID!
+  productId: ID!
+  """상품명(주문 시점 스냅샷)."""
+  productName: String!
+  """정가(원, 주문 시점 스냅샷)."""
+  regularPrice: Int!
+  """할인가(원, 주문 시점 스냅샷). 할인이 없었으면 null이고 정가가 적용된다."""
+  salePrice: Int
+  """주문 수량."""
+  quantity: Int!
+  """이 품목의 합계 금액(원). 옵션 추가금과 수량이 반영된 값이다."""
+  itemSubtotalPrice: Int!
+  """선택한 옵션(주문 시점 스냅샷)."""
+  optionItems: [OrderItemOption!]!
+  """입력한 커스텀 문구(주문 시점 스냅샷)."""
+  customTexts: [OrderItemCustomText!]!
+  """자유 편집 요청(주문 시점 스냅샷)."""
+  freeEdits: [OrderItemFreeEdit!]!
+}
+
+"""주문 시점의 옵션 스냅샷. 판매자가 이후 옵션을 수정·삭제해도 주문 내용은 변하지 않는다."""
+type OrderItemOption {
+  id: ID!
+  """옵션 그룹명(주문 시점)."""
+  groupName: String!
+  """선택한 옵션명(주문 시점)."""
+  optionTitle: String!
+  """옵션 추가금(원, 주문 시점). 음수면 할인으로 동작했다."""
+  priceDelta: Int!
+}
+
+"""주문 시점의 커스텀 문구 스냅샷."""
+type OrderItemCustomText {
+  id: ID!
+  """문구 슬롯 식별 키(주문 시점)."""
+  tokenKey: String!
+  """슬롯의 기본 문구(주문 시점)."""
+  defaultText: String!
+  """구매자가 실제로 입력한 문구."""
+  valueText: String!
+  """입력 화면 노출 순서. 오름차순."""
+  sortOrder: Int!
+}
+
+"""주문 시점의 자유 편집 요청 스냅샷. 구매자가 이미지 위에 영역을 지정해 남긴 요청이다."""
+type OrderItemFreeEdit {
+  id: ID!
+  """지정한 편집 영역을 잘라낸 이미지 URL."""
+  cropImageUrl: String!
+  """해당 영역에 대한 요청 문구."""
+  descriptionText: String!
+  """요청 순서. 오름차순."""
+  sortOrder: Int!
+  """참고로 첨부한 이미지. 없으면 빈 배열."""
+  attachments: [OrderItemFreeEditAttachment!]!
+}
+
+"""자유 편집 요청에 구매자가 첨부한 참고 이미지."""
+type OrderItemFreeEditAttachment {
+  id: ID!
+  """첨부 이미지 URL."""
+  imageUrl: String!
+  """첨부 순서. 오름차순."""
+  sortOrder: Int!
+}
+
+# ---- src/features/product/product-admin-banner.graphql ----
+extend type Query {
+  """
+  플랫폼 배너 목록을 최신 등록순으로 조회한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminBanners(input: AdminBannerListInput): AdminBannerConnection!
+  """
+  배너 1건을 조회한다. 없거나 삭제됐으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminBanner(bannerId: ID!): AdminBanner!
+}
+
+extend type Mutation {
+  """
+  배너를 등록한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  저장 시점에 구매자 조회가 뽑을 수 있는 상태인지 검증한다:
+  linkType에 맞는 링크 필드만 보내야 하며 무관한 필드가 섞이면 BAD_USER_INPUT,
+  링크 대상(상품·매장·카테고리)이 없거나 비활성·삭제 상태면 NOT_FOUND(상품은 소속 매장까지),
+  CATEGORY 지면은 EVENT 카테고리 링크가 필수, startsAt은 endsAt보다 앞서야 한다(BAD_USER_INPUT).
+  """
+  adminCreateBanner(input: AdminCreateBannerInput!): AdminBanner!
+  """
+  배너를 수정한다. 전달한 필드만 바뀌며, 검증은 현재 값과 병합한 최종 상태로 한다(규칙은 adminCreateBanner와 동일).
+  linkType을 바꾸면 이전 타입의 링크 필드는 null로 정리된다. 배너가 없으면 NOT_FOUND.
+  placement·imageUrl·linkType·sortOrder·isActive는 null을 보낼 수 없다(BAD_USER_INPUT) — 생략만 가능.
+  """
+  adminUpdateBanner(input: AdminUpdateBannerInput!): AdminBanner!
+  """
+  배너를 삭제(soft-delete)한다. 없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminDeleteBanner(bannerId: ID!): Boolean!
+}
+
+"""
+플랫폼 배너. 홈·검색 등 앱 전체 지면에 노출되며 매장에 속하지 않는다.
+linkType이 어느 링크 필드를 읽어야 할지 정한다 — 관리자 조회는 저장된 값을 그대로 내린다.
+"""
+type AdminBanner {
+  id: ID!
+  """
+  노출 슬롯.
+  """
+  placement: BannerPlacement!
+  """
+  배너 문구. 미입력 시 null.
+  """
+  title: String
+  """
+  배너 이미지 URL.
+  """
+  imageUrl: String!
+  """
+  이동 대상 타입. 읽어야 할 링크 필드를 가리킨다.
+  """
+  linkType: BannerLinkType!
+  """
+  이동할 URL. linkType이 URL일 때 쓰는 값.
+  """
+  linkUrl: String
+  """
+  이동할 상품 ID. linkType이 PRODUCT일 때 쓰는 값.
+  """
+  linkProductId: ID
+  """
+  이동할 매장 ID. linkType이 STORE일 때 쓰는 값.
+  """
+  linkStoreId: ID
+  """
+  이동할 카테고리 ID. linkType이 CATEGORY일 때 쓰는 값.
+  """
+  linkCategoryId: ID
+  """
+  링크 대상이 지금 노출 가능한지. 구매자 앱과 같은 기준(상품·매장·카테고리가 활성·미삭제, 상품은 소속 매장까지)이며,
+  false면 구매자 앱이 이 배너를 건너뛰고 다음 배너를 노출한다. linkType이 NONE·URL이면 항상 true.
+  """
+  linkTargetAvailable: Boolean!
+  """
+  노출 시작 일시. null이면 시작 제한 없음.
+  """
+  startsAt: DateTime
+  """
+  노출 종료 일시. null이면 종료 제한 없음.
+  """
+  endsAt: DateTime
+  """
+  같은 슬롯 안에서의 노출 순서. 구매자 노출은 오름차순(같으면 id 오름차순)으로 1건만 뽑는다.
+  """
+  sortOrder: Int!
+  """
+  노출 여부. false면 기간 안이어도 나오지 않는다.
+  """
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+배너 목록 페이지. 최신 등록이 먼저 온다.
+"""
+type AdminBannerConnection {
+  """
+  배너. 최신 등록이 먼저 온다.
+  """
+  items: [AdminBanner!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+배너 목록 조회 조건.
+"""
+input AdminBannerListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  노출 슬롯 필터. 미지정 시 전체.
+  """
+  placement: BannerPlacement
+  """
+  노출 여부 필터. 미지정 시 전체.
+  """
+  isActive: Boolean
+}
+
+"""
+배너 등록 입력. linkType에 맞는 링크 필드를 함께 보내야 한다.
+"""
+input AdminCreateBannerInput {
+  """
+  노출 슬롯.
+  """
+  placement: BannerPlacement!
+  """
+  배너 문구.
+  """
+  title: String
+  """
+  배너 이미지 URL. adminCreateUploadUrl(BANNER_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT.
+  """
+  imageUrl: String!
+  """
+  이동 대상 타입. 기본 NONE(이동 없음).
+  """
+  linkType: BannerLinkType = NONE
+  """
+  linkType이 URL일 때 쓸 이동 URL.
+  """
+  linkUrl: String
+  """
+  linkType이 PRODUCT일 때 쓸 상품 ID.
+  """
+  linkProductId: ID
+  """
+  linkType이 STORE일 때 쓸 매장 ID.
+  """
+  linkStoreId: ID
+  """
+  linkType이 CATEGORY일 때 쓸 카테고리 ID.
+  """
+  linkCategoryId: ID
+  """
+  노출 시작 일시. 생략 시 시작 제한 없음.
+  """
+  startsAt: DateTime
+  """
+  노출 종료 일시. 생략 시 종료 제한 없음.
+  """
+  endsAt: DateTime
+  """
+  같은 슬롯 안에서의 노출 순서. 미지정 시 0.
+  """
+  sortOrder: Int
+  """
+  노출 여부. 기본 true.
+  """
+  isActive: Boolean = true
+}
+
+"""
+배너 수정 입력. 전달한 필드만 변경된다(부분 수정).
+"""
+input AdminUpdateBannerInput {
+  bannerId: ID!
+  """
+  노출 슬롯.
+  """
+  placement: BannerPlacement
+  """
+  배너 문구.
+  """
+  title: String
+  """
+  배너 이미지 URL. adminCreateUploadUrl(BANNER_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT.
+  """
+  imageUrl: String
+  """
+  이동 대상 타입.
+  """
+  linkType: BannerLinkType
+  """
+  linkType이 URL일 때 쓸 이동 URL.
+  """
+  linkUrl: String
+  """
+  linkType이 PRODUCT일 때 쓸 상품 ID.
+  """
+  linkProductId: ID
+  """
+  linkType이 STORE일 때 쓸 매장 ID.
+  """
+  linkStoreId: ID
+  """
+  linkType이 CATEGORY일 때 쓸 카테고리 ID.
+  """
+  linkCategoryId: ID
+  """
+  노출 시작 일시.
+  """
+  startsAt: DateTime
+  """
+  노출 종료 일시.
+  """
+  endsAt: DateTime
+  """
+  같은 슬롯 안에서의 노출 순서.
+  """
+  sortOrder: Int
+  """
+  노출 여부.
+  """
+  isActive: Boolean
+}
+
+# ---- src/features/product/product-admin-taxonomy.graphql ----
+extend type Query {
+  """
+  카테고리 마스터 목록을 type·sortOrder·id 순으로 조회한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminCategories(input: AdminCategoryListInput): [AdminCategory!]!
+  """
+  태그 마스터 목록을 최신 생성순으로 조회한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminTags(input: AdminTagListInput): AdminTagConnection!
+}
+
+extend type Mutation {
+  """
+  카테고리를 만든다. 같은 type에 같은 이름이 있으면 BAD_USER_INPUT.
+  삭제된 같은 이름이 있으면 새로 만들지 않고 복구한다(상품 연결은 복구하지 않는다).
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminCreateCategory(input: AdminCreateCategoryInput!): AdminCategory!
+  """
+  카테고리를 수정한다. 전달한 필드만 바뀐다. type은 바꿀 수 없다. 이름 충돌이면 BAD_USER_INPUT, 없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminUpdateCategory(input: AdminUpdateCategoryInput!): AdminCategory!
+  """
+  카테고리를 삭제(soft-delete)하고 상품 연결도 함께 끊는다. 없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminDeleteCategory(categoryId: ID!): Boolean!
+  """
+  태그를 만든다. 같은 이름이 있으면 BAD_USER_INPUT. 삭제된 같은 이름이 있으면 복구한다(상품 연결은 복구하지 않는다).
+  판매자가 sellerSetProductTagsByName으로 만든 태그도 같은 마스터에 있으므로 충돌 대상이다.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminCreateTag(input: AdminCreateTagInput!): AdminTag!
+  """
+  태그 이름을 바꾼다. 충돌이면 BAD_USER_INPUT, 없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminUpdateTag(input: AdminUpdateTagInput!): AdminTag!
+  """
+  태그를 삭제(soft-delete)하고 상품 연결도 함께 끊는다. 없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminDeleteTag(tagId: ID!): Boolean!
+}
+
+"""
+카테고리 마스터. 판매자는 여기 있는 것 중에서만 상품에 연결할 수 있다.
+"""
+type AdminCategory {
+  id: ID!
+  """
+  카테고리 종류(EVENT·STYLE·OTHER). 홈 칩·랭킹은 EVENT만 쓴다.
+  """
+  categoryType: CategoryType!
+  """
+  이름. 같은 종류 안에서 유일.
+  """
+  name: String!
+  """
+  설명. 미등록 시 null.
+  """
+  description: String
+  """
+  노출 순서. 오름차순.
+  """
+  sortOrder: Int!
+  """
+  노출 여부. false면 구매자 카테고리 목록에 나오지 않는다.
+  """
+  isActive: Boolean!
+  """
+  연결된 상품 수(삭제 연결 제외).
+  """
+  productCount: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+태그 마스터. 관리자가 만든 태그와 판매자가 sellerSetProductTagsByName으로 만든 태그(소문자 정규화)를 모두 포함한다.
+"""
+type AdminTag {
+  id: ID!
+  """
+  이름. 전역 유일.
+  """
+  name: String!
+  """
+  연결된 상품 수(삭제 연결 제외).
+  """
+  productCount: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+태그 목록 페이지. 최신 생성이 먼저 온다.
+"""
+type AdminTagConnection {
+  """
+  태그. 최신 생성이 먼저 온다.
+  """
+  items: [AdminTag!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+카테고리 목록 조회 조건.
+"""
+input AdminCategoryListInput {
+  """
+  종류 필터. 미지정 시 전체.
+  """
+  categoryType: CategoryType
+  """
+  비활성 포함 여부. 기본 false.
+  """
+  includeInactive: Boolean = false
+}
+
+"""
+태그 목록 조회 조건.
+"""
+input AdminTagListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  이름 부분일치 검색어. 최대 100자. 미지정 시 전체.
+  """
+  keyword: String
+}
+
+"""
+카테고리 생성 입력.
+"""
+input AdminCreateCategoryInput {
+  """
+  종류.
+  """
+  categoryType: CategoryType!
+  """
+  이름. 1~100자, 같은 종류 안에서 유일.
+  """
+  name: String!
+  """
+  설명. 최대 255자. 선택.
+  """
+  description: String
+  """
+  노출 순서. 미지정 시 0.
+  """
+  sortOrder: Int
+  """
+  노출 여부. 기본 true.
+  """
+  isActive: Boolean = true
+}
+
+"""
+카테고리 수정 입력. 전달한 필드만 변경된다.
+"""
+input AdminUpdateCategoryInput {
+  categoryId: ID!
+  """
+  이름. 1~100자.
+  """
+  name: String
+  """
+  설명. null이면 제거.
+  """
+  description: String
+  """
+  노출 순서.
+  """
+  sortOrder: Int
+  """
+  노출 여부.
+  """
+  isActive: Boolean
+}
+
+"""
+태그 생성 입력.
+"""
+input AdminCreateTagInput {
+  """
+  이름. 1~80자, 전역 유일.
+  """
+  name: String!
+}
+
+"""
+태그 수정 입력.
+"""
+input AdminUpdateTagInput {
+  tagId: ID!
+  """
+  이름. 1~80자, 전역 유일.
+  """
+  name: String!
+}
+
+# ---- src/features/product/product-admin-upload.graphql ----
+extend type Mutation {
+  """
+  이미지 업로드용 Presigned URL을 발급한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN. 배너·매장 로고의 URL 필드는 여기서 발급된 publicUrl만 받는다.
+  """
+  adminCreateUploadUrl(input: AdminCreateUploadUrlInput!): UploadUrl!
+}
+
+"""
+관리자 업로드 URL 발급 입력.
+"""
+input AdminCreateUploadUrlInput {
+  """
+  업로드 용도.
+  """
+  purpose: UploadPurpose!
+  """
+  파일 MIME 타입. image/jpeg·image/png·image/webp만 허용, 아니면 BAD_USER_INPUT.
+  """
+  contentType: String!
+  """
+  파일 크기(바이트). 1 이상 5MB 이하, 아니면 BAD_USER_INPUT.
+  """
+  contentLength: Int!
+}
+
+# ---- src/features/product/product-admin.graphql ----
+extend type Query {
+  """
+  상품 목록을 최신 등록순으로 조회한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminProducts(input: AdminProductListInput): AdminProductConnection!
+  """
+  상품 1건을 소속 매장·이미지·집계·분류·옵션·커스텀 템플릿과 함께 조회한다. 없거나 삭제됐으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminProduct(productId: ID!): AdminProductDetail!
+}
+
+extend type Mutation {
+  """
+  상품 노출 여부를 강제로 바꾼다(정책 위반 상품 내리기). 상품 내용 수정은 판매자 몫이다.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN. 상품이 없으면 NOT_FOUND. 같은 값이면 그대로 반환한다(멱등, 감사 기록 없음).
+  """
+  adminSetProductActive(input: AdminSetProductActiveInput!): AdminProduct!
+}
+
+"""
+상품 요약. 판매자의 SellerProduct와 같은 원본을 관리자 시점으로 본 것이다.
+"""
+type AdminProduct {
+  id: ID!
+  """
+  소속 매장 ID.
+  """
+  storeId: ID!
+  """
+  소속 매장명.
+  """
+  storeName: String!
+  """
+  소속 매장 노출 여부. 매장이 내려가 있으면 상품도 구매자에게 보이지 않는다.
+  """
+  storeIsActive: Boolean!
+  """
+  상품명.
+  """
+  name: String!
+  """
+  정가.
+  """
+  regularPrice: Int!
+  """
+  할인가. 없으면 null.
+  """
+  salePrice: Int
+  """
+  통화 코드.
+  """
+  currency: String!
+  """
+  기본 디자인 이미지 URL. 미등록 시 null.
+  """
+  baseDesignImageUrl: String
+  """
+  노출 여부. false면 구매자 화면에 나오지 않는다.
+  """
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+상품 상세. 소속 매장 상태·이미지·집계와 판매자가 설정한 분류·옵션·커스텀 템플릿을 함께 준다.
+"""
+type AdminProductDetail {
+  """
+  상품.
+  """
+  product: AdminProduct!
+  """
+  소속 매장 노출 여부. 매장이 내려가 있으면 상품도 구매자에게 보이지 않는다.
+  """
+  storeIsActive: Boolean!
+  """
+  상품 설명. 미등록 시 null.
+  """
+  description: String
+  """
+  구매 안내. 미등록 시 null.
+  """
+  purchaseNotice: String
+  """
+  제작 소요 시간(분).
+  """
+  preparationTimeMinutes: Int!
+  """
+  상품 이미지 URL 목록(노출 순서, 삭제 제외).
+  """
+  imageUrls: [String!]!
+  """
+  리뷰 수(삭제 제외).
+  """
+  reviewCount: Int!
+  """
+  주문 항목 수(삭제 제외).
+  """
+  orderItemCount: Int!
+  """
+  연결된 카테고리. 종류(EVENT → STYLE → OTHER) → 노출 순서로 정렬한다. 삭제된 연결·카테고리는 빼고 숨김 카테고리는 isActive=false로 담는다.
+  """
+  categories: [AdminProductCategory!]!
+  """
+  연결된 태그. 이름순. 삭제된 연결·태그는 뺀다.
+  """
+  tags: [AdminProductTag!]!
+  """
+  옵션 그룹. sortOrder 오름차순. 삭제는 빼고 숨김 그룹·선택지는 isActive=false로 담는다.
+  """
+  optionGroups: [AdminProductOptionGroup!]!
+  """
+  커스텀 템플릿 요약(문구 좌표 제외). 없거나 삭제됐으면 null.
+  """
+  customTemplate: AdminProductCustomTemplate
+}
+
+"""
+상품에 연결된 카테고리.
+"""
+type AdminProductCategory {
+  id: ID!
+  """
+  카테고리 분류.
+  """
+  categoryType: CategoryType!
+  """
+  카테고리명.
+  """
+  name: String!
+  """
+  카테고리 노출 여부. false면 숨김 카테고리다(상품 연결은 유지).
+  """
+  isActive: Boolean!
+}
+
+"""
+상품에 연결된 태그.
+"""
+type AdminProductTag {
+  id: ID!
+  """
+  태그명.
+  """
+  name: String!
+}
+
+"""
+옵션 그룹. 구매자는 이 그룹 단위로 선택지를 고른다.
+활성 필수 그룹의 minSelect가 1 이상인데 활성 선택지가 없으면 구매자가 주문할 수 없다.
+"""
+type AdminProductOptionGroup {
+  id: ID!
+  """
+  그룹명.
+  """
+  name: String!
+  """
+  그룹 안내 문구. 미등록 시 null.
+  """
+  description: String
+  """
+  필수 선택 여부. true면 선택 개수가 minSelect~maxSelect 범위 안이어야 하고, false면 0개 선택도 허용된다.
+  """
+  isRequired: Boolean!
+  """
+  최소 선택 개수.
+  """
+  minSelect: Int!
+  """
+  최대 선택 개수. 둘 다 1이면 단일 선택이다.
+  """
+  maxSelect: Int!
+  """
+  선택지에 구매자 커스텀 입력(설명)이 필요한 그룹인지. 현재는 true인 그룹의 옵션을 고르면 주문이 거절된다(잠정 가드).
+  """
+  optionRequiresDescription: Boolean!
+  """
+  선택지에 구매자 커스텀 입력(이미지)이 필요한 그룹인지. 현재는 true인 그룹의 옵션을 고르면 주문이 거절된다(잠정 가드).
+  """
+  optionRequiresImage: Boolean!
+  """
+  상품 안에서의 그룹 노출 순서. 오름차순.
+  """
+  sortOrder: Int!
+  """
+  노출 여부. false면 구매자에게 그룹 자체가 보이지 않는다.
+  """
+  isActive: Boolean!
+  """
+  선택지. sortOrder 오름차순. 삭제는 빼고 숨김 선택지는 isActive=false로 담는다.
+  """
+  optionItems: [AdminProductOptionItem!]!
+}
+
+"""
+옵션 그룹의 선택지 1개.
+"""
+type AdminProductOptionItem {
+  id: ID!
+  """
+  선택지 이름.
+  """
+  title: String!
+  """
+  선택지 설명. 미등록 시 null.
+  """
+  description: String
+  """
+  선택지 이미지 URL. 미등록 시 null.
+  """
+  imageUrl: String
+  """
+  이 선택지를 고를 때 더해지는 금액(원). 음수면 할인이다.
+  """
+  priceDelta: Int!
+  """
+  그룹 안에서의 노출 순서. 오름차순.
+  """
+  sortOrder: Int!
+  """
+  노출 여부. false면 구매자가 고를 수 없다.
+  """
+  isActive: Boolean!
+}
+
+"""
+커스텀 템플릿 요약. 바탕 이미지 위 문구 슬롯 구성이며 슬롯 좌표는 담지 않는다.
+"""
+type AdminProductCustomTemplate {
+  id: ID!
+  """
+  문구를 올릴 바탕 이미지 URL.
+  """
+  baseImageUrl: String!
+  """
+  활성 여부. false면 구매자 화면에 커스텀 입력이 열리지 않는다.
+  """
+  isActive: Boolean!
+  """
+  문구 슬롯. sortOrder 오름차순. 삭제된 슬롯은 뺀다.
+  """
+  textTokens: [AdminProductCustomTextToken!]!
+}
+
+"""
+커스텀 템플릿의 문구 슬롯 1개.
+"""
+type AdminProductCustomTextToken {
+  id: ID!
+  """
+  슬롯 식별 키.
+  """
+  tokenKey: String!
+  """
+  구매자가 입력하지 않았을 때 쓸 기본 문구.
+  """
+  defaultText: String!
+  """
+  입력 가능한 최대 글자 수.
+  """
+  maxLength: Int!
+  """
+  입력 화면에서의 노출 순서. 오름차순.
+  """
+  sortOrder: Int!
+  """
+  필수 입력 여부.
+  """
+  isRequired: Boolean!
+}
+
+"""
+상품 목록 페이지. 최신 등록이 먼저 온다.
+"""
+type AdminProductConnection {
+  """
+  상품. 최신 등록이 먼저 온다.
+  """
+  items: [AdminProduct!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+상품 목록 조회 조건.
+"""
+input AdminProductListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  상품명 부분일치 검색어. 최대 100자. 미지정 시 전체.
+  """
+  keyword: String
+  """
+  소속 매장 ID 필터. 미지정 시 전체.
+  """
+  storeId: ID
+  """
+  노출 여부 필터. 미지정 시 전체.
+  """
+  isActive: Boolean
+}
+
+"""
+상품 노출 여부 변경 입력.
+"""
+input AdminSetProductActiveInput {
+  productId: ID!
+  """
+  노출 여부.
+  """
+  isActive: Boolean!
+  """
+  변경 사유. 감사 로그에 기록된다. 최대 500자. 선택.
+  """
+  reason: String
+}
+
+# ---- src/features/product/product-category.graphql ----
+extend type Query {
+  """전역 카테고리 목록(홈 칩·카테고리 진입 화면). type 미지정 시 전체. 비로그인 접근 가능."""
+  categories(input: CategoriesInput): [CategoryItem!]!
+}
+
+"""전역 카테고리 조회 조건."""
+input CategoriesInput {
+  """EVENT | STYLE | OTHER. 비우면 전체."""
+  type: CategoryType
+}
+
+"""전역 카테고리 항목. '전체' 칩은 카테고리가 아니라 FE 가상 칩(필터 미적용)이라 포함하지 않는다."""
+type CategoryItem {
+  id: ID!
+  """카테고리명. 칩에 그대로 노출된다."""
+  name: String!
+  """분류 축. 홈 칩에는 EVENT만 노출된다."""
+  categoryType: CategoryType!
+  """노출 순서. 오름차순."""
+  sortOrder: Int!
+}
+
+# ---- src/features/product/product-detail.graphql ----
+extend type Query {
+  """상품 상세. 없거나 비활성/삭제 상품(또는 매장)이면 NOT_FOUND. 비로그인 접근 가능."""
+  productDetail(productId: ID!): ProductDetail!
+}
+
+"""상품 상세(구매자용)."""
+type ProductDetail {
+  id: ID!
+  """소속 매장 ID(주문/매장 이동용)."""
+  storeId: ID!
+  """상품명."""
+  name: String!
+  """상품 설명. 미등록 시 null."""
+  description: String
+  """구매 전 필독사항."""
+  purchaseNotice: String
+  """상품 이미지(캐러셀·썸네일, sort_order asc)."""
+  images: [String!]!
+  """정가(원)."""
+  regularPrice: Int!
+  """할인가(원). 할인이 없으면 null이고 regularPrice가 표시가로 쓰인다."""
+  salePrice: Int
+  """할인율(0~100). salePrice 없으면 0."""
+  discountRate: Int!
+  """통화 코드(ISO 4217). 저장된 값을 그대로 돌려주며, 현재 KRW만 주문 가능하다."""
+  currency: String!
+  """후기 탭 카운트."""
+  reviewCount: Int!
+  """로그인 사용자의 찜 여부(비로그인 시 false)."""
+  isWishlisted: Boolean!
+  """옵션 섹션(케이크 사이즈/맛 등, sort_order asc). 활성 그룹만."""
+  optionGroups: [ProductDetailOptionGroup!]!
+}
+
+"""상품 상세 옵션 섹션(그룹)."""
+type ProductDetailOptionGroup {
+  id: ID!
+  """그룹명(섹션 제목)."""
+  name: String!
+  """그룹 안내 문구(섹션 인트로)."""
+  description: String
+  """필수 선택 여부. true면 선택 개수가 minSelect~maxSelect 범위 안이어야 하고, false면 0개 선택도 허용된다."""
+  isRequired: Boolean!
+  """최소 선택 개수."""
+  minSelect: Int!
+  """최대 선택 개수. minSelect와 함께 허용 개수를 정한다(둘 다 1이면 단일 선택)."""
+  maxSelect: Int!
+  """섹션 노출 순서. 오름차순."""
+  sortOrder: Int!
+  """이 그룹의 선택지. 활성 항목만 온다."""
+  items: [ProductDetailOptionItem!]!
+}
+
+"""상품 상세 옵션 항목."""
+type ProductDetailOptionItem {
+  id: ID!
+  """선택지 이름."""
+  title: String!
+  """선택지 설명. 미등록 시 null."""
+  description: String
+  """선택지 이미지 URL. 미등록 시 null."""
+  imageUrl: String
+  """옵션 선택 시 가격 증감(원)."""
+  priceDelta: Int!
+  """그룹 안에서의 노출 순서. 오름차순."""
+  sortOrder: Int!
+}
+
+# ---- src/features/product/product-home.graphql ----
+extend type Query {
+  """홈 '상황별 인기 케이크' 섹션(배너 1건 + 인기 케이크 카드). 비로그인 접근 가능."""
+  popularCakes(input: PopularCakesInput): PopularCakesResult!
+
+  """홈 '다른 사람들은 이렇게 만들었어요' 제작 후기(좋아요순). 없으면 빈 배열. 비로그인 접근 가능."""
+  customCakeShowcase(input: CustomCakeShowcaseInput): [CustomCakeShowcaseItem!]!
+
+  """홈 '랜덤 케이크 둘러보기' 그리드(호출마다 무작위 재추출). 비로그인 접근 가능."""
+  randomCakes(input: RandomCakesInput): RandomCakesResult!
+}
+
+"""랜덤 케이크 조회 조건."""
+input RandomCakesInput {
+  """EVENT 카테고리 ID. 비우면 '전체' 칩(필터 미적용)."""
+  categoryId: ID
+  """이미지 수(기본 9 — 3열 그리드 9개 단위, figma 명세 기준). 1~30만 허용하며 벗어나면 BAD_USER_INPUT."""
+  limit: Int = 9
+}
+
+"""랜덤 케이크 그리드. '새로보기 1/3' 페이지 카운트는 FE 로컬 상태(서버 무관)."""
+type RandomCakesResult {
+  """무작위 추출된 케이크 카드. 호출마다 구성이 달라진다."""
+  items: [RandomCake!]!
+}
+
+"""랜덤 케이크 그리드 셀(클릭 시 케이크 상세 이동)."""
+type RandomCake {
+  id: ID!
+  """소속 매장 ID(상세 URL 구성용: /store/{storeId}/products/{id})."""
+  storeId: ID!
+  """대표 이미지(sort_order 최소)."""
+  thumbnailUrl: String!
+}
+
+"""인기 케이크 조회 조건."""
+input PopularCakesInput {
+  """EVENT 카테고리 ID. 비우면 '전체' 칩(필터 미적용)."""
+  categoryId: ID
+  """2차 시군구 ID 다중 선택. 비우면 전국 대상."""
+  regionIds: [ID!]
+  """카드 수(최대 3 — figma 명세 "최대 3개 케이크 노출")."""
+  limit: Int = 3
+}
+
+"""홈 인기 케이크 섹션 결과."""
+type PopularCakesResult {
+  """카테고리 대표 배너. 등록된 배너가 없으면 null(FE placeholder 처리)."""
+  banner: HomeBanner
+  """인기 케이크 항목. rank 오름차순."""
+  items: [PopularCake!]!
+  """랭킹 산출 기준 시각(서버 조회 시점)."""
+  rankedAt: DateTime!
+}
+
+"""홈 카테고리 대표 배너. linkType에 대응하는 링크 필드 하나만 채워진다."""
+type HomeBanner {
+  id: ID!
+  """배너 이미지 URL."""
+  imageUrl: String!
+  """배너 문구. 미입력 시 null."""
+  title: String
+  """이동 대상 타입. 이 값에 따라 아래 링크 필드 중 하나만 채워진다."""
+  linkType: BannerLinkType!
+  """linkType=URL일 때 이동 URL."""
+  linkUrl: String
+  """linkType=PRODUCT일 때 상품 ID."""
+  linkProductId: ID
+  """linkType=PRODUCT일 때 상품의 소속 매장 ID(상세 URL 구성용: /store/{linkProductStoreId}/products/{linkProductId})."""
+  linkProductStoreId: ID
+  """linkType=STORE일 때 이동 대상 매장 ID."""
+  linkStoreId: ID
+  """linkType=CATEGORY일 때 카테고리 ID(FE 카테고리 자동선택 이동)."""
+  linkCategoryId: ID
+}
+
+"""홈 '다른 사람들은 이렇게 만들었어요' 제작 후기 카드 목록."""
+input CustomCakeShowcaseInput {
+  """가져올 후기 수. 기본 5, 1~20만 허용하며 벗어나면 BAD_USER_INPUT."""
+  limit: Int = 5
+}
+
+"""제작 후기 카드. Before(요청 디자인)/After(완성 사진)가 모두 있는 리뷰만 노출."""
+type CustomCakeShowcaseItem {
+  """후기 보러가기(reviewDetail) 이동용."""
+  reviewId: ID!
+  """후기 소속 매장 ID(상세 URL 구성용: /store/{storeId}/reviews/{reviewId})."""
+  storeId: ID!
+  """좋아요순 순위(1부터)."""
+  rank: Int!
+  """작성자 닉네임. 탈퇴 작성자는 null(FE 익명 표기)."""
+  authorNickname: String
+  """리뷰 본문. 없으면 null."""
+  reviewText: String
+  """좋아요 수. 이 값 기준 내림차순으로 정렬된다."""
+  likeCount: Int!
+  """사용자가 요청한 디자인 이미지(주문 커스텀 자유편집 크롭)."""
+  beforeImageUrl: String!
+  """실제 완성된 케이크 이미지(리뷰 첫 이미지)."""
+  afterImageUrl: String!
+}
+
+"""인기 케이크 항목. rank + 공용 상품 카드."""
+type PopularCake {
+  """인기 순위. 1부터 시작한다."""
+  rank: Int!
+  """상품 카드."""
+  product: ProductCard!
+}
+
+# ---- src/features/product/product-reviews.graphql ----
+extend type Query {
+  """리뷰 상세(후기 상세 화면). 없거나 삭제된 리뷰면 NOT_FOUND. 비로그인 접근 가능."""
+  reviewDetail(reviewId: ID!): ReviewDetail!
+
+  """리뷰 댓글 목록(등록순, 커서). 비로그인 접근 가능."""
+  reviewComments(input: ReviewCommentsInput!): ReviewCommentConnection!
+}
+
+"""리뷰 상세(후기 상세 화면)."""
+type ReviewDetail {
+  """리뷰 본문(목록 카드와 동일 구조, content 전문)."""
+  review: ProductReview!
+  """판매 케이크 정보(현재 상품 기준)."""
+  product: ReviewDetailProduct!
+}
+
+"""리뷰 상세 상단 판매 케이크 정보."""
+type ReviewDetailProduct {
+  productId: ID!
+  """상품명(현재 값). 리뷰 시점 스냅샷이 아니다."""
+  name: String!
+  """대표 이미지(sort_order 최소). 없으면 null."""
+  thumbnailUrl: String
+  """매장명."""
+  storeName: String!
+  """매장 위치 표기(예: 인천 청라동)."""
+  regionLabel: String
+  """정가(원)."""
+  regularPrice: Int!
+  """할인가(원). 할인이 없으면 null."""
+  salePrice: Int
+  """할인율(0~100). salePrice 없으면 0."""
+  discountRate: Int!
+}
+
+"""리뷰 댓글 목록 조회 조건."""
+input ReviewCommentsInput {
+  reviewId: ID!
+  """이전 페이지 마지막 댓글 id(이후부터 조회)."""
+  cursor: String
+  """한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT."""
+  limit: Int = 20
+}
+
+"""리뷰 댓글 목록(등록순, 커서 기반)."""
+type ReviewCommentConnection {
+  """댓글. 등록순으로 온다."""
+  items: [ReviewCommentItem!]!
+  """전체 댓글 수."""
+  totalCount: Int!
+  """다음 페이지 존재 여부."""
+  hasMore: Boolean!
+  """다음 페이지 커서. null이면 마지막 페이지다."""
+  nextCursor: String
+}
+
+"""리뷰 댓글."""
+type ReviewCommentItem {
+  id: ID!
+  """댓글 본문."""
+  content: String!
+  """작성자 닉네임(탈퇴 시 null)."""
+  authorNickname: String
+  """작성자 프로필 이미지(탈퇴/미설정 시 null)."""
+  authorProfileImageUrl: String
+  """로그인 사용자 본인 댓글 여부(삭제 버튼 노출용, 비로그인 시 false)."""
+  isMine: Boolean!
+  """작성 시각. 등록순 정렬 기준이다."""
+  createdAt: DateTime!
+}
+
+# ---- src/features/product/product-search.graphql ----
+extend type Query {
+  """
+  상품 검색(검색 결과 상품 탭). 상품명·태그명에 단어별 AND 부분일치. keyword를 생략하면 필터만으로 조회한다(카테고리 더보기 진입). 비로그인 접근 가능.
+  """
+  searchProducts(input: SearchProductsInput!): SearchProductConnection!
+}
+
+"""상품 검색 정렬. 시안 '추천순' 라벨은 POPULAR(기본)로 해석한다."""
+enum ProductSearchSort {
+  """인기순(최근 주문·찜·베이지안 평점 — 인기 케이크와 동일 산식)."""
+  POPULAR
+  """등록순(최신 등록 우선)."""
+  LATEST
+  """판매순(최근 30일 유효 주문 수량 합)."""
+  BEST_SELLING
+  """낮은 가격순(표시가 = salePrice ?? regularPrice)."""
+  PRICE_ASC
+  """높은 가격순."""
+  PRICE_DESC
+}
+
+"""상품 검색 조건. 필터 그룹 간에는 AND, 그룹 안에서는 OR로 결합된다."""
+input SearchProductsInput {
+  """검색어(정규화: trim·공백 축약, 200자 초과 400). 생략·null이면 검색어 조건 없이 필터만 적용하고, 빈 문자열·공백만 넘기면 400."""
+  keyword: String
+  """상황별(EVENT) 카테고리 ID 다중 선택(그룹 내 OR). 비우면 '전체'."""
+  eventCategoryIds: [ID!]
+  """스타일별(STYLE) 카테고리 ID 다중 선택(그룹 내 OR, 상황별과는 AND). 비우면 '전체'."""
+  styleCategoryIds: [ID!]
+  """최저가(원, 표시가 기준). 비우면 하한 없음."""
+  minPrice: Int
+  """최고가(원, 표시가 기준). 비우면 상한 없음('7만원 이상'). minPrice보다 작으면 400."""
+  maxPrice: Int
+  """2차 시군구 ID 다중 선택. 비우면 전국 대상."""
+  regionIds: [ID!]
+  """정렬 기준. 기본 인기순."""
+  sort: ProductSearchSort = POPULAR
+  """건너뛸 개수. 기본 0."""
+  offset: Int = 0
+  """조회 개수(최대 50)."""
+  limit: Int = 20
+}
+
+"""상품 검색 결과 목록."""
+type SearchProductConnection {
+  """상품 카드. 요청한 sort 순서로 온다. 가격 뒤 '~' 표기는 FE 장식(옵션 가격 가변 안내)."""
+  items: [ProductCard!]!
+  """조건에 맞는 전체 상품 수. 탭 카운트에 쓴다."""
+  totalCount: Int!
+  """다음 페이지 존재 여부."""
+  hasMore: Boolean!
+}
+
+extend type Query {
+  """가격대 필터 시트의 가격 분포 히스토그램(키워드+카테고리+지역 조건, 가격 조건 제외). 비로그인 접근 가능."""
+  searchProductFacets(input: SearchProductFacetsInput!): SearchProductFacets!
+}
+
+"""가격 분포 조회 조건. 가격 필터만 빼고 상품 검색과 같은 조건을 받는다."""
+input SearchProductFacetsInput {
+  """검색어. 규칙은 SearchProductsInput.keyword와 같다(생략·null이면 검색어 조건 없음)."""
+  keyword: String
+  """상황별(EVENT) 카테고리 ID 다중 선택(그룹 내 OR)."""
+  eventCategoryIds: [ID!]
+  """스타일별(STYLE) 카테고리 ID 다중 선택(그룹 내 OR, 상황별과는 AND)."""
+  styleCategoryIds: [ID!]
+  """2차 시군구 ID 다중 선택. 비우면 전국 대상."""
+  regionIds: [ID!]
+}
+
+"""가격 분포. 버킷은 5,000원 고정 폭으로 0원부터 70,000원까지, 마지막은 '70,000원 이상'(maxPrice null)."""
+type SearchProductFacets {
+  """가격 버킷. minPrice 오름차순으로 온다."""
+  buckets: [SearchPriceBucket!]!
+  """조건에 맞는 상품의 최저 표시가. 결과 없으면 null."""
+  minPrice: Int
+  """조건에 맞는 상품의 최고 표시가. 결과 없으면 null."""
+  maxPrice: Int
+  """조건에 맞는 상품 수(가격 조건 제외)."""
+  totalCount: Int!
+}
+
+"""가격 버킷 [minPrice, maxPrice). maxPrice null = 상한 없음."""
+type SearchPriceBucket {
+  """구간 하한(원, 포함)."""
+  minPrice: Int!
+  """구간 상한(원, 미포함). null이면 상한 없는 마지막 구간이다."""
+  maxPrice: Int
+  """이 구간에 속한 상품 수."""
+  count: Int!
+}
+
+# ---- src/features/product/product-seller-upload.graphql ----
+extend type Mutation {
+  """
+  이미지 업로드용 Presigned URL을 발급한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND. 상품·옵션·커스텀 템플릿·매장 로고의 URL 필드는 여기서 발급된 publicUrl만 받는다.
+  """
+  sellerCreateUploadUrl(input: SellerCreateUploadUrlInput!): UploadUrl!
+}
+
+"""
+판매자 업로드 URL 발급 입력.
+"""
+input SellerCreateUploadUrlInput {
+  """
+  업로드 용도.
+  """
+  purpose: UploadPurpose!
+  """
+  파일 MIME 타입. image/jpeg·image/png·image/webp만 허용, 아니면 BAD_USER_INPUT.
+  """
+  contentType: String!
+  """
+  파일 크기(바이트). 1 이상 5MB 이하, 아니면 BAD_USER_INPUT.
+  """
+  contentLength: Int!
+}
+
+# ---- src/features/product/product-seller.graphql ----
+extend type Query {
+  """
+  내 매장 상품 목록을 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerProducts(input: SellerProductListInput): SellerProductConnection!
+  """
+  내 매장 상품 상세를 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerProduct(productId: ID!): SellerProduct!
+  """
+  내 상품에 붙일 태그를 이름으로 검색한다(타이프어헤드). keyword를 정규화(앞뒤 공백·선행 '#' 제거, 연속 공백 1칸, 소문자)한 뒤
+  부분일치로 찾아 이름순(정확 일치가 맨 앞)으로 limit건까지 준다. 정확 일치 태그는 이름순 limit 밖이어도 항상 포함한다.
+  정규화 후 비면 빈 배열, 80자를 넘으면 BAD_USER_INPUT. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerSearchTags(input: SellerTagSearchInput!): [SellerTagSuggestion!]!
+}
+
+extend type Mutation {
+  """
+  내 매장 상품을 생성한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerCreateProduct(input: SellerCreateProductInput!): SellerProduct!
+  """
+  내 매장 상품을 수정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerUpdateProduct(input: SellerUpdateProductInput!): SellerProduct!
+  """
+  내 매장 상품을 삭제한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerDeleteProduct(productId: ID!): Boolean!
+  """
+  내 매장 상품 활성 상태를 변경한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerSetProductActive(input: SellerSetProductActiveInput!): SellerProduct!
+
+  """
+  상품 이미지를 추가한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerAddProductImage(input: SellerAddProductImageInput!): SellerProductImage!
+  """
+  상품 이미지를 삭제한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerDeleteProductImage(imageId: ID!): Boolean!
+  """
+  상품 이미지 순서를 변경한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerReorderProductImages(
+    input: SellerReorderProductImagesInput!
+  ): [SellerProductImage!]!
+
+  """
+  상품 카테고리 연결을 설정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerSetProductCategories(
+    input: SellerSetProductCategoriesInput!
+  ): SellerProduct!
+  """
+  상품 태그 연결을 설정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerSetProductTags(input: SellerSetProductTagsInput!): SellerProduct!
+  """
+  상품 태그 연결을 이름 목록으로 통째로 교체한다. 각 이름은 앞뒤 공백·선행 '#' 제거, 연속 공백 1칸, 소문자로 정규화하고
+  정규화 후 같은 이름은 하나로 합친다(대소문자·악센트가 같은 이름도 DB 기준 하나로 저장되지만, 개수 검사는 정규화 문자열
+  기준이라 악센트만 다른 café·cafe는 각각 센다). 없는 이름은 새 태그로 만들고
+  (삭제된 같은 이름은 복구), 있으면 저장된 형태 그대로 재사용한다. 빈 목록이면 전체 해제.
+  정규화 후 빈 이름이 있거나 80자(코드 포인트, 정규화 전후 모두)를 넘는 이름이 있거나 합친 뒤 20개를 넘으면 BAD_USER_INPUT.
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않거나 내 상품이 아니면 NOT_FOUND.
+  """
+  sellerSetProductTagsByName(
+    input: SellerSetProductTagsByNameInput!
+  ): SellerProduct!
+
+  """
+  상품 옵션 그룹을 생성한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerCreateOptionGroup(
+    input: SellerCreateOptionGroupInput!
+  ): SellerOptionGroup!
+  """
+  상품 옵션 그룹을 수정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerUpdateOptionGroup(
+    input: SellerUpdateOptionGroupInput!
+  ): SellerOptionGroup!
+  """
+  상품 옵션 그룹을 삭제한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerDeleteOptionGroup(optionGroupId: ID!): Boolean!
+  """
+  상품 옵션 그룹 순서를 변경한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerReorderOptionGroups(
+    input: SellerReorderOptionGroupsInput!
+  ): [SellerOptionGroup!]!
+
+  """
+  상품 옵션 아이템을 생성한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerCreateOptionItem(input: SellerCreateOptionItemInput!): SellerOptionItem!
+  """
+  상품 옵션 아이템을 수정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerUpdateOptionItem(input: SellerUpdateOptionItemInput!): SellerOptionItem!
+  """
+  상품 옵션 아이템을 삭제한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerDeleteOptionItem(optionItemId: ID!): Boolean!
+  """
+  상품 옵션 아이템 순서를 변경한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerReorderOptionItems(
+    input: SellerReorderOptionItemsInput!
+  ): [SellerOptionItem!]!
+
+  """
+  상품 커스텀 템플릿을 등록 또는 수정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerUpsertProductCustomTemplate(
+    input: SellerUpsertProductCustomTemplateInput!
+  ): SellerCustomTemplate!
+  """
+  상품 커스텀 템플릿 활성 상태를 변경한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerSetProductCustomTemplateActive(
+    input: SellerSetProductCustomTemplateActiveInput!
+  ): SellerCustomTemplate!
+  """
+  커스텀 텍스트 토큰을 등록 또는 수정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerUpsertProductCustomTextToken(
+    input: SellerUpsertProductCustomTextTokenInput!
+  ): SellerCustomTextToken!
+  """
+  커스텀 텍스트 토큰을 삭제한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerDeleteProductCustomTextToken(tokenId: ID!): Boolean!
+  """
+  커스텀 텍스트 토큰 순서를 변경한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerReorderProductCustomTextTokens(
+    input: SellerReorderProductCustomTextTokensInput!
+  ): [SellerCustomTextToken!]!
+}
+
+"""
+상품에 연결된 카테고리.
+"""
+type SellerCategory {
+  id: ID!
+  """
+  카테고리명.
+  """
+  name: String!
+}
+
+"""
+상품에 연결된 태그.
+"""
+type SellerTag {
+  id: ID!
+  """
+  태그명.
+  """
+  name: String!
+}
+
+"""
+태그 제안 1건. 정확 일치 여부로 FE가 '새 태그 만들기' 행을 띄울지 판단한다.
+"""
+type SellerTagSuggestion {
+  id: ID!
+  """
+  태그명(저장된 형태).
+  """
+  name: String!
+  """
+  정규화한 keyword와 이름이 같으면 true(대소문자·악센트 무시). 목록에 true가 없으면 FE는 '새로 만들기'를 보여준다.
+  """
+  isExactMatch: Boolean!
+  """
+  이 태그가 붙은 활성 상품 수(전 매장). 표시용 근사치이며 정렬에는 쓰지 않는다.
+  """
+  productCount: Int!
+}
+
+"""
+상품 이미지 1장.
+"""
+type SellerProductImage {
+  id: ID!
+  """
+  이미지 URL.
+  """
+  imageUrl: String!
+  """
+  노출 순서. 오름차순이고 가장 앞이 대표 이미지다.
+  """
+  sortOrder: Int!
+}
+
+"""
+옵션 그룹에 속한 선택지 1개.
+"""
+type SellerOptionItem {
+  id: ID!
+  optionGroupId: ID!
+  """
+  선택지 이름.
+  """
+  title: String!
+  """
+  선택지 설명. 미등록 시 null.
+  """
+  description: String
+  """
+  선택지 이미지 URL. 미등록 시 null.
+  """
+  imageUrl: String
+  """
+  이 선택지를 고를 때 더해지는 금액(원). 음수면 할인으로 동작하되 품목 금액이 0원 미만이 되면 거절된다.
+  """
+  priceDelta: Int!
+  """
+  그룹 안에서의 노출 순서. 오름차순.
+  """
+  sortOrder: Int!
+  """
+  노출 여부. false면 구매자가 고를 수 없다.
+  """
+  isActive: Boolean!
+}
+
+"""
+상품 옵션 그룹. 구매자는 이 그룹 단위로 선택지를 고르고, 주문 생성 시 서버가
+필수·최소·최대 선택 규칙을 재검증한다. 활성 필수 그룹의 minSelect가 1 이상인데 활성 선택지가 없으면 주문할 수 없다.
+"""
+type SellerOptionGroup {
+  id: ID!
+  productId: ID!
+  """
+  그룹명(상품 상세의 옵션 섹션 제목).
+  """
+  name: String!
+  """
+  그룹 안내 문구(상품 상세 옵션 섹션 인트로).
+  """
+  description: String
+  """
+  필수 선택 여부. true면 선택 개수가 minSelect~maxSelect 범위 안이어야 하고, false면 0개 선택도 허용된다.
+  """
+  isRequired: Boolean!
+  """
+  최소 선택 개수.
+  """
+  minSelect: Int!
+  """
+  최대 선택 개수. minSelect와 함께 허용 개수를 정한다(둘 다 1이면 단일 선택).
+  """
+  maxSelect: Int!
+  """
+  선택지에 구매자 커스텀 입력(설명)이 필요한 그룹인지.
+  현재는 커스텀 체크아웃이 확장되기 전이라, 이 값이 true인 그룹의 옵션을 고르면
+  주문이 거절된다(잠정 가드). 켜기 전에 주문 가능 여부를 확인해야 한다.
+  """
+  optionRequiresDescription: Boolean!
+  """
+  선택지에 구매자 커스텀 입력(이미지)이 필요한 그룹인지.
+  optionRequiresDescription과 마찬가지로 현재는 true인 그룹의 옵션 선택이 거절된다.
+  """
+  optionRequiresImage: Boolean!
+  """
+  상품 안에서의 그룹 노출 순서. 오름차순.
+  """
+  sortOrder: Int!
+  """
+  노출 여부. false면 구매자에게 그룹 자체가 보이지 않는다.
+  """
+  isActive: Boolean!
+  """
+  이 그룹의 선택지. sortOrder 오름차순.
+  """
+  optionItems: [SellerOptionItem!]!
+}
+
+"""
+커스텀 케이크 문구 슬롯 1개. 구매자가 이 자리에 문구를 입력한다.
+"""
+type SellerCustomTextToken {
+  id: ID!
+  templateId: ID!
+  """
+  슬롯 식별 키. 주문 시 스냅샷으로 남아 어느 자리 문구인지 구분한다.
+  """
+  tokenKey: String!
+  """
+  구매자가 입력하지 않았을 때 쓸 기본 문구.
+  """
+  defaultText: String!
+  """
+  입력 가능한 최대 글자 수.
+  """
+  maxLength: Int!
+  """
+  입력 화면에서의 노출 순서. 오름차순.
+  """
+  sortOrder: Int!
+  """
+  필수 입력 여부.
+  """
+  isRequired: Boolean!
+  """
+  베이스 이미지 위에서 문구가 놓일 가로 위치. 미지정 시 null이고 배치는 클라이언트가 정한다.
+  """
+  posX: Int
+  """
+  베이스 이미지 위에서 문구가 놓일 세로 위치. 미지정 시 null.
+  """
+  posY: Int
+  """
+  문구 영역 너비. 미지정 시 null.
+  """
+  width: Int
+  """
+  문구 영역 높이. 미지정 시 null.
+  """
+  height: Int
+}
+
+"""
+상품 커스텀 템플릿. 베이스 이미지 위에 문구 슬롯을 올려 구매자가 문구를 넣게 한다.
+상품당 1개다.
+"""
+type SellerCustomTemplate {
+  id: ID!
+  productId: ID!
+  """
+  문구를 올릴 바탕 이미지 URL.
+  """
+  baseImageUrl: String!
+  """
+  활성 여부. false면 구매자 화면에 커스텀 입력이 열리지 않는다.
+  """
+  isActive: Boolean!
+  """
+  문구 슬롯. sortOrder 오름차순.
+  """
+  textTokens: [SellerCustomTextToken!]!
+}
+
+"""
+내 매장 상품. 목록·상세 모두 이 타입으로 내려온다.
+"""
+type SellerProduct {
+  id: ID!
+  storeId: ID!
+  """
+  상품명.
+  """
+  name: String!
+  """
+  상품 설명.
+  """
+  description: String
+  """
+  구매 전 안내 문구(주의사항 등).
+  """
+  purchaseNotice: String
+  """
+  정가(원).
+  """
+  regularPrice: Int!
+  """
+  할인가(원). null이면 할인이 없고 정가가 표시가다.
+  """
+  salePrice: Int
+  """
+  통화 코드(ISO 4217, 대문자 3자). KRW만 주문 가능하다.
+  """
+  currency: String!
+  """
+  커스텀 도안의 바탕 이미지 URL. 커스텀을 쓰지 않으면 null.
+  """
+  baseDesignImageUrl: String
+  """
+  제작 소요 시간(분). 픽업 가능 시각 계산의 리드타임에 반영된다.
+  """
+  preparationTimeMinutes: Int!
+  """
+  노출 여부. false면 구매자 화면에 나오지 않는다.
+  """
+  isActive: Boolean!
+  """
+  상품 이미지. sortOrder 오름차순이고 첫 장이 대표 이미지다.
+  """
+  images: [SellerProductImage!]!
+  """
+  연결된 카테고리. 없으면 빈 배열.
+  """
+  categories: [SellerCategory!]!
+  """
+  연결된 태그. 없으면 빈 배열.
+  """
+  tags: [SellerTag!]!
+  """
+  옵션 그룹. sortOrder 오름차순이며 비활성 그룹도 포함된다.
+  """
+  optionGroups: [SellerOptionGroup!]!
+  """
+  커스텀 템플릿. 등록하지 않았으면 null.
+  """
+  customTemplate: SellerCustomTemplate
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+상품 목록 페이지. 최신 등록이 먼저 온다.
+"""
+type SellerProductConnection {
+  """
+  상품. 최신 등록이 먼저 온다.
+  """
+  items: [SellerProduct!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+상품 목록 조회 조건. 필터는 AND로 결합되고 미지정 필터는 적용되지 않는다.
+"""
+input SellerProductListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  노출 여부 필터. 생략하면 서버가 활성 상품만 반환한다(SDL 기본값이 아니라 서비스 기본 동작).
+  """
+  isActive: Boolean
+  """
+  카테고리 필터. 해당 카테고리가 연결된 상품만.
+  """
+  categoryId: ID
+  """
+  상품명 또는 연결된 태그명 부분일치 검색. 둘 중 하나만 맞아도 포함된다.
+  """
+  search: String
+}
+
+"""
+상품 생성 입력. 이미지·옵션·카테고리는 생성 후 각 전용 mutation으로 붙인다
+(대표 이미지 1장만 여기서 함께 등록한다).
+"""
+input SellerCreateProductInput {
+  """
+  상품명.
+  """
+  name: String!
+  """
+  대표 이미지 URL. 상품 생성과 함께 첫 이미지로 등록된다. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT.
+  """
+  initialImageUrl: String!
+  """
+  상품 설명.
+  """
+  description: String
+  """
+  구매 전 안내 문구.
+  """
+  purchaseNotice: String
+  """
+  정가(원).
+  """
+  regularPrice: Int!
+  """
+  할인가(원). 생략하면 할인 없음.
+  """
+  salePrice: Int
+  """
+  통화 코드(ISO 4217, 대문자 3자). 기본 KRW. 다른 코드도 저장은 되지만 구매자 주문이 거절된다.
+  """
+  currency: String = "KRW"
+  """
+  커스텀 도안의 바탕 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT.
+  """
+  baseDesignImageUrl: String
+  """
+  제작 소요 시간(분). 기본 180.
+  """
+  preparationTimeMinutes: Int = 180
+  """
+  노출 여부. 기본 true.
+  """
+  isActive: Boolean = true
+}
+
+"""
+상품 수정 입력. 전달한 필드만 변경된다(부분 수정). 노출 여부는 별도 mutation을 쓴다.
+"""
+input SellerUpdateProductInput {
+  productId: ID!
+  """
+  상품명.
+  """
+  name: String
+  """
+  상품 설명.
+  """
+  description: String
+  """
+  구매 전 안내 문구.
+  """
+  purchaseNotice: String
+  """
+  정가(원).
+  """
+  regularPrice: Int
+  """
+  할인가(원).
+  """
+  salePrice: Int
+  """
+  통화 코드(ISO 4217, 대문자 3자). KRW 외에는 구매자 주문이 거절된다.
+  """
+  currency: String
+  """
+  커스텀 도안의 바탕 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT.
+  """
+  baseDesignImageUrl: String
+  """
+  제작 소요 시간(분).
+  """
+  preparationTimeMinutes: Int
+}
+
+"""
+상품 노출 여부 변경 입력.
+"""
+input SellerSetProductActiveInput {
+  productId: ID!
+  """
+  true면 구매자 화면에 노출한다.
+  """
+  isActive: Boolean!
+}
+
+"""
+상품 이미지 추가 입력.
+"""
+input SellerAddProductImageInput {
+  productId: ID!
+  """
+  추가할 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT.
+  """
+  imageUrl: String!
+  """
+  노출 순서. 미지정 시 맨 뒤에 붙는다.
+  """
+  sortOrder: Int
+}
+
+"""
+상품 이미지 순서 변경 입력. 배열 순서가 곧 새 노출 순서다.
+현재 이미지 전부를 빠짐없이 담아야 하며, 개수가 다르거나 남의 이미지 ID가 섞이면 BAD_USER_INPUT.
+"""
+input SellerReorderProductImagesInput {
+  productId: ID!
+  """
+  새 순서대로 나열한 이미지 ID 전체.
+  """
+  imageIds: [ID!]!
+}
+
+"""
+상품 카테고리 연결 설정 입력. 전달한 목록으로 통째로 교체한다
+(빈 배열이면 연결을 모두 끊는다).
+"""
+input SellerSetProductCategoriesInput {
+  productId: ID!
+  """
+  연결할 카테고리 ID 전체.
+  """
+  categoryIds: [ID!]!
+}
+
+"""
+상품 태그 연결 설정 입력. 전달한 목록으로 통째로 교체한다.
+"""
+input SellerSetProductTagsInput {
+  productId: ID!
+  """
+  연결할 태그 ID 전체.
+  """
+  tagIds: [ID!]!
+}
+
+"""
+이름 기반 태그 연결 설정 입력. 전달한 목록으로 통째로 교체한다.
+"""
+input SellerSetProductTagsByNameInput {
+  productId: ID!
+  """
+  연결할 태그 이름 전체. 정규화·중복 제거 뒤 최대 20개(개수는 정규화 문자열 기준 — 악센트만 다른 이름은 저장 시 하나로
+  합쳐져도 각각 센다). 각 이름은 정규화 전후 모두 80자(코드 포인트) 이내. 빈 배열이면 전체 해제.
+  """
+  names: [String!]!
+}
+
+"""
+태그 검색 입력.
+"""
+input SellerTagSearchInput {
+  """
+  검색어. 정규화 후 80자를 넘으면 BAD_USER_INPUT.
+  """
+  keyword: String!
+  """
+  최대 건수. 기본 10, 1~20만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 10
+}
+
+"""
+옵션 그룹 생성 입력.
+"""
+input SellerCreateOptionGroupInput {
+  productId: ID!
+  """
+  그룹명.
+  """
+  name: String!
+  """
+  그룹 안내 문구.
+  """
+  description: String
+  """
+  필수 선택 여부. 기본 true. false면 0개 선택도 허용된다.
+  """
+  isRequired: Boolean = true
+  """
+  최소 선택 개수. 기본 1.
+  """
+  minSelect: Int = 1
+  """
+  최대 선택 개수. 기본 1. minSelect와 함께 허용 개수를 정한다.
+  """
+  maxSelect: Int = 1
+  """
+  구매자 커스텀 입력(설명)이 필요한 그룹으로 표시한다. 기본 false. 현재는 켜면 해당 옵션 주문이 거절된다.
+  """
+  optionRequiresDescription: Boolean = false
+  """
+  구매자 커스텀 입력(이미지)이 필요한 그룹으로 표시한다. 기본 false. 현재는 켜면 해당 옵션 주문이 거절된다.
+  """
+  optionRequiresImage: Boolean = false
+  """
+  노출 순서. 오름차순이고 동률의 순서는 보장하지 않는다. 미지정 시 0.
+  """
+  sortOrder: Int
+  """
+  노출 여부. 기본 true.
+  """
+  isActive: Boolean = true
+}
+
+"""
+옵션 그룹 수정 입력. 전달한 필드만 변경된다(부분 수정).
+"""
+input SellerUpdateOptionGroupInput {
+  optionGroupId: ID!
+  """
+  그룹명.
+  """
+  name: String
+  """
+  그룹 안내 문구.
+  """
+  description: String
+  """
+  필수 선택 여부. false면 0개 선택도 허용된다.
+  """
+  isRequired: Boolean
+  """
+  최소 선택 개수.
+  """
+  minSelect: Int
+  """
+  최대 선택 개수.
+  """
+  maxSelect: Int
+  """
+  구매자 커스텀 입력(설명)이 필요한 그룹으로 표시한다. 현재는 켜면 해당 옵션 주문이 거절된다.
+  """
+  optionRequiresDescription: Boolean
+  """
+  구매자 커스텀 입력(이미지)이 필요한 그룹으로 표시한다. 현재는 켜면 해당 옵션 주문이 거절된다.
+  """
+  optionRequiresImage: Boolean
+  """
+  노출 순서.
+  """
+  sortOrder: Int
+  """
+  노출 여부.
+  """
+  isActive: Boolean
+}
+
+"""
+옵션 그룹 순서 변경 입력. 배열 순서가 곧 새 노출 순서이고, 해당 상품의 그룹
+전부를 빠짐없이 담아야 한다.
+"""
+input SellerReorderOptionGroupsInput {
+  productId: ID!
+  """
+  새 순서대로 나열한 옵션 그룹 ID 전체.
+  """
+  optionGroupIds: [ID!]!
+}
+
+"""
+옵션 선택지 생성 입력.
+"""
+input SellerCreateOptionItemInput {
+  optionGroupId: ID!
+  """
+  선택지 이름.
+  """
+  title: String!
+  """
+  선택지 설명.
+  """
+  description: String
+  """
+  선택지 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT.
+  """
+  imageUrl: String
+  """
+  추가 금액(원). 기본 0. 음수면 할인으로 동작하되 품목 금액이 0원 미만이 되면 거절된다.
+  """
+  priceDelta: Int = 0
+  """
+  노출 순서. 오름차순이고 동률의 순서는 보장하지 않는다. 미지정 시 0.
+  """
+  sortOrder: Int
+  """
+  노출 여부. 기본 true.
+  """
+  isActive: Boolean = true
+}
+
+"""
+옵션 선택지 수정 입력. 전달한 필드만 변경된다(부분 수정).
+"""
+input SellerUpdateOptionItemInput {
+  optionItemId: ID!
+  """
+  선택지 이름.
+  """
+  title: String
+  """
+  선택지 설명.
+  """
+  description: String
+  """
+  선택지 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT.
+  """
+  imageUrl: String
+  """
+  추가 금액(원).
+  """
+  priceDelta: Int
+  """
+  노출 순서.
+  """
+  sortOrder: Int
+  """
+  노출 여부.
+  """
+  isActive: Boolean
+}
+
+"""
+옵션 선택지 순서 변경 입력. 배열 순서가 곧 새 노출 순서이고, 해당 그룹의 선택지
+전부를 빠짐없이 담아야 한다.
+"""
+input SellerReorderOptionItemsInput {
+  optionGroupId: ID!
+  """
+  새 순서대로 나열한 선택지 ID 전체.
+  """
+  optionItemIds: [ID!]!
+}
+
+"""
+커스텀 템플릿 등록·수정 입력. 상품당 1개라 같은 상품에 다시 보내면 덮어쓴다.
+"""
+input SellerUpsertProductCustomTemplateInput {
+  productId: ID!
+  """
+  문구를 올릴 바탕 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT.
+  """
+  baseImageUrl: String!
+  """
+  활성 여부. 기본 true.
+  """
+  isActive: Boolean = true
+}
+
+"""
+커스텀 템플릿 활성 상태 변경 입력.
+"""
+input SellerSetProductCustomTemplateActiveInput {
+  templateId: ID!
+  """
+  true면 구매자 화면에 커스텀 입력이 열린다.
+  """
+  isActive: Boolean!
+}
+
+"""
+커스텀 문구 슬롯 등록·수정 입력.
+"""
+input SellerUpsertProductCustomTextTokenInput {
+  """
+  수정할 슬롯 ID. 생략하면 새로 등록한다.
+  """
+  tokenId: ID
+  templateId: ID!
+  """
+  슬롯 식별 키. 주문 스냅샷에 그대로 남는다.
+  """
+  tokenKey: String!
+  """
+  구매자가 입력하지 않았을 때 쓸 기본 문구.
+  """
+  defaultText: String!
+  """
+  입력 가능한 최대 글자 수. 기본 30.
+  """
+  maxLength: Int = 30
+  """
+  입력 화면 노출 순서. 오름차순이고 동률의 순서는 보장하지 않는다. 미지정 시 0.
+  """
+  sortOrder: Int
+  """
+  필수 입력 여부. 기본 true.
+  """
+  isRequired: Boolean = true
+  """
+  베이스 이미지 위 가로 위치. 생략 시 배치를 클라이언트가 정한다.
+  """
+  posX: Int
+  """
+  베이스 이미지 위 세로 위치.
+  """
+  posY: Int
+  """
+  문구 영역 너비.
+  """
+  width: Int
+  """
+  문구 영역 높이.
+  """
+  height: Int
+}
+
+"""
+커스텀 문구 슬롯 순서 변경 입력. 배열 순서가 곧 새 노출 순서이고, 해당 템플릿의
+슬롯 전부를 빠짐없이 담아야 한다.
+"""
+input SellerReorderProductCustomTextTokensInput {
+  templateId: ID!
+  """
+  새 순서대로 나열한 슬롯 ID 전체.
+  """
+  tokenIds: [ID!]!
+}
+
+# ---- src/features/product/product-storefront.graphql ----
+extend type Query {
+  """매장이 보유한 활성 상품의 카테고리 목록(좌측 사이드바). 빈 카테고리 제외. 비로그인 접근 가능."""
+  storeProductCategories(storeId: ID!): [StoreProductCategory!]!
+
+  """매장 상품 목록(카테고리 필터 / 매장 내 검색 / 커서). 비로그인 접근 가능."""
+  storeProducts(input: StoreProductsInput!): StoreProductConnection!
+}
+
+"""매장 상품 카테고리(사이드바 항목)."""
+type StoreProductCategory {
+  id: ID!
+  """카테고리명. 섹션 제목으로 쓴다."""
+  name: String!
+  """분류 축."""
+  categoryType: CategoryType!
+  """섹션 노출 순서. 오름차순."""
+  sortOrder: Int!
+  """이 매장의 해당 카테고리 활성 상품 수."""
+  productCount: Int!
+}
+
+"""상품 카테고리 분류."""
+enum CategoryType {
+  """상황·이벤트 기준 분류(생일, 기념일 등). 홈 화면 칩에는 이 분류만 노출된다."""
+  EVENT
+  """디자인·스타일 기준 분류."""
+  STYLE
+  """위 둘로 분류되지 않는 그 밖의 분류. 조회 필터로도 쓸 수 있다."""
+  OTHER
+}
+
+"""매장 상품 목록 조회 조건. 필터는 AND로 결합된다."""
+input StoreProductsInput {
+  storeId: ID!
+  """특정 카테고리 섹션만. 비우면 전체."""
+  categoryId: ID
+  """매장 내 상품명·태그 검색어."""
+  search: String
+  """이전 페이지 마지막 항목 id(이후부터 조회)."""
+  cursor: String
+  """한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT."""
+  limit: Int = 20
+}
+
+"""매장 상품 목록(커서 기반)."""
+type StoreProductConnection {
+  """매장 상품 항목. 등록 최신순으로 온다."""
+  items: [StoreProduct!]!
+  """조건에 맞는 활성 상품 전체 건수."""
+  totalCount: Int!
+  """다음 페이지 존재 여부."""
+  hasMore: Boolean!
+  """다음 페이지 커서. null이면 마지막 페이지다."""
+  nextCursor: String
+}
+
+"""매장 상품 항목. 공용 상품 카드 + 매장 상품 목록 전용 필드."""
+type StoreProduct {
+  """상품 카드."""
+  product: ProductCard!
+  """상품 설명. 미등록 시 null."""
+  description: String
+  """통화 코드(ISO 4217). 저장된 값을 그대로 돌려주며, 현재 KRW만 주문 가능하다."""
+  currency: String!
+  """소속 카테고리 ID(FE 섹션 그룹핑/스크롤 스파이용)."""
+  categoryIds: [ID!]!
+}
+
+# ---- src/features/product/product-upload.types.graphql ----
+"""
+업로드 용도. 용도마다 저장 경로가 다르고, 저장 입력은 같은 용도로 발급된 URL만 받는다.
+역할별 허용 범위: 판매자 PRODUCT_IMAGE·STORE_IMAGE, 관리자 BANNER_IMAGE·STORE_IMAGE(밖이면 BAD_USER_INPUT).
+"""
+enum UploadPurpose {
+  """
+  상품 이미지·커스텀 도안 바탕·옵션 선택지 이미지·커스텀 템플릿 바탕(판매자).
+  """
+  PRODUCT_IMAGE
+  """
+  매장 프로필(로고) 이미지(판매자·관리자).
+  """
+  STORE_IMAGE
+  """
+  플랫폼 배너 이미지(관리자).
+  """
+  BANNER_IMAGE
+}
+
+# ---- src/features/product/product.types.graphql ----
+"""상품 카드. 인기 케이크·판매 Best·검색 결과·매장 상품·찜·최근 본 상품이 공용으로 쓴다."""
+type ProductCard {
+  id: ID!
+  """소속 매장 ID(상세 URL 구성용: /store/{storeId}/products/{id})."""
+  storeId: ID!
+  """상품명."""
+  name: String!
+  """대표 이미지(sort_order 최소). 없으면 null."""
+  thumbnailUrl: String
+  """정가(원)."""
+  regularPrice: Int!
+  """할인가(원). 할인이 없으면 null이고 regularPrice가 표시가로 쓰인다."""
+  salePrice: Int
+  """할인율(0~100). salePrice 없으면 0."""
+  discountRate: Int!
+  """매장명."""
+  storeName: String!
+  """매장 위치 표기(예: 인천 청라동)."""
+  regionLabel: String
+  """상품 평균 평점(0.0~5.0, 소수 첫째 자리). 리뷰 없으면 0.0."""
+  ratingAverage: Float!
+  """리뷰 수."""
+  reviewCount: Int!
+  """로그인 사용자의 찜 여부(비로그인 시 false)."""
+  isWishlisted: Boolean!
+}
+
+"""
+배너 클릭 시 이동할 대상 타입. 구매자 노출·판매자 관리 API가 공용으로 쓴다.
+
+값에 따라 읽어야 할 링크 필드가 정해진다. 구매자 조회(HomeBanner)에서는 서버가
+나머지 링크 필드를 null로 비워서 내려주지만, 판매자 조회(SellerBanner)는 저장된
+값을 그대로 반환한다 — 판매자 화면에서는 linkType과 맞지 않는 필드에 값이 남아
+있을 수 있으므로 linkType을 기준으로 판단해야 한다.
+"""
+enum BannerLinkType {
+  """이동 없음. 구매자 조회에서는 링크 필드가 전부 null로 내려온다."""
+  NONE
+  """`linkUrl`만 채워진다."""
+  URL
+  """
+  상품으로 이동. 구매자 배너(HomeBanner)는 `linkProductId`와 `linkProductStoreId`가
+  함께 채워진다(상품 상세 경로에 매장 ID가 필요). 판매자 배너는 `linkProductId`만 있고
+  `linkProductStoreId` 필드 자체가 없다.
+  """
+  PRODUCT
+  """`linkStoreId`만 채워진다."""
+  STORE
+  """`linkCategoryId`만 채워진다."""
+  CATEGORY
+}
+
+"""
+배너가 노출될 자리. 구매자 API가 실제로 읽는 값은 HOME_MAIN·CATEGORY·SEARCH 셋이고,
+나머지는 아직 소비처가 없는 예약값이다.
+"""
+enum BannerPlacement {
+  """홈 '상황별 인기 케이크' 배너. 카테고리 칩이 '전체'일 때 노출된다."""
+  HOME_MAIN
+  """
+  홈 '상황별 인기 케이크' 배너 중 특정 카테고리 칩을 선택했을 때 노출되는 것.
+  해당 카테고리로 연결된 배너만 뽑히므로 linkCategoryId를 함께 지정해야 한다.
+  카테고리 진입 화면의 배너가 아니다.
+  """
+  CATEGORY
+  """검색 진입 화면 배너 슬롯"""
+  SEARCH
+  """예약값. 이 자리를 읽는 구매자 쿼리가 없어 등록해도 노출되지 않는다."""
+  HOME_SUB
+  """예약값. 이 자리를 읽는 구매자 쿼리가 없어 등록해도 노출되지 않는다."""
+  STORE
+}
+
+# ---- src/features/region/region-admin.graphql ----
+extend type Query {
+  """
+  지역 마스터 목록을 level·sortOrder·id 순으로 조회한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminRegions(input: AdminRegionListInput): [AdminRegion!]!
+}
+
+extend type Mutation {
+  """
+  지역을 만든다. parentId가 없으면 1차(광역), 있으면 그 아래 2차(시군구)다 — parentId는 활성 1차 지역이어야
+  하며 아니면 BAD_USER_INPUT. slug가 이미 쓰이고 있으면 BAD_USER_INPUT. 삭제된 같은 slug가 있으면 새로 만들지
+  않고 복구하되, 삭제된 지역과 level이 다르면 BAD_USER_INPUT. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminCreateRegion(input: AdminCreateRegionInput!): AdminRegion!
+  """
+  지역을 수정한다. 전달한 필드만 바뀌고 parentId·level은 바꿀 수 없다. slug 충돌이면 BAD_USER_INPUT, 없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminUpdateRegion(input: AdminUpdateRegionInput!): AdminRegion!
+  """
+  지역을 삭제(soft-delete)한다. 2차 지역에 매장이 연결돼 있거나 1차 지역에 하위 지역(비활성 포함)이 있으면 BAD_USER_INPUT.
+  없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminDeleteRegion(regionId: ID!): Boolean!
+}
+
+"""
+지역 마스터 1건.
+"""
+type AdminRegion {
+  id: ID!
+  """
+  상위 1차 지역 ID. 1차 지역이면 null.
+  """
+  parentId: ID
+  """
+  1 = 광역 그룹, 2 = 시군구.
+  """
+  level: Int!
+  """
+  이름.
+  """
+  name: String!
+  """
+  URL·시드용 고유 키.
+  """
+  slug: String!
+  """
+  노출 순서. 오름차순.
+  """
+  sortOrder: Int!
+  """
+  노출 여부.
+  """
+  isActive: Boolean!
+  """
+  중심 위도. 미등록 시 null.
+  """
+  centerLat: String
+  """
+  중심 경도. 미등록 시 null.
+  """
+  centerLng: String
+  """
+  연결된 매장 수(삭제 제외). 2차 지역만 의미 있다.
+  """
+  storeCount: Int!
+  """
+  활성 하위 지역 수. 1차 지역만 의미 있다.
+  """
+  childCount: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+지역 목록 조회 조건.
+"""
+input AdminRegionListInput {
+  """
+  상위 지역 ID. 지정하면 그 아래 2차 지역만, 미지정 시 전체.
+  """
+  parentId: ID
+  """
+  비활성 포함 여부. 기본 false.
+  """
+  includeInactive: Boolean = false
+}
+
+"""
+지역 생성 입력.
+"""
+input AdminCreateRegionInput {
+  """
+  상위 1차 지역 ID. 없으면 1차 지역을 만든다.
+  """
+  parentId: ID
+  """
+  이름. 1~80자.
+  """
+  name: String!
+  """
+  고유 키. 1~120자, 소문자·숫자·`-`만.
+  """
+  slug: String!
+  """
+  노출 순서. 미지정 시 0.
+  """
+  sortOrder: Int
+  """
+  노출 여부. 기본 true.
+  """
+  isActive: Boolean = true
+  """
+  중심 위도(문자열, -90~90). 선택.
+  """
+  centerLat: String
+  """
+  중심 경도(문자열, -180~180). 선택.
+  """
+  centerLng: String
+}
+
+"""
+지역 수정 입력. 전달한 필드만 변경된다.
+"""
+input AdminUpdateRegionInput {
+  regionId: ID!
+  """
+  이름.
+  """
+  name: String
+  """
+  고유 키.
+  """
+  slug: String
+  """
+  노출 순서.
+  """
+  sortOrder: Int
+  """
+  노출 여부.
+  """
+  isActive: Boolean
+  """
+  중심 위도. null이면 제거.
+  """
+  centerLat: String
+  """
+  중심 경도. null이면 제거.
+  """
+  centerLng: String
+}
+
+# ---- src/features/region/region.types.graphql ----
+extend type Query {
+  """1차 광역 지역 목록 (전국 포함)"""
+  regionGroups: [RegionGroup!]!
+  """특정 1차 지역의 2차 시군구 목록"""
+  regions(parentId: ID!): [Region!]!
+  """지역명 자동검색 (1·2차 모두 대상)"""
+  searchRegions(input: SearchRegionsInput!): [RegionSearchResult!]!
+  """
+  현재 위치가 속한 2차 지역과 그 상위 1차 지역. 비로그인 허용. 선택 가능한 지역이 없으면 null(서비스 지역 밖·바다·해외 포함).
+  위치 변환(카카오)이 실패하면 LOCATION_LOOKUP_UNAVAILABLE, IP당 분당 30회를 넘으면 RATE_LIMITED. 좌표는 저장하지 않고 이용 사실만 기록한다.
+  """
+  regionByLocation(input: RegionByLocationInput!): RegionByLocation
+}
+
+"""현재 위치(WGS84)."""
+input RegionByLocationInput {
+  """위도. -90~90."""
+  latitude: Float!
+  """경도. -180~180."""
+  longitude: Float!
+}
+
+"""현재 위치가 속한 지역."""
+type RegionByLocation {
+  """상위 1차 지역."""
+  group: RegionGroup!
+  """현재 위치가 속한 2차 시군구."""
+  region: Region!
+}
+
+"""지역 자동검색 입력."""
+input SearchRegionsInput {
+  """검색어. 1·2차 지역명 모두를 대상으로 부분일치 검색한다."""
+  keyword: String!
+  """한 번에 가져올 개수. 기본 20, 1~50만 허용하며 벗어나면 BAD_USER_INPUT."""
+  limit: Int = 20
+}
+
+"""1차 광역 지역 (예: 서울 북부, 인천)"""
+type RegionGroup {
+  id: ID!
+  """화면에 노출되는 1차 지역명."""
+  name: String!
+  """URL·쿼리에 쓰는 영문 식별자."""
+  slug: String!
+  """하위 2차 지역 보유 여부 (전국 등은 false)"""
+  hasChildren: Boolean!
+}
+
+"""2차 시군구 지역 (예: 강남구, 수원시영통구)"""
+type Region {
+  id: ID!
+  """상위 1차 지역 ID. 최상위면 null."""
+  parentId: ID
+  """화면에 노출되는 2차 지역명."""
+  name: String!
+  """URL·쿼리에 쓰는 영문 식별자."""
+  slug: String!
+  """지역 계층 깊이. 1=광역, 2=시군구."""
+  level: Int!
+}
+
+"""지역 검색 결과. 동명 시군구 구분을 위해 상위 지역명을 동반."""
+type RegionSearchResult {
+  id: ID!
+  """매칭된 지역명."""
+  name: String!
+  """상위 1차 지역명. 동명 시군구를 구분하는 용도이며 1차 지역이면 null."""
+  parentName: String
+  """지역 계층 깊이. 1=광역, 2=시군구."""
+  level: Int!
+}
+
+# ---- src/features/review/review-admin.graphql ----
+extend type Query {
+  """
+  리뷰·댓글 신고 목록을 최신 접수순으로 조회한다. 기본은 PENDING만. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminReviewReports(
+    input: AdminReviewReportListInput
+  ): AdminReviewReportConnection!
+  """
+  신고 1건을 대상 원문과 함께 조회한다. 없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminReviewReport(reportId: ID!): AdminReviewReportDetail!
+  """
+  리뷰 목록을 최신순으로 조회한다(삭제 포함 가능). 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminReviews(input: AdminReviewListInput): AdminReviewConnection!
+  """
+  리뷰 댓글 목록을 최신순으로 조회한다(삭제 포함 가능). 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminReviewComments(
+    input: AdminReviewCommentListInput
+  ): AdminReviewCommentConnection!
+}
+
+extend type Mutation {
+  """
+  신고를 처리한다. DELETE_TARGET은 대상(리뷰 또는 댓글)을 삭제하고 같은 대상의 다른 미처리 신고도 함께 RESOLVED로 닫는다.
+  REJECT는 이 신고만 REJECTED로 닫는다. 이미 처리된 신고면 BAD_USER_INPUT, 없으면 NOT_FOUND.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminResolveReviewReport(
+    input: AdminResolveReviewReportInput!
+  ): AdminReviewReport!
+  """
+  리뷰를 강제 삭제(soft-delete)한다. 사진·댓글도 함께 내려가고 미처리 신고는 RESOLVED로 닫힌다.
+  없거나 이미 삭제됐으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminDeleteReview(input: AdminDeleteReviewInput!): Boolean!
+  """
+  리뷰 댓글을 강제 삭제(soft-delete)한다. 미처리 신고는 RESOLVED로 닫힌다.
+  없거나 이미 삭제됐으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminDeleteReviewComment(input: AdminDeleteReviewCommentInput!): Boolean!
+}
+
+"""
+신고 대상 종류.
+"""
+enum AdminReviewReportTargetType {
+  """
+  리뷰.
+  """
+  REVIEW
+  """
+  리뷰 댓글.
+  """
+  REVIEW_COMMENT
+}
+
+"""
+신고 처리 방식.
+"""
+enum AdminReviewReportAction {
+  """
+  대상을 삭제하고 같은 대상의 미처리 신고를 모두 RESOLVED로 닫는다.
+  """
+  DELETE_TARGET
+  """
+  이 신고만 REJECTED로 닫고 대상은 유지한다.
+  """
+  REJECT
+}
+
+"""
+리뷰·댓글 신고 1건.
+"""
+type AdminReviewReport {
+  id: ID!
+  """
+  대상 종류.
+  """
+  targetType: AdminReviewReportTargetType!
+  """
+  대상 ID(리뷰 또는 댓글).
+  """
+  targetId: ID!
+  """
+  신고자 계정 ID.
+  """
+  reporterAccountId: ID!
+  """
+  신고 시점의 신고자 닉네임. 이후 닉네임을 바꾸거나 탈퇴해도 그대로 남는다. 이 값을 기록하기 전에 탈퇴한 신고자는 null.
+  """
+  reporterNickname: String
+  """
+  신고자가 지금 탈퇴한 상태면 true.
+  """
+  reporterWithdrawn: Boolean!
+  """
+  신고 사유.
+  """
+  reason: ReviewReportReason!
+  """
+  상세 설명. 없으면 null.
+  """
+  detail: String
+  """
+  신고 시점의 대상 본문(리뷰는 2000자까지). 작성자가 삭제·재작성해도 무엇이 신고됐는지 남는다.
+  """
+  contentSnapshot: String
+  """
+  처리 상태.
+  """
+  status: ReviewReportStatus!
+  """
+  처리한 관리자 계정 ID. 미처리면 null.
+  """
+  resolvedByAccountId: ID
+  """
+  처리한 관리자의 처리 시점 라벨 `이름(아이디)`(한쪽만 있으면 그 값). 미처리이거나 작성자 삭제로 닫혔으면 null.
+  """
+  resolvedByLabel: String
+  """
+  처리 시각. 미처리면 null.
+  """
+  resolvedAt: DateTime
+  """
+  처리 메모. 없으면 null.
+  """
+  resolutionNote: String
+  """
+  접수 시각.
+  """
+  createdAt: DateTime!
+}
+
+"""
+신고 대상 원문 요약.
+"""
+type AdminReviewReportTarget {
+  """
+  대상 ID.
+  """
+  id: ID!
+  """
+  댓글이면 소속 리뷰 ID, 리뷰면 null.
+  """
+  reviewId: ID
+  """
+  작성자 계정 ID.
+  """
+  authorAccountId: ID!
+  """
+  작성자 닉네임. 탈퇴(프로필 삭제)면 null.
+  """
+  authorNickname: String
+  """
+  본문. 리뷰는 없을 수 있다.
+  """
+  content: String
+  """
+  리뷰가 달린 매장 ID.
+  """
+  storeId: ID!
+  """
+  리뷰 작성 시점의 매장명(주문 품목 스냅샷).
+  """
+  storeName: String!
+  """
+  이미 삭제된 대상이면 true.
+  """
+  deleted: Boolean!
+  """
+  리뷰 대상이면 첨부 미디어(sortOrder 순, 삭제된 대상이면 함께 내려간 미디어). 댓글 대상이면 빈 배열.
+  """
+  media: [ReviewMedia!]!
+}
+
+"""
+신고 상세.
+"""
+type AdminReviewReportDetail {
+  """
+  신고.
+  """
+  report: AdminReviewReport!
+  """
+  대상 원문.
+  """
+  target: AdminReviewReportTarget!
+}
+
+"""
+신고 목록 페이지. 최신 접수가 먼저 온다.
+"""
+type AdminReviewReportConnection {
+  """
+  신고. 최신 접수가 먼저 온다.
+  """
+  items: [AdminReviewReport!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+리뷰(관리자 시점).
+"""
+type AdminReview {
+  id: ID!
+  """
+  매장 ID.
+  """
+  storeId: ID!
+  """
+  매장명.
+  """
+  storeName: String!
+  """
+  상품 ID.
+  """
+  productId: ID!
+  """
+  리뷰 작성 시점의 상품명(주문 품목 스냅샷).
+  """
+  productName: String!
+  """
+  작성자 계정 ID.
+  """
+  authorAccountId: ID!
+  """
+  작성자 닉네임. 탈퇴(프로필 삭제)면 null.
+  """
+  authorNickname: String
+  """
+  평점(0.0~5.0).
+  """
+  rating: Float!
+  """
+  본문. 없으면 null.
+  """
+  content: String
+  """
+  댓글 수(삭제 제외).
+  """
+  commentCount: Int!
+  """
+  좋아요 수(삭제 제외).
+  """
+  likeCount: Int!
+  """
+  삭제된 리뷰면 true.
+  """
+  deleted: Boolean!
+  """
+  첨부 미디어(sortOrder 순). 삭제된 리뷰면 리뷰와 함께 내려간 미디어. 없으면 빈 배열.
+  """
+  media: [ReviewMedia!]!
+  """
+  작성 시각.
+  """
+  createdAt: DateTime!
+}
+
+"""
+리뷰 목록 페이지. 최신 작성이 먼저 온다.
+"""
+type AdminReviewConnection {
+  """
+  리뷰. 최신 작성이 먼저 온다.
+  """
+  items: [AdminReview!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+리뷰 댓글(관리자 시점).
+"""
+type AdminReviewComment {
+  id: ID!
+  """
+  소속 리뷰 ID.
+  """
+  reviewId: ID!
+  """
+  작성자 계정 ID.
+  """
+  authorAccountId: ID!
+  """
+  작성자 닉네임. 탈퇴(프로필 삭제)면 null.
+  """
+  authorNickname: String
+  """
+  본문.
+  """
+  content: String!
+  """
+  삭제된 댓글이면 true.
+  """
+  deleted: Boolean!
+  """
+  작성 시각.
+  """
+  createdAt: DateTime!
+}
+
+"""
+리뷰 댓글 목록 페이지. 최신 작성이 먼저 온다.
+"""
+type AdminReviewCommentConnection {
+  """
+  댓글. 최신 작성이 먼저 온다.
+  """
+  items: [AdminReviewComment!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+신고 목록 조회 조건.
+"""
+input AdminReviewReportListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  처리 상태 필터. 기본 PENDING. 전체를 보려면 null을 명시한다.
+  """
+  status: ReviewReportStatus = PENDING
+  """
+  대상 종류 필터. 미지정 시 전체.
+  """
+  targetType: AdminReviewReportTargetType
+}
+
+"""
+리뷰 목록 조회 조건.
+"""
+input AdminReviewListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  본문 부분일치 검색어. 최대 100자. 미지정 시 전체.
+  """
+  keyword: String
+  """
+  매장 ID 필터. 미지정 시 전체.
+  """
+  storeId: ID
+  """
+  작성자 계정 ID 필터. 미지정 시 전체.
+  """
+  accountId: ID
+  """
+  리뷰 ID 필터. 지정하면 그 리뷰 1건만(삭제 리뷰는 includeDeleted일 때만). 미지정 시 전체.
+  """
+  reviewId: ID
+  """
+  삭제된 리뷰 포함 여부. 기본 false.
+  """
+  includeDeleted: Boolean = false
+}
+
+"""
+리뷰 댓글 목록 조회 조건.
+"""
+input AdminReviewCommentListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  소속 리뷰 ID 필터. 미지정 시 전체.
+  """
+  reviewId: ID
+  """
+  작성자 계정 ID 필터. 미지정 시 전체.
+  """
+  accountId: ID
+  """
+  삭제된 댓글 포함 여부. 기본 false.
+  """
+  includeDeleted: Boolean = false
+}
+
+"""
+신고 처리 입력.
+"""
+input AdminResolveReviewReportInput {
+  reportId: ID!
+  """
+  처리 방식.
+  """
+  action: AdminReviewReportAction!
+  """
+  처리 메모. 최대 500자. 선택.
+  """
+  note: String
+}
+
+"""
+리뷰 강제 삭제 입력.
+"""
+input AdminDeleteReviewInput {
+  reviewId: ID!
+  """
+  삭제 사유. 감사 로그와 닫히는 신고의 메모에 기록된다. 최대 500자.
+  """
+  reason: String!
+}
+
+"""
+리뷰 댓글 강제 삭제 입력.
+"""
+input AdminDeleteReviewCommentInput {
+  commentId: ID!
+  """
+  삭제 사유. 감사 로그와 닫히는 신고의 메모에 기록된다. 최대 500자.
+  """
+  reason: String!
+}
+
+# ---- src/features/review/review-engagement.graphql ----
+extend type Mutation {
+  """
+  리뷰 좋아요. 로그인 필수.
+  """
+  likeReview(reviewId: ID!): Boolean!
+  """
+  리뷰 좋아요 해제(멱등: 좋아요가 없어도 true). 로그인 필수.
+  """
+  unlikeReview(reviewId: ID!): Boolean!
+  """
+  리뷰 댓글 작성. 로그인 필수.
+  """
+  writeReviewComment(input: WriteReviewCommentInput!): MyReviewComment!
+  """
+  내 리뷰 댓글 삭제(soft). 로그인 필수. 본인 댓글만 가능.
+  """
+  deleteMyReviewComment(commentId: ID!): Boolean!
+}
+
+"""
+리뷰 댓글 작성 입력.
+"""
+input WriteReviewCommentInput {
+  reviewId: ID!
+  """
+  1~500자
+  """
+  content: String!
+}
+
+"""
+작성된 내 리뷰 댓글(작성 직후 반환).
+"""
+type MyReviewComment {
+  id: ID!
+  reviewId: ID!
+  """
+  댓글 본문.
+  """
+  content: String!
+  """
+  작성 시각.
+  """
+  createdAt: DateTime!
+}
+
+extend type Mutation {
+  """
+  리뷰를 신고한다. 로그인 필수(USER). 리뷰가 없거나 삭제됐거나 매장·상품이 내려가 있으면 NOT_FOUND,
+  본인 리뷰면 BAD_USER_INPUT. 같은 리뷰에 아직 처리되지 않은 내 신고가 있으면 새로 만들지 않고 그 건을 돌려준다(alreadyReported=true).
+  """
+  reportReview(input: ReportReviewInput!): ReviewReportResult!
+  """
+  리뷰 댓글을 신고한다. 로그인 필수(USER). 댓글이 없거나 삭제됐거나 리뷰·매장·상품이 내려가 있으면 NOT_FOUND,
+  본인 댓글이면 BAD_USER_INPUT. 같은 댓글에 아직 처리되지 않은 내 신고가 있으면 그 건을 돌려준다(alreadyReported=true).
+  """
+  reportReviewComment(input: ReportReviewCommentInput!): ReviewReportResult!
+}
+
+"""
+신고 사유.
+"""
+enum ReviewReportReason {
+  """
+  광고·도배.
+  """
+  SPAM
+  """
+  욕설·비방.
+  """
+  ABUSE
+  """
+  부적절한 내용(음란·혐오 등).
+  """
+  INAPPROPRIATE
+  """
+  기타. detail에 사유를 적는다.
+  """
+  OTHER
+}
+
+"""
+신고 처리 상태.
+"""
+enum ReviewReportStatus {
+  """
+  접수됨. 운영자 확인 대기.
+  """
+  PENDING
+  """
+  처리됨(대상 삭제).
+  """
+  RESOLVED
+  """
+  기각됨(대상 유지).
+  """
+  REJECTED
+}
+
+"""
+리뷰 신고 입력.
+"""
+input ReportReviewInput {
+  reviewId: ID!
+  """
+  신고 사유.
+  """
+  reason: ReviewReportReason!
+  """
+  상세 설명. 최대 500자. 선택.
+  """
+  detail: String
+}
+
+"""
+리뷰 댓글 신고 입력.
+"""
+input ReportReviewCommentInput {
+  commentId: ID!
+  """
+  신고 사유.
+  """
+  reason: ReviewReportReason!
+  """
+  상세 설명. 최대 500자. 선택.
+  """
+  detail: String
+}
+
+"""
+신고 접수 결과.
+"""
+type ReviewReportResult {
+  """
+  신고 ID.
+  """
+  reportId: ID!
+  """
+  처리 상태. 접수 직후는 PENDING.
+  """
+  status: ReviewReportStatus!
+  """
+  이미 접수된 내 신고를 돌려준 경우 true.
+  """
+  alreadyReported: Boolean!
+  """
+  접수 시각.
+  """
+  createdAt: DateTime!
+}
+
+# ---- src/features/review/review-listing.graphql ----
+extend type Query {
+  """
+  상품 공개 리뷰 목록(커서). 사진 필터·정렬 지원. 비로그인 접근 가능.
+  """
+  productReviews(input: ProductReviewsInput!): ProductReviewConnection!
+
+  """
+  매장 공개 리뷰 목록(최신순, 커서 기반). 비로그인 접근 가능.
+  """
+  storeReviews(input: StoreReviewsInput!): StoreReviewConnection!
+}
+
+"""
+상품 리뷰 목록 조회 조건.
+"""
+input ProductReviewsInput {
+  productId: ID!
+  """
+  true면 사진(미디어) 있는 리뷰만(사진후기 그리드/사진후기 상세).
+  """
+  photoOnly: Boolean = false
+  """
+  정렬 기준. 기본 최신순. 정렬을 바꾸면 기존 cursor는 무효다.
+  """
+  sort: ReviewSort = LATEST
+  """
+  이전 페이지의 nextCursor 값(불투명 토큰). 동일 sort에서만 유효.
+  """
+  cursor: String
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+}
+
+"""
+매장 리뷰 목록 조회 조건.
+"""
+input StoreReviewsInput {
+  storeId: ID!
+  """
+  true면 사진(미디어) 있는 리뷰만(사진후기 그리드).
+  """
+  photoOnly: Boolean = false
+  """
+  정렬 기준. 기본 최신순. 정렬을 바꾸면 기존 cursor는 무효다.
+  """
+  sort: ReviewSort = LATEST
+  """
+  이전 페이지의 nextCursor 값(불투명 토큰). 동일 sort에서만 유효.
+  """
+  cursor: String
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+}
+
+"""
+상품 리뷰 목록(커서 기반).
+"""
+type ProductReviewConnection {
+  """
+  리뷰. 요청한 sort 순서로 온다.
+  """
+  items: [ProductReview!]!
+  """
+  전체 리뷰 수(후기 탭 카운트). 0이면 빈 상태.
+  """
+  totalCount: Int!
+  """
+  사진 리뷰 수(사진후기 카운트).
+  """
+  photoTotalCount: Int!
+  """
+  다음 페이지 존재 여부.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다. 정렬을 바꾸면 기존 커서는 무효다.
+  """
+  nextCursor: String
+}
+
+"""
+상품 공개 리뷰.
+"""
+type ProductReview {
+  id: ID!
+  """
+  평점(0.0~5.0).
+  """
+  rating: Float!
+  """
+  리뷰 본문. 없으면 null.
+  """
+  content: String
+  """
+  첨부 미디어. 없으면 빈 배열.
+  """
+  media: [ReviewMedia!]!
+  """
+  좋아요 수.
+  """
+  likeCount: Int!
+  """
+  로그인 사용자의 좋아요 여부(비로그인 시 false).
+  """
+  isLiked: Boolean!
+  """
+  댓글 수.
+  """
+  commentCount: Int!
+  """
+  작성자 닉네임(탈퇴 시 null).
+  """
+  authorNickname: String
+  """
+  작성자 프로필 이미지(탈퇴/미설정 시 null).
+  """
+  authorProfileImageUrl: String
+  """
+  주문 시 선택 옵션 스냅샷(커스텀 정보: 모양/크기/맛 등).
+  """
+  customOptions: [ReviewCustomOption!]!
+  """
+  작성 시각. 최신순 정렬 기준이다.
+  """
+  createdAt: DateTime!
+}
+
+"""
+리뷰의 주문 옵션 스냅샷(커스텀 정보 행).
+"""
+type ReviewCustomOption {
+  """
+  옵션 그룹명 스냅샷(예: 모양/크기/맛).
+  """
+  groupName: String!
+  """
+  선택 옵션명 스냅샷(예: (기본) 동그라미).
+  """
+  optionTitle: String!
+}
+
+"""
+매장 리뷰 목록(커서 기반).
+"""
+type StoreReviewConnection {
+  """
+  리뷰. 요청한 sort 순서로 온다.
+  """
+  items: [StoreReview!]!
+  """
+  전체 리뷰 수(후기 탭 카운트). 0이면 빈 상태.
+  """
+  totalCount: Int!
+  """
+  사진 리뷰 수(사진후기 카운트).
+  """
+  photoTotalCount: Int!
+  """
+  다음 페이지 존재 여부.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다. 정렬을 바꾸면 기존 커서는 무효다.
+  """
+  nextCursor: String
+}
+
+"""
+매장 공개 리뷰.
+"""
+type StoreReview {
+  id: ID!
+  """
+  평점(0.0~5.0).
+  """
+  rating: Float!
+  """
+  리뷰 본문. 없으면 null.
+  """
+  content: String
+  """
+  첨부 미디어. 없으면 빈 배열.
+  """
+  media: [ReviewMedia!]!
+  """
+  좋아요 수.
+  """
+  likeCount: Int!
+  """
+  로그인 사용자의 좋아요 여부(비로그인 시 false).
+  """
+  isLiked: Boolean!
+  """
+  작성자 닉네임.
+  """
+  authorNickname: String
+  """
+  연결 상품명(주문 시점 스냅샷).
+  """
+  productName: String!
+  """
+  작성 시각. 최신순 정렬 기준이다.
+  """
+  createdAt: DateTime!
+}
+
+# ---- src/features/review/review.types.graphql ----
+"""
+리뷰 첨부 미디어 1건. 상품 리뷰·매장 리뷰·내 리뷰·관리자 리뷰가 공용으로 쓴다.
+"""
+type ReviewMedia {
+  """
+  미디어 종류.
+  """
+  mediaType: ReviewMediaType!
+  """
+  미디어 원본 URL.
+  """
+  mediaUrl: String!
+  """
+  동영상 대표 프레임 URL. 이미지면 null일 수 있다.
+  """
+  thumbnailUrl: String
+  """
+  노출 순서. 오름차순.
+  """
+  sortOrder: Int!
+}
+
+"""
+리뷰 첨부 미디어 종류.
+"""
+enum ReviewMediaType {
+  """
+  이미지.
+  """
+  IMAGE
+  """
+  동영상. thumbnailUrl이 있으면 대표 프레임으로 쓰지만 필수가 아니라 없을 수 있다.
+  """
+  VIDEO
+}
+
+"""
+리뷰 목록 정렬. 상품 리뷰·매장 리뷰가 공용으로 쓴다.
+"""
+enum ReviewSort {
+  """
+  최신순.
+  """
+  LATEST
+  """
+  좋아요순(동률이면 최신순).
+  """
+  LIKES
+}
+
+# ---- src/features/search/search-admin.graphql ----
+extend type Query {
+  """
+  검색 키워드 바로가기 칩 전체(삭제 제외, 비활성·노출 기간 밖 포함)를 노출 순서(sortOrder·id)대로 조회한다.
+  adminReorderSearchKeywordChips는 이 목록 전체를 받는다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminSearchKeywordChips: [AdminSearchKeywordChip!]!
+}
+
+extend type Mutation {
+  """
+  검색 키워드 바로가기 칩을 만든다. 새 칩은 맨 뒤에 붙는다. keyword는 검색과 같은 규칙(앞뒤 공백 제거,
+  연속 공백 1칸)으로 정규화하며 비면 KEYWORD_EMPTY, 200자를 넘으면 KEYWORD_TOO_LONG. 삭제되지 않은 칩과
+  키워드가 같으면(대소문자 무시) SEARCH_KEYWORD_CHIP_TAKEN, startsAt이 endsAt보다 늦거나 같으면
+  INVALID_EXPOSURE_WINDOW(모두 BAD_USER_INPUT). 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminCreateSearchKeywordChip(
+    input: AdminCreateSearchKeywordChipInput!
+  ): AdminSearchKeywordChip!
+  """
+  검색 키워드 바로가기 칩을 수정한다. 전달한 필드만 바뀌며, 노출 기간은 현재 값과 병합한 최종 상태로 검증한다.
+  키워드·기간 규칙은 adminCreateSearchKeywordChip과 같다. 없거나 삭제됐으면 NOT_FOUND. 관리자 로그인 필수.
+  ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminUpdateSearchKeywordChip(
+    input: AdminUpdateSearchKeywordChipInput!
+  ): AdminSearchKeywordChip!
+  """
+  검색 키워드 바로가기 칩을 삭제(soft-delete)한다. 삭제한 키워드는 새 칩으로 다시 만들 수 있다. 없거나 이미
+  삭제됐으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminDeleteSearchKeywordChip(chipId: ID!): Boolean!
+  """
+  검색 키워드 바로가기 칩의 노출 순서를 바꾼다. chipIds 배열 순서가 곧 새 순서이며, 삭제되지 않은 칩
+  전부(adminSearchKeywordChips 결과)를 빠짐없이 보내야 한다. 중복 ID는 DUPLICATE_IDS, 개수가 다르면
+  IDS_LENGTH_MISMATCH, 없는 ID가 섞이면 INVALID_IDS(모두 BAD_USER_INPUT) — 화면을 연 사이 다른 관리자가
+  칩을 추가·삭제했으면 목록을 다시 불러와야 한다. 바뀐 순서의 전체 목록을 반환한다. 관리자 로그인 필수.
+  ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminReorderSearchKeywordChips(
+    input: AdminReorderSearchKeywordChipsInput!
+  ): [AdminSearchKeywordChip!]!
+}
+
+"""
+검색 키워드 바로가기 칩 1건(관리자용).
+"""
+type AdminSearchKeywordChip {
+  id: ID!
+  """
+  칩 문구이자 누르면 실행되는 검색어(정규화된 값).
+  """
+  keyword: String!
+  """
+  노출 순서. 오름차순.
+  """
+  sortOrder: Int!
+  """
+  노출 여부. false면 기간과 무관하게 노출하지 않는다.
+  """
+  isActive: Boolean!
+  """
+  노출 시작 시각(포함). null이면 시작 제한 없음.
+  """
+  startsAt: DateTime
+  """
+  노출 종료 시각(제외). null이면 종료 제한 없음.
+  """
+  endsAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+검색 키워드 바로가기 칩 생성 입력.
+"""
+input AdminCreateSearchKeywordChipInput {
+  """
+  칩 문구이자 검색어. 정규화 후 1~200자(코드 포인트 기준).
+  """
+  keyword: String!
+  """
+  노출 여부. 기본 true.
+  """
+  isActive: Boolean = true
+  """
+  노출 시작 시각(포함, ISO 8601 오프셋 포함). 생략하면 시작 제한 없음.
+  """
+  startsAt: DateTime
+  """
+  노출 종료 시각(제외, ISO 8601 오프셋 포함). 생략하면 종료 제한 없음.
+  """
+  endsAt: DateTime
+}
+
+"""
+검색 키워드 바로가기 칩 수정 입력. 전달한 필드만 변경된다.
+"""
+input AdminUpdateSearchKeywordChipInput {
+  chipId: ID!
+  """
+  칩 문구이자 검색어. null은 허용하지 않는다.
+  """
+  keyword: String
+  """
+  노출 여부. null은 허용하지 않는다.
+  """
+  isActive: Boolean
+  """
+  노출 시작 시각(포함). null이면 시작 제한을 없앤다.
+  """
+  startsAt: DateTime
+  """
+  노출 종료 시각(제외). null이면 종료 제한을 없앤다.
+  """
+  endsAt: DateTime
+}
+
+"""
+검색 키워드 바로가기 칩 순서 변경 입력.
+"""
+input AdminReorderSearchKeywordChipsInput {
+  """
+  새 노출 순서대로 나열한 칩 ID 전체(삭제되지 않은 칩 전부).
+  """
+  chipIds: [ID!]!
+}
+
+# ---- src/features/search/search-entry.graphql ----
+extend type Query {
+  """
+  검색 진입 화면 '인기 검색어' TOP10(매시 정각 스냅샷 기준, 순위 변동 포함). 스냅샷이 없으면 빈 목록 + rankedAt null. 비로그인 접근 가능.
+  """
+  popularSearchKeywords(
+    input: PopularSearchKeywordsInput
+  ): PopularSearchKeywordsResult!
+
+  """
+  검색 진입 화면 '실시간 판매 Best'(최근 24시간 유효 주문 수량 합 desc, 판매 0건 제외). 비로그인 접근 가능.
+  """
+  realtimeBestCakes(input: RealtimeBestCakesInput): RealtimeBestCakesResult!
+
+  """
+  검색 진입 화면 배너(placement=SEARCH) 1건. 등록된 배너가 없으면 null(FE placeholder 처리). 비로그인 접근 가능.
+  """
+  searchBanner: HomeBanner
+
+  """
+  검색 진입 화면 키워드 바로가기 칩(누르면 그 키워드로 검색). 노출 중인 칩의 키워드를 노출 순서대로 준다.
+  노출 여부가 켜져 있고 노출 기간(시작 포함, 종료 제외) 안인 칩만 포함하며, 없으면 빈 목록. 비로그인 접근 가능.
+  """
+  searchKeywordChips: [String!]!
+}
+
+extend type Mutation {
+  """
+  검색 실행 기록. 로그인 시 최근 검색어(SearchHistory) 갱신 + 인기 검색어 집계 이벤트 기록, 비로그인 시 집계 이벤트만. 검색 실행 시 1회 호출(탭 전환·페이지네이션에는 호출하지 않는다).
+  """
+  recordSearch(
+    """
+    기록할 검색어. 앞뒤 공백 제거 + 연속 공백 1칸 축약 후 저장한다. 빈 문자열이거나
+    200자(코드 포인트 기준)를 넘으면 BAD_USER_INPUT.
+    """
+    keyword: String!
+  ): Boolean!
+}
+
+"""
+인기 검색어 조회 조건.
+"""
+input PopularSearchKeywordsInput {
+  """
+  노출 개수(최대 20 — 스냅샷 저장 상한).
+  """
+  limit: Int = 10
+}
+
+"""
+직전 스냅샷 대비 순위 변동.
+"""
+enum SearchKeywordTrend {
+  """
+  직전 스냅샷보다 순위가 올랐다.
+  """
+  UP
+  """
+  직전 스냅샷보다 순위가 내렸다.
+  """
+  DOWN
+  """
+  직전 스냅샷과 순위가 같다.
+  """
+  SAME
+  """
+  직전 스냅샷에 없던 신규 진입. 상승(UP)과 구분된다.
+  """
+  NEW
+}
+
+"""
+인기 검색어 스냅샷. 정각마다 갱신된다.
+"""
+type PopularSearchKeywordsResult {
+  """
+  순위 오름차순.
+  """
+  items: [PopularSearchKeyword!]!
+  """
+  스냅샷 기준 시각(정각). 화면의 'YY.MM.DD HH:mm 기준' 표기. 스냅샷이 없으면 null.
+  """
+  rankedAt: DateTime
+}
+
+"""
+인기 검색어 1건.
+"""
+type PopularSearchKeyword {
+  """
+  순위(1부터).
+  """
+  rank: Int!
+  """
+  정규화된 검색어.
+  """
+  keyword: String!
+  """
+  직전 스냅샷 대비 순위 변동.
+  """
+  trend: SearchKeywordTrend!
+  """
+  집계 윈도우(직전 24시간) 내 검색 횟수.
+  """
+  searchCount: Int!
+}
+
+"""
+실시간 판매 Best 조회 조건.
+"""
+input RealtimeBestCakesInput {
+  """
+  카드 수(최대 20).
+  """
+  limit: Int = 10
+}
+
+"""
+실시간 판매 Best. 카드는 홈 인기 케이크와 동일 타입(지역·매장명·케이크명·가격·할인율).
+"""
+type RealtimeBestCakesResult {
+  """
+  판매 Best 카드. 순위 오름차순.
+  """
+  items: [PopularCake!]!
+  """
+  집계 기준 시각(호출 시점). 화면의 'YY.MM.DD HH:mm 기준' 표기.
+  """
+  rankedAt: DateTime!
+}
+
+# ---- src/features/search/search-history.graphql ----
+extend type Query {
+  """
+  최근 검색어 목록 조회. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  mySearchHistories(input: MySearchHistoriesInput): SearchHistoryConnection!
+}
+
+extend type Mutation {
+  """
+  특정 검색어 기록 삭제. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  deleteSearchHistory(id: ID!): Boolean!
+  """
+  검색어 기록 전체 삭제. 로그인 필수. 본인 데이터만 대상이 된다.
+  """
+  clearSearchHistories: Boolean!
+}
+
+"""
+검색어 목록 조회 입력
+"""
+input MySearchHistoriesInput {
+  """
+  오프셋
+  """
+  offset: Int = 0
+  """
+  조회 개수(최대 50)
+  """
+  limit: Int = 20
+}
+
+"""
+검색어 목록 응답
+"""
+type SearchHistoryConnection {
+  """
+  검색어 아이템 목록
+  """
+  items: [SearchHistoryItem!]!
+  """
+  전체 개수
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부
+  """
+  hasMore: Boolean!
+}
+
+"""
+검색어 아이템
+"""
+type SearchHistoryItem {
+  """
+  검색 기록 ID
+  """
+  id: ID!
+  """
+  검색어
+  """
+  keyword: String!
+  """
+  마지막 사용 시각
+  """
+  lastUsedAt: DateTime!
+}
+
+# ---- src/features/search/search-result.graphql ----
+extend type Query {
+  """
+  검색 결과 '전체' 탭 카운트(상품/매장). 필터·정렬 없이 키워드(+지역)만 반영하며, keyword를 생략하면 지역만 반영한다. '전체 N'은 FE가 합산. 비로그인 접근 가능.
+  """
+  searchSummary(input: SearchSummaryInput!): SearchSummary!
+}
+
+"""
+검색 결과 탭 카운트 조회 조건.
+"""
+input SearchSummaryInput {
+  """
+  검색어. 규칙은 SearchProductsInput.keyword와 같다(생략·null이면 검색어 조건 없음, 빈 문자열·공백은 400).
+  """
+  keyword: String
+  """
+  2차 시군구 ID 다중 선택. 비우면 전국 대상.
+  """
+  regionIds: [ID!]
+}
+
+"""
+검색 결과 탭 카운트. '전체 N'은 두 값을 FE가 합산한다.
+"""
+type SearchSummary {
+  """
+  조건에 맞는 상품 수.
+  """
+  productCount: Int!
+  """
+  조건에 맞는 매장 수.
+  """
+  storeCount: Int!
+}
+
+# ---- src/features/store/store-admin-geocode.graphql ----
+extend type Query {
+  """
+  주소 문자열을 좌표·행정구역으로 변환한다(카카오 로컬 주소 검색의 첫 결과). 매장 등록·수정과 지역 중심 좌표 입력을 돕는다. 결과가 없으면 null.
+  카카오가 거절·지연(3초)하거나 서버에 키가 없으면 GEOCODE_UNAVAILABLE — 좌표를 직접 입력받는다.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminGeocodeAddress(
+    """
+    검색할 주소(도로명·지번·지역명). 앞뒤 공백을 뺀 1~200자(코드 포인트 기준). 비면 TEXT_REQUIRED, 넘으면 TEXT_TOO_LONG.
+    """
+    query: String!
+  ): AdminGeocodeResult
+}
+
+"""
+주소 좌표 변환 결과.
+"""
+type AdminGeocodeResult {
+  """
+  위도. 매장 좌표 저장 정밀도에 맞춰 소수 7자리로 반올림한다.
+  """
+  latitude: Float!
+  """
+  경도. 매장 좌표 저장 정밀도에 맞춰 소수 7자리로 반올림한다.
+  """
+  longitude: Float!
+  """
+  도로명 주소. 지역명·지번만으로 찾아 도로명이 없으면 null.
+  """
+  roadAddress: String
+  """
+  지번 주소. 없으면 null.
+  """
+  jibunAddress: String
+  """
+  시·도 이름(예: 서울). 없으면 null.
+  """
+  sido: String
+  """
+  시·군·구 이름(예: 강남구, 수원시 영통구). 없으면 null.
+  """
+  sigungu: String
+  """
+  법정동·리 이름(예: 역삼동). 없으면 null.
+  """
+  bname: String
+  """
+  시군구 코드 5자리(법정동 코드 앞 5자리). 지역 slug 'sgg-<코드>'와 같은 체계다. 없으면 null.
+  """
+  sigunguCode: String
+  """
+  sigunguCode에 해당하는 활성 2단계 지역 ID. 매장 regionId에 그대로 쓸 수 있다. 등록된 지역이 없거나 비활성이면 null.
+  """
+  regionId: ID
+}
+
+# ---- src/features/store/store-admin-seller.graphql ----
+extend type Query {
+  """
+  판매자 계정 목록을 최신 생성순으로 조회한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminSellers(input: AdminSellerListInput): AdminSellerConnection!
+  """
+  판매자 계정 1건을 조회한다. SELLER 계정이 아니거나 없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminSeller(accountId: ID!): AdminSeller!
+}
+
+extend type Mutation {
+  """
+  판매자를 온보딩한다 — 계정·로그인 자격증명·사업자 프로필·매장을 한 트랜잭션으로 만든다.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  username이 이미 쓰이고 있으면 BAD_USER_INPUT. regionId는 활성 2차 지역(시군구)이어야 하며 아니면 BAD_USER_INPUT.
+  생성된 계정은 최초 로그인 시 비밀번호 변경이 강제된다.
+  """
+  adminCreateSeller(input: AdminCreateSellerInput!): AdminSeller!
+  """
+  판매자 비밀번호를 초기화한다. 새 비밀번호로 교체하고 모든 로그인 세션을 폐기하며,
+  최초 로그인 시 변경이 강제된다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  대상이 SELLER 계정이 아니거나 자격증명이 없으면 NOT_FOUND.
+  """
+  adminResetSellerPassword(input: AdminResetSellerPasswordInput!): Boolean!
+}
+
+"""
+판매자 계정. 자격증명·사업자 프로필·매장 요약을 함께 보여준다.
+"""
+type AdminSeller {
+  """
+  계정 ID.
+  """
+  accountId: ID!
+  """
+  로그인 username. 자격증명이 없는 개발용 계정이면 null.
+  """
+  username: String
+  """
+  이메일. 미등록 시 null.
+  """
+  email: String
+  """
+  이름. 미등록 시 null.
+  """
+  name: String
+  """
+  계정 상태.
+  """
+  status: AccountStatus!
+  """
+  초기 비밀번호 상태. true면 본인이 비밀번호를 바꾸기 전까지 판매자 API가 FORBIDDEN이다.
+  """
+  mustChangePassword: Boolean!
+  """
+  최근 로그인 시각. 로그인 이력이 없으면 null.
+  """
+  lastLoginAt: DateTime
+  """
+  사업자 프로필. 개발용 계정은 없을 수 있다.
+  """
+  profile: AdminSellerProfile
+  """
+  보유 매장 요약. 매장이 없거나 삭제됐으면 null.
+  """
+  store: AdminSellerStoreSummary
+  createdAt: DateTime!
+}
+
+"""
+판매자 사업자 프로필.
+"""
+type AdminSellerProfile {
+  """
+  상호.
+  """
+  businessName: String!
+  """
+  사업자 연락처.
+  """
+  businessPhone: String!
+  """
+  홈페이지·SNS URL. 미등록 시 null.
+  """
+  websiteUrl: String
+}
+
+"""
+판매자 매장 요약. 상세는 매장 관리 API에서 본다.
+"""
+type AdminSellerStoreSummary {
+  id: ID!
+  """
+  매장명.
+  """
+  storeName: String!
+  """
+  매장 대표 연락처.
+  """
+  storePhone: String!
+  """
+  전체 주소 문자열.
+  """
+  addressFull: String!
+  """
+  매장 노출 여부.
+  """
+  isActive: Boolean!
+}
+
+"""
+판매자 계정 목록 페이지. 최신 생성이 먼저 온다.
+"""
+type AdminSellerConnection {
+  """
+  판매자 계정. 최신 생성이 먼저 온다.
+  """
+  items: [AdminSeller!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+판매자 목록 조회 조건.
+"""
+input AdminSellerListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  username·이메일·이름·매장명 부분일치 검색어. 최대 100자. 미지정 시 전체.
+  """
+  keyword: String
+  """
+  계정 상태 필터. 미지정 시 전체.
+  """
+  status: AccountStatus
+}
+
+"""
+판매자 온보딩 입력. 계정·자격증명·사업자 프로필·매장을 한 번에 만든다.
+"""
+input AdminCreateSellerInput {
+  """
+  로그인 username. 4~80자, 소문자·숫자·`.`·`_`·`-`만 허용. 이미 쓰이고 있으면 BAD_USER_INPUT.
+  """
+  username: String!
+  """
+  초기 비밀번호. 8~64자(공백만으로는 불가). 최초 로그인 시 변경이 강제되므로 조합 규칙은 없다.
+  """
+  password: String!
+  """
+  계정 이메일. 선택.
+  """
+  email: String
+  """
+  계정 이름(운영자명). 선택.
+  """
+  name: String
+  """
+  상호.
+  """
+  businessName: String!
+  """
+  사업자 연락처.
+  """
+  businessPhone: String!
+  """
+  홈페이지·SNS URL. 선택.
+  """
+  websiteUrl: String
+  """
+  매장 기본 정보.
+  """
+  store: AdminCreateSellerStoreInput!
+}
+
+"""
+온보딩 시 만들 매장 기본 정보. 영업시간·픽업 정책은 판매자가 이후 직접 설정한다.
+"""
+input AdminCreateSellerStoreInput {
+  """
+  매장명.
+  """
+  storeName: String!
+  """
+  매장 대표 연락처.
+  """
+  storePhone: String!
+  """
+  전체 주소 문자열.
+  """
+  addressFull: String!
+  """
+  시·도 단위. 선택.
+  """
+  addressCity: String
+  """
+  시·군·구 단위. 선택.
+  """
+  addressDistrict: String
+  """
+  읍·면·동 단위. 선택.
+  """
+  addressNeighborhood: String
+  """
+  지역 필터용 2차 지역(시군구) ID. 활성 2차 지역이 아니면 BAD_USER_INPUT. 선택.
+  """
+  regionId: ID
+  """
+  위도. 정밀도 손실을 피하려고 문자열로 받는다. 선택.
+  """
+  latitude: String
+  """
+  경도. 정밀도 손실을 피하려고 문자열로 받는다. 선택.
+  """
+  longitude: String
+  """
+  지도 진입에 쓸 provider. 기본 NONE.
+  """
+  mapProvider: StoreMapProvider = NONE
+}
+
+"""
+판매자 비밀번호 초기화 입력.
+"""
+input AdminResetSellerPasswordInput {
+  """
+  대상 판매자 계정 ID.
+  """
+  accountId: ID!
+  """
+  새 초기 비밀번호. 8~64자(공백만으로는 불가). 최초 로그인 시 변경이 강제되므로 조합 규칙은 없다.
+  """
+  newPassword: String!
+}
+
+# ---- src/features/store/store-admin.graphql ----
+extend type Query {
+  """
+  매장 목록을 최신 등록순으로 조회한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminStores(input: AdminStoreListInput): AdminStoreConnection!
+  """
+  매장 1건을 판매자 계정·집계와 함께 조회한다. 없거나 삭제됐으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminStore(storeId: ID!): AdminStoreDetail!
+}
+
+extend type Mutation {
+  """
+  매장 노출 여부를 바꾼다. false면 구매자 화면에서 사라진다(판매자 API로는 바꿀 수 없는 값).
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN. 매장이 없으면 NOT_FOUND. 같은 값이면 그대로 반환한다(멱등, 감사 기록 없음).
+  """
+  adminSetStoreActive(input: AdminSetStoreActiveInput!): AdminStore!
+  """
+  매장 기본 정보를 대리 수정한다. 전달한 필드만 바뀌며 규칙은 판매자의 sellerUpdateStoreBasicInfo와 같다.
+  regionId는 활성 2차 지역만 허용(아니면 BAD_USER_INPUT), null이면 연결 해제.
+  storeName·storePhone·addressFull·mapProvider는 null을 보낼 수 없다(BAD_USER_INPUT) — 생략만 가능.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN. 매장이 없으면 NOT_FOUND.
+  """
+  adminUpdateStoreBasicInfo(input: AdminUpdateStoreBasicInfoInput!): AdminStore!
+}
+
+"""
+매장. 판매자의 SellerStore와 같은 원본을 관리자 시점으로 본 것이다.
+"""
+type AdminStore {
+  id: ID!
+  """
+  이 매장을 소유한 판매자 계정 ID.
+  """
+  sellerAccountId: ID!
+  """
+  판매자 계정 라벨 `이름(아이디)`(판매자 생성 시점 기록). 한쪽만 있으면 그 값, 둘 다 없으면 null.
+  """
+  sellerLabel: String
+  """
+  매장명.
+  """
+  storeName: String!
+  """
+  매장 대표 연락처.
+  """
+  storePhone: String!
+  """
+  전체 주소 문자열.
+  """
+  addressFull: String!
+  """
+  시·도 단위. 매핑되지 않았으면 null.
+  """
+  addressCity: String
+  """
+  시·군·구 단위. 매핑되지 않았으면 null.
+  """
+  addressDistrict: String
+  """
+  읍·면·동 단위. 매핑되지 않았으면 null.
+  """
+  addressNeighborhood: String
+  """
+  지역 필터용 2차 지역 ID. 미연결이면 null.
+  """
+  regionId: ID
+  """
+  위도. 정밀도 손실을 피하려고 문자열로 내려준다. 좌표 미등록 시 null.
+  """
+  latitude: String
+  """
+  경도. 정밀도 손실을 피하려고 문자열로 내려준다. 좌표 미등록 시 null.
+  """
+  longitude: String
+  """
+  지도 진입에 쓸 provider.
+  """
+  mapProvider: StoreMapProvider!
+  """
+  매장 홈페이지·SNS URL. 미등록 시 null.
+  """
+  websiteUrl: String
+  """
+  영업시간 안내 문구(자유 입력).
+  """
+  businessHoursText: String
+  """
+  매장 프로필(로고) 이미지 URL. 미등록 시 null.
+  """
+  profileImageUrl: String
+  """
+  문의 채팅 인사말 템플릿. null이면 기본 문구.
+  """
+  greetingMessage: String
+  """
+  픽업 예약 시간 슬롯 간격(분).
+  """
+  pickupSlotIntervalMinutes: Int!
+  """
+  최소 리드타임(분).
+  """
+  minLeadTimeMinutes: Int!
+  """
+  예약 가능 범위(일).
+  """
+  maxDaysAhead: Int!
+  """
+  매장 노출 여부. false면 구매자 화면에 나오지 않는다.
+  """
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+매장 상세. 소유 판매자 계정 요약과 집계를 함께 준다.
+"""
+type AdminStoreDetail {
+  """
+  매장.
+  """
+  store: AdminStore!
+  """
+  소유 판매자 계정 요약.
+  """
+  seller: AdminStoreSeller!
+  """
+  상품 수(삭제 제외).
+  """
+  productCount: Int!
+  """
+  주문 항목 수(삭제 제외).
+  """
+  orderItemCount: Int!
+}
+
+"""
+매장 소유 판매자 요약.
+"""
+type AdminStoreSeller {
+  """
+  계정 ID.
+  """
+  accountId: ID!
+  """
+  로그인 username. 자격증명이 없으면 null.
+  """
+  username: String
+  """
+  이메일. 미등록 시 null.
+  """
+  email: String
+  """
+  이름. 미등록 시 null.
+  """
+  name: String
+  """
+  계정 상태.
+  """
+  status: AccountStatus!
+}
+
+"""
+매장 목록 페이지. 최신 등록이 먼저 온다.
+"""
+type AdminStoreConnection {
+  """
+  매장. 최신 등록이 먼저 온다.
+  """
+  items: [AdminStore!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+매장 목록 조회 조건.
+"""
+input AdminStoreListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  매장명 부분일치 검색어. 최대 100자. 미지정 시 전체.
+  """
+  keyword: String
+  """
+  노출 여부 필터. 미지정 시 전체.
+  """
+  isActive: Boolean
+  """
+  2차 지역 ID 필터. 미지정 시 전체.
+  """
+  regionId: ID
+}
+
+"""
+매장 노출 여부 변경 입력.
+"""
+input AdminSetStoreActiveInput {
+  storeId: ID!
+  """
+  노출 여부.
+  """
+  isActive: Boolean!
+  """
+  변경 사유. 감사 로그에 기록된다. 최대 500자. 선택.
+  """
+  reason: String
+}
+
+"""
+매장 기본 정보 대리 수정 입력. 전달한 필드만 변경된다(부분 수정).
+"""
+input AdminUpdateStoreBasicInfoInput {
+  storeId: ID!
+  """
+  매장명.
+  """
+  storeName: String
+  """
+  매장 대표 연락처.
+  """
+  storePhone: String
+  """
+  전체 주소 문자열.
+  """
+  addressFull: String
+  """
+  시·도 단위. null이면 제거.
+  """
+  addressCity: String
+  """
+  시·군·구 단위. null이면 제거.
+  """
+  addressDistrict: String
+  """
+  읍·면·동 단위. null이면 제거.
+  """
+  addressNeighborhood: String
+  """
+  지역 필터용 2차 지역 ID. 활성 2차 지역만 허용, null이면 연결 해제.
+  """
+  regionId: ID
+  """
+  위도(문자열). null이면 제거.
+  """
+  latitude: String
+  """
+  경도(문자열). null이면 제거.
+  """
+  longitude: String
+  """
+  지도 진입에 쓸 provider.
+  """
+  mapProvider: StoreMapProvider
+  """
+  매장 홈페이지·SNS URL. null이면 제거.
+  """
+  websiteUrl: String
+  """
+  영업시간 안내 문구. null이면 제거.
+  """
+  businessHoursText: String
+  """
+  매장 프로필(로고) 이미지 URL. null이면 제거. adminCreateUploadUrl(STORE_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT.
+  """
+  profileImageUrl: String
+  """
+  문의 채팅 인사말 템플릿. null이면 기본 문구로 되돌린다.
+  """
+  greetingMessage: String
+}
+
+# ---- src/features/store/store-detail.graphql ----
+extend type Query {
+  """매장 상세 헤더. 없거나 비활성/삭제 매장이면 NOT_FOUND. 비로그인 접근 가능."""
+  storeDetail(storeId: ID!): StoreDetail!
+}
+
+"""매장 상세 헤더(구매자용)."""
+type StoreDetail {
+  id: ID!
+  """매장명."""
+  storeName: String!
+  """매장 위치 표기(예: 인천 청라동)."""
+  regionLabel: String
+  """평균 평점(0.0~5.0, 소수 첫째 자리)."""
+  ratingAverage: Float!
+  """리뷰 수."""
+  reviewCount: Int!
+  """로그인 사용자의 찜 여부(비로그인 시 false)."""
+  isWishlisted: Boolean!
+  """매장 대표 이미지(캐러셀, sort_order asc)."""
+  images: [String!]!
+  """매장 전화번호(전화 액션시트)."""
+  phoneNumber: String!
+  """전체 주소(표시·복사용)."""
+  addressFull: String!
+  """위도(지도). 미설정 시 null."""
+  latitude: Float
+  """경도(지도). 미설정 시 null."""
+  longitude: Float
+  """지도 진입에 쓸 provider."""
+  mapProvider: StoreMapProvider!
+  """영업시간 표기 텍스트(예: 10:00AM ~ 19:00PM)."""
+  businessHoursText: String
+  """정기 휴무 표기(예: 매주 2,4주 월요일 쉽니다)."""
+  regularClosureText: String
+  """찾아오는 길 안내."""
+  accessGuideText: String
+  """매장 홈페이지·SNS URL. 미등록 시 null."""
+  websiteUrl: String
+}
+
+# ---- src/features/store/store-pickup-schedule.graphql ----
+extend type Query {
+  """매장별 월 픽업 가능 날짜. 없거나 비활성/삭제 매장이면 NOT_FOUND. 비로그인 접근 가능. yearMonth: "YYYY-MM" """
+  pickupCalendar(
+    storeId: ID!
+    """대상 연월. "YYYY-MM" 형식(KST 기준). 예: "2026-09". 형식이 어긋나면 BAD_USER_INPUT."""
+    yearMonth: String!
+  ): PickupCalendar!
+  """매장별 선택 날짜의 픽업 시간 슬롯. date: "YYYY-MM-DD" """
+  pickupTimeSlots(
+    storeId: ID!
+    """대상 날짜. "YYYY-MM-DD" 형식(KST 기준). 예: "2026-09-10". 형식이 어긋나면 BAD_USER_INPUT."""
+    date: String!
+  ): PickupTimeSlots!
+}
+
+"""매장별 월 픽업 달력(상품 상세 픽업 일정 선택용)."""
+type PickupCalendar {
+  """요청한 연월. "YYYY-MM"."""
+  yearMonth: String!
+  """해당 월의 전 날짜. 선택 불가한 날도 사유와 함께 포함된다."""
+  days: [PickupDay!]!
+}
+
+"""매장 달력의 하루. 매장 영업요일·특별휴무·일별 생산 수량이 모두 반영된 결과다."""
+type PickupDay {
+  """날짜. "YYYY-MM-DD" (KST)."""
+  date: String!
+  """픽업 예약 가능 여부."""
+  selectable: Boolean!
+  """선택 불가 사유. PAST | OUT_OF_RANGE | CLOSED(휴무·영업요일 아님·당일 잔여 슬롯 없음) | CAPACITY_FULL. 선택 가능 시 null."""
+  reason: String
+}
+
+"""매장별 특정 날짜의 픽업 시간 슬롯. 영업하지 않는 날은 빈 배열."""
+type PickupTimeSlots {
+  """요청한 날짜. "YYYY-MM-DD" (KST)."""
+  date: String!
+  """오전 슬롯. 12:00 이전(12:00은 afternoon에 들어간다)."""
+  morning: [PickupSlot!]!
+  """오후 슬롯. 12:00 포함, 이후."""
+  afternoon: [PickupSlot!]!
+}
+
+"""매장 픽업 시간 슬롯 1칸. 간격은 매장의 pickupSlotIntervalMinutes 정책을 따른다."""
+type PickupSlot {
+  """슬롯 시각. "HH:mm" (KST)."""
+  time: String!
+  """예약 가능 여부. 매장 리드타임·영업시간·잔여 수량을 반영한 값이다."""
+  available: Boolean!
+}
+
+# ---- src/features/store/store-search.graphql ----
+extend type Query {
+  """
+  매장 검색(검색 결과 매장 탭). 매장명에 단어별 AND 부분일치, 인기순 고정. keyword를 생략하면 지역 조건만 적용한다. 비로그인 접근 가능.
+  """
+  searchStores(input: SearchStoresInput!): SearchStoreConnection!
+}
+
+"""매장 검색 조건. 커서가 아니라 오프셋 방식이다."""
+input SearchStoresInput {
+  """검색어. 규칙은 SearchProductsInput.keyword와 같다(생략·null이면 검색어 조건 없음, 빈 문자열·공백은 400)."""
+  keyword: String
+  """2차 시군구 ID 다중 선택. 비우면 전국 대상."""
+  regionIds: [ID!]
+  """건너뛸 개수. 기본 0."""
+  offset: Int = 0
+  """조회 개수(최대 50)."""
+  limit: Int = 20
+}
+
+"""매장 검색 결과 목록."""
+type SearchStoreConnection {
+  """매장 카드. 인기순으로 온다 — 찜 수·리뷰 통계·최근 주문 수로 산출하며 검색어 관련도는 반영하지 않는다."""
+  items: [StoreCard!]!
+  """조건에 맞는 전체 매장 수. 탭 카운트에 쓴다."""
+  totalCount: Int!
+  """다음 페이지 존재 여부."""
+  hasMore: Boolean!
+}
+
+# ---- src/features/store/store-seller-audit.graphql ----
+extend type Query {
+  """
+  내 매장 감사 로그 목록을 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerAuditLogs(input: SellerAuditLogListInput): SellerAuditLogConnection!
+}
+
+"""
+판매자 조작 감사 로그 1건. 매장 설정·상품·주문 변경 이력을 남긴다.
+로그는 누적만 되고 수정·삭제되지 않는다.
+"""
+type SellerAuditLog {
+  id: ID!
+  """
+  조작한 계정 ID.
+  """
+  actorAccountId: ID!
+  """
+  대상 매장 ID. 판매자가 매장을 보유하면 채워지고, 보유하지 않은 상태의 조작에서만 null이다.
+  """
+  storeId: ID
+  """
+  조작 대상 종류.
+  """
+  targetType: AuditTargetType!
+  """
+  대상 리소스 ID.
+  """
+  targetId: ID!
+  """
+  기록된 행위 종류.
+  """
+  action: AuditActionType!
+  """
+  변경 전 값(JSON 문자열). 생성 조작이면 null.
+  """
+  beforeJson: String
+  """
+  변경 후 값(JSON 문자열). 삭제 조작이면 null일 수 있다.
+  """
+  afterJson: String
+  """
+  요청 IP. 수집하지 못했으면 null.
+  """
+  ipAddress: String
+  """
+  요청 User-Agent. 수집하지 못했으면 null.
+  """
+  userAgent: String
+  """
+  기록 시각.
+  """
+  createdAt: DateTime!
+}
+
+"""
+감사 로그 목록 페이지. 최신 기록이 먼저 온다.
+"""
+type SellerAuditLogConnection {
+  """
+  감사 로그. 최신 기록이 먼저 온다.
+  """
+  items: [SellerAuditLog!]!
+  """
+  조건에 맞는 전체 건수.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+감사 로그 조회 조건.
+"""
+input SellerAuditLogListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  대상 종류 필터. 미지정 시 전체.
+  """
+  targetType: AuditTargetType
+}
+
+# ---- src/features/store/store-seller.graphql ----
+extend type Query {
+  """내 매장 정보를 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerMyStore: SellerStore!
+  """내 매장 요일별 영업시간 목록을 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerStoreBusinessHours: [SellerStoreBusinessHour!]!
+  """내 매장 특별휴무 목록을 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerStoreSpecialClosures(input: CursorInput): SellerStoreSpecialClosureConnection!
+  """내 매장 일별 생산 가능 수량 목록을 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerStoreDailyCapacities(input: SellerDateCursorInput): SellerStoreDailyCapacityConnection!
+  """내 매장 FAQ 목록을 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerFaqTopics: [SellerFaqTopic!]!
+}
+
+extend type Mutation {
+  """내 매장 기본 정보를 수정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerUpdateStoreBasicInfo(input: SellerUpdateStoreBasicInfoInput!): SellerStore!
+  """내 매장 영업시간을 등록 또는 수정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerUpsertStoreBusinessHour(input: SellerUpsertStoreBusinessHourInput!): SellerStoreBusinessHour!
+  """내 매장 특별휴무를 등록 또는 수정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerUpsertStoreSpecialClosure(input: SellerUpsertStoreSpecialClosureInput!): SellerStoreSpecialClosure!
+  """내 매장 특별휴무를 삭제한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerDeleteStoreSpecialClosure(closureId: ID!): Boolean!
+  """내 매장 픽업 정책을 수정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerUpdatePickupPolicy(input: SellerUpdatePickupPolicyInput!): SellerStore!
+  """내 매장 일별 생산 가능 수량을 등록 또는 수정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerUpsertStoreDailyCapacity(input: SellerUpsertStoreDailyCapacityInput!): SellerStoreDailyCapacity!
+  """내 매장 일별 생산 가능 수량을 삭제한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerDeleteStoreDailyCapacity(capacityId: ID!): Boolean!
+  """FAQ 항목을 생성한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerCreateFaqTopic(input: SellerCreateFaqTopicInput!): SellerFaqTopic!
+  """FAQ 항목을 수정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerUpdateFaqTopic(input: SellerUpdateFaqTopicInput!): SellerFaqTopic!
+  """FAQ 항목을 삭제한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND."""
+  sellerDeleteFaqTopic(topicId: ID!): Boolean!
+}
+
+"""날짜 범위 필터가 붙은 커서 목록 입력. 일별 생산 수량 조회에 쓴다."""
+input SellerDateCursorInput {
+  """한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT."""
+  limit: Int = 20
+  """이전 응답의 nextCursor. 첫 페이지는 생략한다."""
+  cursor: String
+  """조회 시작 날짜(이상). 미지정 시 하한 없음."""
+  fromDate: DateTime
+  """조회 종료 날짜(이하). 미지정 시 상한 없음."""
+  toDate: DateTime
+}
+
+"""내 매장 정보. 구매자에게 노출되는 매장 상세와 같은 원본을 판매자 시점으로 본 것이다."""
+type SellerStore {
+  id: ID!
+  """이 매장을 소유한 판매자 계정 ID."""
+  sellerAccountId: ID!
+  """매장명."""
+  storeName: String!
+  """매장 대표 연락처."""
+  storePhone: String!
+  """전체 주소 문자열. 화면에 그대로 노출된다."""
+  addressFull: String!
+  """시·도 단위. 지역 필터·표기에 쓰이며 매핑되지 않았으면 null."""
+  addressCity: String
+  """시·군·구 단위. 매핑되지 않았으면 null."""
+  addressDistrict: String
+  """읍·면·동 단위. 매핑되지 않았으면 null."""
+  addressNeighborhood: String
+  """위도. 정밀도 손실을 피하려고 문자열로 내려준다. 좌표 미등록 시 null."""
+  latitude: String
+  """경도. 정밀도 손실을 피하려고 문자열로 내려준다. 좌표 미등록 시 null."""
+  longitude: String
+  """지도 진입에 쓸 provider."""
+  mapProvider: StoreMapProvider!
+  """매장 홈페이지·SNS URL. 미등록 시 null."""
+  websiteUrl: String
+  """영업시간 안내 문구(자유 입력). 요일별 영업시간과 별개로 화면에 그대로 노출된다."""
+  businessHoursText: String
+  """매장 프로필(로고) 이미지 URL. 미등록 시 null."""
+  profileImageUrl: String
+  """문의 채팅 인사말 템플릿({nickname}/{storeName} 치환). null이면 기본 문구."""
+  greetingMessage: String
+  """픽업 예약 시간 슬롯 간격(분). 이 간격으로 예약 가능 시각이 생성된다."""
+  pickupSlotIntervalMinutes: Int!
+  """최소 리드타임(분). 지금부터 이 시간 이후의 슬롯만 예약할 수 있다."""
+  minLeadTimeMinutes: Int!
+  """예약 가능 범위(일). 오늘부터 이 일수까지의 날짜만 달력에 열린다."""
+  maxDaysAhead: Int!
+  """매장 노출 여부. false면 구매자 화면에 나오지 않는다."""
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""요일별 정기 영업시간. 요일마다 최대 1건이다."""
+type SellerStoreBusinessHour {
+  id: ID!
+  """요일. 0=일요일 ~ 6=토요일."""
+  dayOfWeek: Int!
+  """해당 요일 정기 휴무 여부. true면 openTime·closeTime은 의미가 없다."""
+  isClosed: Boolean!
+  """영업 시작 시각. 시:분:초만 의미가 있고 날짜 부분은 쓰지 않는다. 휴무일이면 null."""
+  openTime: DateTime
+  """영업 종료 시각. 시:분:초만 의미가 있고 날짜 부분은 쓰지 않는다. 휴무일이면 null."""
+  closeTime: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""특정 날짜의 임시 휴무. 요일별 정기 영업시간보다 우선한다."""
+type SellerStoreSpecialClosure {
+  id: ID!
+  """휴무 날짜. 날짜 부분만 의미가 있다."""
+  closureDate: DateTime!
+  """휴무 사유. 미입력 시 null."""
+  reason: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""특별휴무 목록 페이지."""
+type SellerStoreSpecialClosureConnection {
+  """특별휴무. 최신 등록이 먼저 온다."""
+  items: [SellerStoreSpecialClosure!]!
+  """조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다."""
+  totalCount: Int!
+  """다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다."""
+  hasMore: Boolean!
+  """다음 페이지 커서. null이면 마지막 페이지다."""
+  nextCursor: String
+}
+
+"""특정 날짜의 생산 가능 수량. 미설정 날짜는 수량 제한이 없다."""
+type SellerStoreDailyCapacity {
+  id: ID!
+  """대상 날짜. 날짜 부분만 의미가 있다."""
+  capacityDate: DateTime!
+  """그날 받을 수 있는 최대 주문 수량. 예약분이 이 수를 채우면 달력에서 닫힌다."""
+  capacity: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""일별 생산 가능 수량 목록 페이지."""
+type SellerStoreDailyCapacityConnection {
+  """일별 생산 수량 설정. 최신 등록이 먼저 온다."""
+  items: [SellerStoreDailyCapacity!]!
+  """조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다."""
+  totalCount: Int!
+  """다음 페이지 존재 여부. limit+1 조회로 판정하므로 추가 쿼리가 없다."""
+  hasMore: Boolean!
+  """다음 페이지 커서. null이면 마지막 페이지다."""
+  nextCursor: String
+}
+
+"""
+매장 기본 정보 수정 입력. 모든 필드가 선택이며, 전달한 필드만 변경된다
+(부분 수정). 전달하지 않은 필드는 기존 값을 유지한다.
+"""
+input SellerUpdateStoreBasicInfoInput {
+  """매장명."""
+  storeName: String
+  """매장 대표 연락처."""
+  storePhone: String
+  """전체 주소 문자열."""
+  addressFull: String
+  """시·도 단위."""
+  addressCity: String
+  """시·군·구 단위."""
+  addressDistrict: String
+  """읍·면·동 단위."""
+  addressNeighborhood: String
+  """위도. 정밀도 손실을 피하려고 문자열로 받는다."""
+  latitude: String
+  """경도. 정밀도 손실을 피하려고 문자열로 받는다."""
+  longitude: String
+  """지도 진입에 쓸 provider."""
+  mapProvider: StoreMapProvider
+  """매장 홈페이지·SNS URL."""
+  websiteUrl: String
+  """영업시간 안내 문구(자유 입력)."""
+  businessHoursText: String
+  """매장 프로필(로고) 이미지 URL. null 전달 시 제거. sellerCreateUploadUrl(STORE_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT."""
+  profileImageUrl: String
+  """문의 채팅 인사말 템플릿. 빈 문자열이면 기본 문구로 되돌린다(null 저장)."""
+  greetingMessage: String
+}
+
+"""
+요일별 영업시간 등록·수정 입력. dayOfWeek 기준으로 upsert되므로 같은 요일을 다시
+보내면 덮어쓴다.
+"""
+input SellerUpsertStoreBusinessHourInput {
+  """요일. 0=일요일 ~ 6=토요일."""
+  dayOfWeek: Int!
+  """정기 휴무 여부. true면 openTime·closeTime을 보내지 않아도 된다."""
+  isClosed: Boolean!
+  """영업 시작 시각. 시:분:초만 저장된다."""
+  openTime: DateTime
+  """영업 종료 시각. 시:분:초만 저장된다."""
+  closeTime: DateTime
+}
+
+"""특별휴무 등록·수정 입력."""
+input SellerUpsertStoreSpecialClosureInput {
+  """수정할 특별휴무 ID. 생략하면 새로 등록한다."""
+  closureId: ID
+  """휴무 날짜. 날짜 부분만 저장된다."""
+  closureDate: DateTime!
+  """휴무 사유."""
+  reason: String
+}
+
+"""
+픽업 정책 수정 입력. 세 값이 함께 픽업 달력·시간 슬롯 생성 규칙을 이룬다.
+범위를 벗어나면 BAD_USER_INPUT.
+"""
+input SellerUpdatePickupPolicyInput {
+  """픽업 예약 시간 슬롯 간격(분)."""
+  pickupSlotIntervalMinutes: Int!
+  """최소 리드타임(분). 지금부터 이 시간 이후의 슬롯만 열린다."""
+  minLeadTimeMinutes: Int!
+  """예약 가능 범위(일). 오늘부터 이 일수까지 달력이 열린다."""
+  maxDaysAhead: Int!
+}
+
+"""일별 생산 가능 수량 등록·수정 입력."""
+input SellerUpsertStoreDailyCapacityInput {
+  """수정할 수량 설정 ID. 생략하면 새로 등록한다."""
+  capacityId: ID
+  """대상 날짜. 날짜 부분만 저장된다."""
+  capacityDate: DateTime!
+  """그날 받을 수 있는 최대 주문 수량."""
+  capacity: Int!
+}
+
+"""매장 FAQ 항목. 문의 채팅에서 자동응답 카드로 노출된다."""
+type SellerFaqTopic {
+  id: ID!
+  storeId: ID!
+  """FAQ 질문 제목. 채팅에서 버튼 라벨로 쓰인다."""
+  title: String!
+  """FAQ 답변 본문(HTML). 서버 측 sanitize는 아직 적용돼 있지 않다."""
+  answerHtml: String!
+  """노출 순서. 오름차순이고 같으면 id 오름차순."""
+  sortOrder: Int!
+  """노출 여부. false면 구매자에게 보이지 않는다."""
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""FAQ 항목 생성 입력."""
+input SellerCreateFaqTopicInput {
+  """FAQ 질문 제목."""
+  title: String!
+  """FAQ 답변 본문(HTML)."""
+  answerHtml: String!
+  """노출 순서. 오름차순이고 같으면 id 오름차순. 미지정 시 0이라 기존이 모두 0이면 맨 뒤에 온다."""
+  sortOrder: Int
+  """노출 여부. 기본 true."""
+  isActive: Boolean = true
+}
+
+"""FAQ 항목 수정 입력. 전달한 필드만 변경된다(부분 수정)."""
+input SellerUpdateFaqTopicInput {
+  topicId: ID!
+  """FAQ 질문 제목."""
+  title: String
+  """FAQ 답변 본문(HTML)."""
+  answerHtml: String
+  """노출 순서."""
+  sortOrder: Int
+  """노출 여부."""
+  isActive: Boolean
+}
+
+# ---- src/features/store/store-today-pickup.graphql ----
+extend type Query {
+  """오늘 픽업 가능 매장 리스트(인기순). 오늘 예약 가능 슬롯이 있는 매장만. 비로그인 접근 가능."""
+  todayPickupStores(input: TodayPickupStoresInput): TodayPickupStoreConnection!
+}
+
+"""오늘 픽업 가능 매장 조회 조건. 커서가 아니라 오프셋 방식이다."""
+input TodayPickupStoresInput {
+  """2차 시군구 ID 다중 선택. 비우면 전국 대상."""
+  regionIds: [ID!]
+  """건너뛸 개수. 기본 0."""
+  offset: Int = 0
+  """한 번에 가져올 개수. 기본 20, 1~50만 허용하며 벗어나면 BAD_USER_INPUT."""
+  limit: Int = 20
+}
+
+"""오늘 픽업 가능 매장 목록."""
+type TodayPickupStoreConnection {
+  """매장 카드. 오늘 픽업 가능한 매장만 담긴다."""
+  items: [TodayPickupStore!]!
+  """오늘 픽업 가능한 매장 총수."""
+  totalCount: Int!
+  """다음 페이지 존재 여부."""
+  hasMore: Boolean!
+  """슬롯 산출 기준 시각(서버 조회 시점). 화면의 'N시 기준' 표기에 사용."""
+  asOf: DateTime!
+}
+
+"""오늘 픽업 가능 매장 항목. 공용 매장 카드 + 오늘 슬롯 그리드."""
+type TodayPickupStore {
+  """매장 카드."""
+  store: StoreCard!
+  """오늘 영업시간 내 슬롯 목록. 리드타임 마감 슬롯은 available=false."""
+  slots: [TodayPickupSlot!]!
+}
+
+"""픽업 슬롯("HH:MM")."""
+type TodayPickupSlot {
+  """슬롯 시각. "HH:MM" (KST)."""
+  time: String!
+  """지금 예약 가능한지. 리드타임이 지난 슬롯은 false."""
+  available: Boolean!
+}
+
+# ---- src/features/store/store-wishlist.graphql ----
+extend type Query {
+  """내가 찜한 매장 목록 (찜 최신순). 비활성/삭제 매장은 제외. 로그인 필요."""
+  myWishlistedStores(input: MyWishlistedStoresInput): MyWishlistedStoresConnection!
+}
+
+extend type Mutation {
+  """매장 찜 추가 (멱등: 이미 있어도 true, soft-delete된 항목은 복원). 로그인 필요."""
+  addStoreToWishlist(storeId: ID!): Boolean!
+  """매장 찜 해제 (멱등: 이미 없어도 true). 로그인 필요."""
+  removeStoreFromWishlist(storeId: ID!): Boolean!
+}
+
+"""찜한 매장 목록 조회 조건. 커서가 아니라 오프셋 방식이다."""
+input MyWishlistedStoresInput {
+  """건너뛸 개수. 기본 0."""
+  offset: Int = 0
+  """한 번에 가져올 개수. 기본 20, 1~50만 허용하며 벗어나면 BAD_USER_INPUT."""
+  limit: Int = 20
+}
+
+"""찜한 매장 목록. 최근 찜한 순으로 온다."""
+type MyWishlistedStoresConnection {
+  """찜한 매장 카드. 최근 찜한 순으로 온다."""
+  items: [WishlistedStore!]!
+  """전체 찜 매장 수. offset·limit과 무관하다."""
+  totalCount: Int!
+  """다음 페이지 존재 여부."""
+  hasMore: Boolean!
+}
+
+"""찜한 매장 항목. 공용 매장 카드 + 찜 시각. 카드 이미지는 최대 3장, isWishlisted는 항상 true다."""
+type WishlistedStore {
+  """매장 카드."""
+  store: StoreCard!
+  """찜한 시각."""
+  addedAt: DateTime!
+}
+
+# ---- src/features/store/store.types.graphql ----
+extend type Query {
+  """인기 매장 리스트 (지역 필터 + 인기순). 비로그인 접근 가능."""
+  popularStores(input: PopularStoresInput): PopularStoreConnection!
+}
+
+"""인기 매장 조회 조건. 커서가 아니라 오프셋 방식이다."""
+input PopularStoresInput {
+  """2차 시군구 ID 다중 선택. 비우면 전국 대상."""
+  regionIds: [ID!]
+  """건너뛸 개수. 기본 0."""
+  offset: Int = 0
+  """한 번에 가져올 개수. 기본 20, 1~50만 허용하며 벗어나면 BAD_USER_INPUT."""
+  limit: Int = 20
+}
+
+"""인기 매장 목록. rank 오름차순이다."""
+type PopularStoreConnection {
+  """인기 매장 항목. rank 오름차순."""
+  items: [PopularStore!]!
+  """조건에 맞는 전체 매장 수. offset·limit과 무관하다."""
+  totalCount: Int!
+  """다음 페이지 존재 여부."""
+  hasMore: Boolean!
+  """랭킹 산출 기준 시각(서버 조회 시점). 화면의 'N시 기준' 표기에 사용."""
+  rankedAt: DateTime!
+}
+
+"""인기 매장 항목. rank + 공용 매장 카드."""
+type PopularStore {
+  """인기 순위. 1부터 시작하며 rankedAt 시점 기준이다."""
+  rank: Int!
+  """매장 카드."""
+  store: StoreCard!
+}
+
+"""매장 카드. 인기 매장·오늘 픽업·검색 결과·찜 목록이 공용으로 쓴다."""
+type StoreCard {
+  id: ID!
+  """매장명."""
+  storeName: String!
+  """매장 프로필(로고) 이미지. 미등록 시 null."""
+  profileImageUrl: String
+  """평균 평점(0.0~5.0, 소수 첫째 자리). 리뷰 없으면 0.0."""
+  ratingAverage: Float!
+  """리뷰 수."""
+  reviewCount: Int!
+  """매장 위치 표기(예: 인천 청라동)."""
+  regionLabel: String
+  """대표 케이크 이미지(활성 상품 대표 이미지, 최신 상품 우선). 최대 4장, 찜 목록은 3장."""
+  cakeImageUrls: [String!]!
+  """로그인 사용자의 찜 여부(비로그인 시 false)."""
+  isWishlisted: Boolean!
+}
+
+"""매장 지도 연동 provider. 구매자·판매자 API가 공용으로 쓴다."""
+enum StoreMapProvider {
+  """네이버 지도 딥링크를 쓴다."""
+  NAVER
+  """카카오맵 딥링크를 쓴다."""
+  KAKAO
+  """지도 연결 없음. 지도 진입 동선을 노출하지 않는다."""
+  NONE
+}
+
+# ---- src/features/system/system.graphql ----
+extend type Query {
+  """서버 상태 확인용 핑"""
+  ping: String!
+}
