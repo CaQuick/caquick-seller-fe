@@ -53,6 +53,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-image-picker',
       { photosPermission: '상품·매장 사진을 올리기 위해 사진 보관함에 접근합니다.' },
     ],
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission: '매장 주소의 지역을 찾기 위해 현재 위치를 사용합니다.',
+        // 포그라운드만 쓴다 — 플러그인 기본값인 영문 '항상 허용'·동작 인식 문구를 넣지 않는다
+        locationAlwaysAndWhenInUsePermission: false,
+        locationAlwaysPermission: false,
+        motionUsagePermission: false,
+      },
+    ],
   ],
   extra: {
     // TODO(EAS): eas: { projectId: '<projectId>' }
