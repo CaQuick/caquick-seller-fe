@@ -96,6 +96,82 @@ export type SearchRegionsInput = {
   limit?: number | null | undefined;
 };
 
+/** 상품 이미지 추가 입력. */
+export type SellerAddProductImageInput = {
+  /** 추가할 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT. */
+  imageUrl: string;
+  productId: string | number;
+  /** 노출 순서. 미지정 시 맨 뒤에 붙는다. */
+  sortOrder?: number | null | undefined;
+};
+
+/** 옵션 그룹 생성 입력. */
+export type SellerCreateOptionGroupInput = {
+  /** 그룹 안내 문구. */
+  description?: string | null | undefined;
+  /** 노출 여부. 기본 true. */
+  isActive?: boolean | null | undefined;
+  /** 필수 선택 여부. 기본 true. false면 0개 선택도 허용된다. */
+  isRequired?: boolean | null | undefined;
+  /** 최대 선택 개수. 기본 1. minSelect와 함께 허용 개수를 정한다. */
+  maxSelect?: number | null | undefined;
+  /** 최소 선택 개수. 기본 1. */
+  minSelect?: number | null | undefined;
+  /** 그룹명. */
+  name: string;
+  /** 구매자 커스텀 입력(설명)이 필요한 그룹으로 표시한다. 기본 false. 현재는 켜면 해당 옵션 주문이 거절된다. */
+  optionRequiresDescription?: boolean | null | undefined;
+  /** 구매자 커스텀 입력(이미지)이 필요한 그룹으로 표시한다. 기본 false. 현재는 켜면 해당 옵션 주문이 거절된다. */
+  optionRequiresImage?: boolean | null | undefined;
+  productId: string | number;
+  /** 노출 순서. 오름차순이고 동률의 순서는 보장하지 않는다. 미지정 시 0. */
+  sortOrder?: number | null | undefined;
+};
+
+/** 옵션 선택지 생성 입력. */
+export type SellerCreateOptionItemInput = {
+  /** 선택지 설명. */
+  description?: string | null | undefined;
+  /** 선택지 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT. */
+  imageUrl?: string | null | undefined;
+  /** 노출 여부. 기본 true. */
+  isActive?: boolean | null | undefined;
+  optionGroupId: string | number;
+  /** 추가 금액(원). 기본 0. 음수면 할인으로 동작하되 품목 금액이 0원 미만이 되면 거절된다. */
+  priceDelta?: number | null | undefined;
+  /** 노출 순서. 오름차순이고 동률의 순서는 보장하지 않는다. 미지정 시 0. */
+  sortOrder?: number | null | undefined;
+  /** 선택지 이름. */
+  title: string;
+};
+
+/**
+ * 상품 생성 입력. 이미지·옵션·카테고리는 생성 후 각 전용 mutation으로 붙인다
+ * (대표 이미지 1장만 여기서 함께 등록한다).
+ */
+export type SellerCreateProductInput = {
+  /** 커스텀 도안의 바탕 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT. */
+  baseDesignImageUrl?: string | null | undefined;
+  /** 통화 코드(ISO 4217, 대문자 3자). 기본 KRW. 다른 코드도 저장은 되지만 구매자 주문이 거절된다. */
+  currency?: string | null | undefined;
+  /** 상품 설명. */
+  description?: string | null | undefined;
+  /** 대표 이미지 URL. 상품 생성과 함께 첫 이미지로 등록된다. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT. */
+  initialImageUrl: string;
+  /** 노출 여부. 기본 true. */
+  isActive?: boolean | null | undefined;
+  /** 상품명. */
+  name: string;
+  /** 제작 소요 시간(분). 기본 180. */
+  preparationTimeMinutes?: number | null | undefined;
+  /** 구매 전 안내 문구. */
+  purchaseNotice?: string | null | undefined;
+  /** 정가(원). */
+  regularPrice: number;
+  /** 할인가(원). 생략하면 할인 없음. */
+  salePrice?: number | null | undefined;
+};
+
 /** 판매자 업로드 URL 발급 입력. */
 export type SellerCreateUploadUrlInput = {
   /** 파일 크기(바이트). 1 이상 5MB 이하, 아니면 BAD_USER_INPUT. */
@@ -171,6 +247,34 @@ export type SellerSetProductActiveInput = {
   /** true면 구매자 화면에 노출한다. */
   isActive: boolean;
   productId: string | number;
+};
+
+/**
+ * 상품 카테고리 연결 설정 입력. 전달한 목록으로 통째로 교체한다
+ * (빈 배열이면 연결을 모두 끊는다).
+ */
+export type SellerSetProductCategoriesInput = {
+  /** 연결할 카테고리 ID 전체. */
+  categoryIds: Array<string | number>;
+  productId: string | number;
+};
+
+/** 이름 기반 태그 연결 설정 입력. 전달한 목록으로 통째로 교체한다. */
+export type SellerSetProductTagsByNameInput = {
+  /**
+   * 연결할 태그 이름 전체. 정규화·중복 제거 뒤 최대 20개(개수는 정규화 문자열 기준 — 악센트만 다른 이름은 저장 시 하나로
+   * 합쳐져도 각각 센다). 각 이름은 정규화 전후 모두 80자(코드 포인트) 이내. 빈 배열이면 전체 해제.
+   */
+  names: Array<string>;
+  productId: string | number;
+};
+
+/** 태그 검색 입력. */
+export type SellerTagSearchInput = {
+  /** 검색어. 정규화 후 80자를 넘으면 BAD_USER_INPUT. */
+  keyword: string;
+  /** 최대 건수. 기본 10, 1~20만 허용하며 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
 };
 
 /**
@@ -436,6 +540,55 @@ export type SellerProductDeleteMutationVariables = Exact<{
 
 export type SellerProductDeleteMutation = { sellerDeleteProduct: boolean };
 
+export type SellerProductCreateMutationVariables = Exact<{
+  input: SellerCreateProductInput;
+}>;
+
+
+export type SellerProductCreateMutation = { sellerCreateProduct: { id: string } };
+
+export type SellerProductAddImageMutationVariables = Exact<{
+  input: SellerAddProductImageInput;
+}>;
+
+
+export type SellerProductAddImageMutation = { sellerAddProductImage: { id: string } };
+
+export type SellerProductSetCategoriesMutationVariables = Exact<{
+  input: SellerSetProductCategoriesInput;
+}>;
+
+
+export type SellerProductSetCategoriesMutation = { sellerSetProductCategories: { id: string } };
+
+export type SellerProductSetTagsMutationVariables = Exact<{
+  input: SellerSetProductTagsByNameInput;
+}>;
+
+
+export type SellerProductSetTagsMutation = { sellerSetProductTagsByName: { id: string } };
+
+export type SellerProductCreateOptionGroupMutationVariables = Exact<{
+  input: SellerCreateOptionGroupInput;
+}>;
+
+
+export type SellerProductCreateOptionGroupMutation = { sellerCreateOptionGroup: { id: string } };
+
+export type SellerProductCreateOptionItemMutationVariables = Exact<{
+  input: SellerCreateOptionItemInput;
+}>;
+
+
+export type SellerProductCreateOptionItemMutation = { sellerCreateOptionItem: { id: string } };
+
+export type SellerProductTagSearchQueryVariables = Exact<{
+  input: SellerTagSearchInput;
+}>;
+
+
+export type SellerProductTagSearchQuery = { sellerSearchTags: Array<{ id: string, name: string, isExactMatch: boolean, productCount: number }> };
+
 export type SellerStoreFieldsFragment = { id: string, storeName: string, storePhone: string, addressFull: string, addressCity: string | null, addressDistrict: string | null, addressNeighborhood: string | null, mapProvider: StoreMapProvider, websiteUrl: string | null, businessHoursText: string | null, profileImageUrl: string | null, greetingMessage: string | null, pickupSlotIntervalMinutes: number, minLeadTimeMinutes: number, maxDaysAhead: number, isActive: boolean };
 
 export type SellerStoreMyStoreQueryVariables = Exact<{ [key: string]: never; }>;
@@ -564,6 +717,13 @@ export type SellerStorePickupTimeSlotsQueryVariables = Exact<{
 
 
 export type SellerStorePickupTimeSlotsQuery = { pickupTimeSlots: { date: string, morning: Array<{ time: string, available: boolean }>, afternoon: Array<{ time: string, available: boolean }> } };
+
+export type SellerUploadsCreateUploadUrlMutationVariables = Exact<{
+  input: SellerCreateUploadUrlInput;
+}>;
+
+
+export type SellerUploadsCreateUploadUrlMutation = { sellerCreateUploadUrl: { uploadUrl: string, publicUrl: string } };
 
 export type PingQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -1003,6 +1163,58 @@ export const SellerProductDeleteDocument = new TypedDocumentString(`
   sellerDeleteProduct(productId: $productId)
 }
     `) as unknown as TypedDocumentString<SellerProductDeleteMutation, SellerProductDeleteMutationVariables>;
+export const SellerProductCreateDocument = new TypedDocumentString(`
+    mutation SellerProductCreate($input: SellerCreateProductInput!) {
+  sellerCreateProduct(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductCreateMutation, SellerProductCreateMutationVariables>;
+export const SellerProductAddImageDocument = new TypedDocumentString(`
+    mutation SellerProductAddImage($input: SellerAddProductImageInput!) {
+  sellerAddProductImage(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductAddImageMutation, SellerProductAddImageMutationVariables>;
+export const SellerProductSetCategoriesDocument = new TypedDocumentString(`
+    mutation SellerProductSetCategories($input: SellerSetProductCategoriesInput!) {
+  sellerSetProductCategories(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductSetCategoriesMutation, SellerProductSetCategoriesMutationVariables>;
+export const SellerProductSetTagsDocument = new TypedDocumentString(`
+    mutation SellerProductSetTags($input: SellerSetProductTagsByNameInput!) {
+  sellerSetProductTagsByName(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductSetTagsMutation, SellerProductSetTagsMutationVariables>;
+export const SellerProductCreateOptionGroupDocument = new TypedDocumentString(`
+    mutation SellerProductCreateOptionGroup($input: SellerCreateOptionGroupInput!) {
+  sellerCreateOptionGroup(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductCreateOptionGroupMutation, SellerProductCreateOptionGroupMutationVariables>;
+export const SellerProductCreateOptionItemDocument = new TypedDocumentString(`
+    mutation SellerProductCreateOptionItem($input: SellerCreateOptionItemInput!) {
+  sellerCreateOptionItem(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductCreateOptionItemMutation, SellerProductCreateOptionItemMutationVariables>;
+export const SellerProductTagSearchDocument = new TypedDocumentString(`
+    query SellerProductTagSearch($input: SellerTagSearchInput!) {
+  sellerSearchTags(input: $input) {
+    id
+    name
+    isExactMatch
+    productCount
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductTagSearchQuery, SellerProductTagSearchQueryVariables>;
 export const SellerStoreMyStoreDocument = new TypedDocumentString(`
     query SellerStoreMyStore {
   sellerMyStore {
@@ -1228,6 +1440,14 @@ export const SellerStorePickupTimeSlotsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerStorePickupTimeSlotsQuery, SellerStorePickupTimeSlotsQueryVariables>;
+export const SellerUploadsCreateUploadUrlDocument = new TypedDocumentString(`
+    mutation SellerUploadsCreateUploadUrl($input: SellerCreateUploadUrlInput!) {
+  sellerCreateUploadUrl(input: $input) {
+    uploadUrl
+    publicUrl
+  }
+}
+    `) as unknown as TypedDocumentString<SellerUploadsCreateUploadUrlMutation, SellerUploadsCreateUploadUrlMutationVariables>;
 export const PingDocument = new TypedDocumentString(`
     query Ping {
   ping
