@@ -1,4 +1,10 @@
-import { hrefFor, parsePushData, type PushTarget, shouldToast, staleKeysFor } from './routing';
+import {
+  hrefFor,
+  parsePushData,
+  type PushTarget,
+  shouldToastMessage,
+  staleKeysFor,
+} from './routing';
 
 const order: PushTarget = { kind: 'ORDER_SUBMITTED', orderId: '0' };
 const message: PushTarget = { kind: 'BUYER_MESSAGE', conversationId: 'c9' };
@@ -46,16 +52,14 @@ describe('staleKeysFor', () => {
   });
 });
 
-describe('shouldToast', () => {
-  it.each<[PushTarget, string, boolean]>([
-    [order, '/', false],
-    [order, '/orders', false],
-    [message, '/', true],
-    [message, '/orders/3', true],
-    [message, '/chats/c1', true],
-    [message, '/chats', false],
-    [message, '/chats/c9', false],
-  ])('%j · %s → %s', (target, pathname, expected) => {
-    expect(shouldToast(target, pathname)).toBe(expected);
+describe('shouldToastMessage', () => {
+  it.each<[string, boolean]>([
+    ['/', true],
+    ['/orders/3', true],
+    ['/chats/c1', true],
+    ['/chats', false],
+    ['/chats/c9', false],
+  ])('%s → %s', (pathname, expected) => {
+    expect(shouldToastMessage('c9', pathname)).toBe(expected);
   });
 });
