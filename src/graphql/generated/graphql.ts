@@ -770,6 +770,11 @@ export type SellerReviewsCommentsQueryVariables = Exact<{
 
 export type SellerReviewsCommentsQuery = { reviewComments: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, content: string, authorNickname: string | null, createdAt: string }> } };
 
+export type SellerSettingsStoreQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerSettingsStoreQuery = { sellerMyStore: { id: string, storeName: string } };
+
 export type SellerStoreAuditLogsQueryVariables = Exact<{
   input?: SellerAuditLogListInput | null | undefined;
 }>;
@@ -1539,6 +1544,14 @@ export const SellerReviewsCommentsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerReviewsCommentsQuery, SellerReviewsCommentsQueryVariables>;
+export const SellerSettingsStoreDocument = new TypedDocumentString(`
+    query SellerSettingsStore {
+  sellerMyStore {
+    id
+    storeName
+  }
+}
+    `) as unknown as TypedDocumentString<SellerSettingsStoreQuery, SellerSettingsStoreQueryVariables>;
 export const SellerStoreAuditLogsDocument = new TypedDocumentString(`
     query SellerStoreAuditLogs($input: SellerAuditLogListInput) {
   sellerAuditLogs(input: $input) {
