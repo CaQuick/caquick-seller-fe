@@ -38,10 +38,6 @@ function useProductId(): string {
   return useLocalSearchParams<{ id: string }>().id;
 }
 
-export function ProductDetailScreen() {
-  return <EmptyState title="상품 상세" message={`상품 #${useProductId()}의 내용을 불러옵니다.`} />;
-}
-
 export function ProductEditScreen() {
   return <EmptyState title="상품 수정" message={`상품 #${useProductId()}의 정보를 수정합니다.`} />;
 }

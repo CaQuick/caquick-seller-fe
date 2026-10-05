@@ -1,7 +1,6 @@
 export { productsKeys } from './api/queryKeys';
 export {
   ProductCustomTemplateScreen,
-  ProductDetailScreen,
   ProductEditScreen,
   ProductImagesScreen,
   ProductNewBasicScreen,
@@ -10,4 +9,5 @@ export {
   ProductNewPreviewScreen,
   ProductOptionsScreen,
 } from './ui/screens';
+export { ProductDetailScreen } from './ui/detail-screen';
 export { ProductsScreen } from './ui/list-screen';
