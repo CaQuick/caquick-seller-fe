@@ -96,6 +96,9 @@ export interface CredentialSession {
   refreshExpiresAt: string;
 }
 
+/** 개발 빌드 전용 테스트 토큰. refresh 토큰이 없다 */
+type DevTokenSession = Pick<CredentialSession, 'accessToken' | 'tokenType' | 'expiresInSeconds'>;
+
 export const sellerAuthApi = {
   login: (body: { username: string; password: string }) =>
     authRequest<CredentialSession>('/seller/login', { body }),
@@ -104,4 +107,9 @@ export const sellerAuthApi = {
   logout: (refreshToken: string) => authRequest<void>('/seller/logout', { body: { refreshToken } }),
   changePassword: (body: { currentPassword: string; newPassword: string }) =>
     authRequest<{ ok: boolean }>('/seller/change-password', { auth: true, body }),
+  /** 운영 번들에서는 __DEV__ 상수 접기로 요청 경로째 빠진다 */
+  devIssueToken: (accountId: string) =>
+    __DEV__
+      ? authRequest<DevTokenSession>('/dev/issue-token', { body: { accountId } })
+      : Promise.reject(new ApiError('개발 빌드 전용', 'FORBIDDEN', 'DEV_ONLY_ENDPOINT', 403)),
 };
