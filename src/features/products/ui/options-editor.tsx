@@ -1,14 +1,15 @@
 import { type BottomSheetModal } from '@gorhom/bottom-sheet';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, Text, TextInput, View } from 'react-native';
 import Sortable from 'react-native-sortables';
 
 import { messageFor } from '@/shared/api';
 import { colors, shadow } from '@/shared/config/tokens';
 import { cn } from '@/shared/lib/cn';
 import { formatNumber } from '@/shared/lib/format';
-import { ConfirmSheet, Icon, showToast } from '@/shared/ui';
+import { ConfirmSheet, Icon, showToast, Switch } from '@/shared/ui';
 
+import { priceText, toDigits } from '../model/draft-form';
 import { pickImages, uploadProductImage } from '../model/draft-images';
 import {
   type GroupFields,
@@ -29,6 +30,9 @@ export interface OptionsEditorProps {
   onAddItem: (groupKey: string, fields: ItemFields) => void;
   onChangeItem: (groupKey: string, itemKey: string, patch: Partial<ItemFields>) => void;
   onRemoveItem: (groupKey: string, itemKey: string) => void;
+  /** 상품 관리(즉시 저장): 아이템 행에 추가 금액 입력·활성 스위치·순서 버튼을 둔다 */
+  live?: boolean;
+  onReorderItems?: (groupKey: string, itemKeys: string[]) => void;
 }
 
 const NEW_GROUP = { isRequired: true, minSelect: 1, maxSelect: 1 } as const;
@@ -122,7 +126,7 @@ export function OptionsEditor(props: OptionsEditorProps) {
       <ConfirmSheet
         ref={removeSheet}
         title={`'${groupTarget?.name ?? ''}' 그룹을 삭제할까요?`}
-        description={`그룹 안의 옵션 ${groupTarget?.items.length ?? 0}개도 함께 삭제돼요`}
+        description={`그룹 안의 옵션 ${groupTarget?.items.length ?? 0}개도 함께 삭제돼요${props.live ? '\n이미 받은 주문의 선택 내용은 그대로 남아요' : ''}`}
         confirmLabel="삭제하기"
         onConfirm={() => {
           if (groupTarget) onRemoveGroup(groupTarget.key);
@@ -218,15 +222,27 @@ function GroupCard({
         </Pressable>
       </View>
       <View className="gap-2">
-        {group.items.map((item) => (
-          <ItemRow
-            key={item.key}
-            item={item}
-            onEdit={() => handlers.editItem(group.key, item)}
-            onImage={(imageUrl) => editor.onChangeItem(group.key, item.key, { imageUrl })}
-            onRemove={() => editor.onRemoveItem(group.key, item.key)}
-          />
-        ))}
+        {group.items.map((item, i) => {
+          const row = {
+            item,
+            onEdit: () => handlers.editItem(group.key, item),
+            onChange: (patch: Partial<ItemFields>) =>
+              editor.onChangeItem(group.key, item.key, patch),
+            onRemove: () => editor.onRemoveItem(group.key, item.key),
+          };
+          if (!editor.live) return <ItemRow key={item.key} {...row} />;
+          const keys = group.items.map((x) => x.key);
+          const move = (to: number) => () =>
+            editor.onReorderItems?.(group.key, moveKey(keys, i, to));
+          return (
+            <LiveItemRow
+              key={item.key}
+              {...row}
+              onUp={i > 0 ? move(i - 1) : undefined}
+              onDown={i < keys.length - 1 ? move(i + 1) : undefined}
+            />
+          );
+        })}
       </View>
       <Pressable
         accessibilityRole="button"
@@ -240,16 +256,28 @@ function GroupCard({
   );
 }
 
-function ItemRow({
-  item,
-  onEdit,
-  onImage,
-  onRemove,
-}: {
+interface RowProps {
   item: OptionItemValue;
   onEdit: () => void;
-  onImage: (imageUrl: string) => void;
+  onChange: (patch: Partial<ItemFields>) => void;
   onRemove: () => void;
+}
+
+const moveKey = (keys: string[], from: number, to: number) => {
+  const next = keys.filter((_, i) => i !== from);
+  next.splice(to, 0, keys[from]!);
+  return next;
+};
+
+/** 썸네일을 누르면 바로 골라 올린다 */
+function ItemThumb({
+  item,
+  onImage,
+  className,
+}: {
+  item: OptionItemValue;
+  onImage: (imageUrl: string) => void;
+  className: string;
 }) {
   const [uploading, setUploading] = useState(false);
   const changeImage = async () => {
@@ -264,29 +292,48 @@ function ItemRow({
       setUploading(false);
     }
   };
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title} 이미지 ${item.imageUrl ? '변경' : '추가'}`}
+      accessibilityState={{ busy: uploading, disabled: uploading }}
+      disabled={uploading}
+      onPress={() => void changeImage()}
+      hitSlop={6}
+      className={cn('items-center justify-center overflow-hidden rounded-sm bg-gray-bg', className)}
+    >
+      {item.imageUrl ? (
+        <Image source={{ uri: item.imageUrl }} className="h-full w-full" />
+      ) : (
+        <Icon name="add" size={14} color={colors.placeholder} />
+      )}
+      {uploading ? (
+        <View className="absolute inset-0 items-center justify-center bg-dim">
+          <ActivityIndicator size="small" color={colors.surface} />
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
 
+function RemoveButton({ title, onRemove }: { title: string; onRemove: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title} 삭제`}
+      onPress={onRemove}
+      hitSlop={12}
+      className="w-[18px] items-center"
+    >
+      <Text className="font-sans text-lg text-chevron">×</Text>
+    </Pressable>
+  );
+}
+
+function ItemRow({ item, onEdit, onChange, onRemove }: RowProps) {
   return (
     <View className="flex-row items-center gap-2.5 rounded-md border border-line bg-surface px-3 py-2.5">
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${item.title} 이미지 ${item.imageUrl ? '변경' : '추가'}`}
-        accessibilityState={{ busy: uploading, disabled: uploading }}
-        disabled={uploading}
-        onPress={() => void changeImage()}
-        hitSlop={4}
-        className="h-9 w-9 items-center justify-center overflow-hidden rounded-sm bg-gray-bg"
-      >
-        {item.imageUrl ? (
-          <Image source={{ uri: item.imageUrl }} className="h-full w-full" />
-        ) : (
-          <Icon name="add" size={14} color={colors.placeholder} />
-        )}
-        {uploading ? (
-          <View className="absolute inset-0 items-center justify-center bg-dim">
-            <ActivityIndicator size="small" color={colors.surface} />
-          </View>
-        ) : null}
-      </Pressable>
+      <ItemThumb item={item} onImage={(imageUrl) => onChange({ imageUrl })} className="h-9 w-9" />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${item.title} 수정`}
@@ -306,15 +353,125 @@ function ItemRow({
       >
         {`+${formatNumber(item.priceDelta)}원`}
       </Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${item.title} 삭제`}
-        onPress={onRemove}
-        hitSlop={12}
-        className="w-[18px] items-center"
-      >
-        <Text className="font-sans text-lg text-chevron">×</Text>
-      </Pressable>
+      <RemoveButton title={item.title} onRemove={onRemove} />
     </View>
+  );
+}
+
+/** .products-item: 썸네일·이름·× 아래 줄에 추가 금액 입력(포커스가 빠질 때 저장)과 활성 스위치. 꺼지면 회색·금액 잠금 */
+function LiveItemRow({
+  item,
+  onEdit,
+  onChange,
+  onRemove,
+  onUp,
+  onDown,
+}: RowProps & { onUp?: () => void; onDown?: () => void }) {
+  const active = item.isActive !== false;
+  return (
+    <View className="flex-row gap-2.5 rounded-md border border-line bg-surface px-3 py-2.5">
+      <ItemThumb item={item} onImage={(imageUrl) => onChange({ imageUrl })} className="h-8 w-8" />
+      <View className="flex-1 gap-2">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${item.title} 수정`}
+          onPress={onEdit}
+          className="min-h-8 justify-center"
+        >
+          <Text
+            className={cn(
+              'font-sans text-base tracking-tight',
+              active ? 'text-text' : 'text-muted',
+            )}
+          >
+            {item.title}
+          </Text>
+          {item.description ? (
+            <Text className="font-sans text-xs tracking-tight text-muted">{item.description}</Text>
+          ) : null}
+        </Pressable>
+        <View className="flex-row items-center justify-between gap-2">
+          {/* 서버 값이 바뀌면(실패 롤백 포함) 입력을 새로 만든다 */}
+          <PriceInput
+            key={item.priceDelta}
+            title={item.title}
+            value={item.priceDelta}
+            editable={active}
+            onCommit={(priceDelta) => onChange({ priceDelta })}
+          />
+          <View className="flex-row items-center gap-3">
+            {onUp ? <MoveButton label={`${item.title} 위로 이동`} up onPress={onUp} /> : null}
+            {onDown ? <MoveButton label={`${item.title} 아래로 이동`} onPress={onDown} /> : null}
+            <Switch
+              value={active}
+              onValueChange={(isActive) => onChange({ isActive })}
+              accessibilityLabel={`${item.title} 판매`}
+            />
+          </View>
+        </View>
+      </View>
+      <View className="justify-center">
+        <RemoveButton title={item.title} onRemove={onRemove} />
+      </View>
+    </View>
+  );
+}
+
+function PriceInput({
+  title,
+  value,
+  editable,
+  onCommit,
+}: {
+  title: string;
+  value: number;
+  editable: boolean;
+  onCommit: (value: number) => void;
+}) {
+  const [digits, setDigits] = useState(String(value));
+  const commit = () => {
+    const next = Number(digits || 0);
+    if (next !== value) onCommit(next);
+  };
+  return (
+    <View
+      className={cn(
+        'h-9 w-[104px] flex-row items-center rounded-sm border px-2',
+        editable ? 'border-border bg-surface' : 'border-line bg-gray2',
+      )}
+    >
+      <TextInput
+        accessibilityLabel={`${title} 추가 금액`}
+        accessibilityState={{ disabled: !editable }}
+        editable={editable}
+        keyboardType="number-pad"
+        textAlign="right"
+        value={priceText(digits)}
+        onChangeText={(t) => setDigits(toDigits(t).slice(0, 9))}
+        onEndEditing={commit}
+        cursorColor={colors.caret}
+        selectionColor={colors.caret}
+        className={cn(
+          'flex-1 font-sans text-base tracking-tight',
+          Number(digits || 0) === 0 || !editable ? 'text-muted' : 'text-ink',
+        )}
+      />
+      <Text className="pl-1 font-sans text-base tracking-tight text-label">원</Text>
+    </View>
+  );
+}
+
+function MoveButton({ label, up, onPress }: { label: string; up?: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      hitSlop={8}
+      className="h-7 w-7 items-center justify-center rounded-sm bg-gray2"
+      style={up ? { transform: [{ rotate: '180deg' }] } : undefined}
+    >
+      <Icon name="chevronDown" size={14} color={colors.label} />
+    </Pressable>
   );
 }

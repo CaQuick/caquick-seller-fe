@@ -210,7 +210,7 @@ function restoreDescription({ savedAt, draft }: SavedDraft) {
   return `${formatKst(savedAt)}에 저장한 '${name}'${josa(name, '을/를')} 이어서 작성할까요?`;
 }
 
-function Label({ children }: { children: string }) {
+export function Label({ children }: { children: string }) {
   return (
     <Text className="mb-3 mt-[18px] font-sans text-lg font-semibold tracking-tight text-text2">
       {children}
@@ -219,7 +219,7 @@ function Label({ children }: { children: string }) {
 }
 
 /** .sublbl + .field.sel. 공용 SelectField는 큰 라벨이 붙어 2열 보조 라벨 모양을 직접 그린다 */
-function CategorySelect({
+export function CategorySelect({
   label,
   value,
   onPress,
@@ -255,7 +255,7 @@ function CategorySelect({
 }
 
 /** 빈 상태는 점선 안내(.kw-empty), 있으면 '# 태그' 칩(pill 예외) + 점선 원 추가 버튼 */
-function Keywords({ tags, onEdit }: { tags: string[]; onEdit: () => void }) {
+export function Keywords({ tags, onEdit }: { tags: string[]; onEdit: () => void }) {
   if (tags.length === 0) {
     return (
       <Pressable
