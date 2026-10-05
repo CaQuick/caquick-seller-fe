@@ -13,20 +13,12 @@ const config: KnipConfig = {
     // 폰트 파일 복사 원본(assets/fonts)
     'pretendard',
     // 스캐폴드 단계에 미리 핀한 런타임 의존성 — 해당 기능 PR이 import하면 여기서 뺀다
-    '@hookform/resolvers',
     '@native-html/render',
     '@react-native-async-storage/async-storage',
     '@react-native-community/datetimepicker',
-    'expo-file-system',
     'expo-image',
-    'expo-image-manipulator',
-    'graphql-ws',
-    'react-hook-form',
     'react-native-calendars',
     'react-native-sortables',
-    'react-native-svg',
-    'sonner-native',
-    'zustand',
   ],
 };
 
