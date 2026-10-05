@@ -1,0 +1,27 @@
+codecov:
+  require_ci_to_pass: false
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+        base: auto
+    patch:
+      default:
+        target: 80%
+        threshold: 0%
+
+comment:
+  layout: 'header, diff, files, footer'
+  behavior: default
+  require_changes: false
+  require_base: true
+  require_head: true
+  hide_project_coverage: false
+
+ignore:
+  - 'src/test/**'
+  - 'src/graphql/generated/**'
+  - 'src/shared/ui/**'

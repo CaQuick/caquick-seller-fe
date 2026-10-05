@@ -1,0 +1,99 @@
+# Dependabot. 보안 패치는 별도 PR, 일반 업데이트는 minor/patch를 묶어 노이즈를 줄인다(BE·관리자 FE와 동일).
+version: 2
+updates:
+  - package-ecosystem: 'npm'
+    directory: '/'
+    # 작업 브랜치 → develop → 릴리즈 PR → main. 의존성 PR도 develop으로
+    target-branch: develop
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'Asia/Seoul'
+    open-pull-requests-limit: 5
+    labels:
+      - '📦 Dependencies'
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+    groups:
+      npm-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - 'minor'
+          - 'patch'
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - '*'
+    ignore:
+      # SDK 핀(bundledNativeModules): 메이저는 SDK 업그레이드 PR로 한꺼번에
+      - dependency-name: 'expo'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'expo-*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react-native'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react-dom'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'expo-router'
+        update-types: ['version-update:semver-major']
+      # reanimated 4.5.x·worklets 0.10.x는 expo-modules-core C++ 호환 — pnpm.overrides로도 고정
+      - dependency-name: 'react-native-reanimated'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: 'react-native-worklets'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      # gesture-handler 3은 API 대개편(SDK 57은 2.32 권장)
+      - dependency-name: 'react-native-gesture-handler'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react-native-*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@react-native-community/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@react-native-async-storage/*'
+        update-types: ['version-update:semver-major']
+      # NativeWind 5는 tailwind 4·react-native-css 3 전제 — 마이그레이션 PR로
+      - dependency-name: 'nativewind'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'tailwindcss'
+        update-types: ['version-update:semver-major']
+      # msw 3은 ESM 전용·msw/native 분리 — Jest 29 CJS와 충돌
+      - dependency-name: 'msw'
+        update-types: ['version-update:semver-major']
+      # jest-expo 57은 Jest 29까지
+      - dependency-name: 'jest'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'jest-expo'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'babel-jest'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/jest'
+        update-types: ['version-update:semver-major']
+      # 메이저는 수동 마이그레이션 PR로 — 플러그인·설정 변경이 따라온다
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'eslint'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    target-branch: develop
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'Asia/Seoul'
+    open-pull-requests-limit: 3
+    labels:
+      - '📦 Dependencies'
+    commit-message:
+      prefix: 'ci'
+      include: 'scope'
+    groups:
+      actions-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - 'minor'
+          - 'patch'
