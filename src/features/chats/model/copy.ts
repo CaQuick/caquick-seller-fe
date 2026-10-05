@@ -1,0 +1,22 @@
+/** 채팅 화면·토스트 문구 */
+export const CHATS_COPY = {
+  filterAll: '전체',
+  filterNeedsReply: '답변 필요',
+  emptyTitle: '아직 문의가 없어요',
+  emptyDescription: '구매자가 문의를 보내면 여기에 표시됩니다',
+  emptyNeedsReplyTitle: '답변이 필요한 문의가 없어요',
+  emptyNeedsReplyDescription: '새 문의가 오면 여기에 표시됩니다',
+  newInquiry: (name: string, preview: string) => `새 문의 · ${name}: ${preview}`,
+  autoReply: '자동응답',
+  inputPlaceholder: '메시지 입력',
+  send: '보내기',
+  retry: '재시도',
+  reconnecting: '연결을 다시 시도하는 중…',
+  orderLink: '주문 보기 ›',
+  menu: '더보기',
+  menuAutoReply: '자동응답 관리',
+  menuAutoReplyDescription: '인사말·자주 묻는 질문 답변',
+  menuOrder: '주문 보기',
+  close: '닫기',
+  roomEmpty: '아직 주고받은 메시지가 없어요',
+} as const;

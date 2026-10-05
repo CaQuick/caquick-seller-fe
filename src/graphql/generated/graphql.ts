@@ -22,6 +22,25 @@ export type CategoryType =
   /** 디자인·스타일 기준 분류. */
   | 'STYLE';
 
+/** 대화 메시지 본문 형식. 구매자·판매자 API가 공용으로 쓴다. */
+export type ConversationBodyFormat =
+  /**
+   * 서식이 있는 본문(FAQ 답변 등). 목록 미리보기에서는 태그를 제거해 한 줄로 만든다.
+   * 서버 측 sanitize는 아직 적용돼 있지 않다.
+   */
+  | 'HTML'
+  /** 평문. 목록 미리보기에도 원문이 그대로 쓰인다. */
+  | 'TEXT';
+
+/** 대화 메시지 발신자 유형. 구매자·판매자 API가 공용으로 쓴다. */
+export type ConversationSenderType =
+  /** 판매자(매장)가 보낸 메시지. FAQ 질문 칩에 대한 자동응답도 이 값으로 저장된다. */
+  | 'STORE'
+  /** 시스템이 발신한 메시지. */
+  | 'SYSTEM'
+  /** 구매자가 보낸 메시지. */
+  | 'USER';
+
 /** 커서 페이지네이션 공통 입력. 필터가 필요한 목록은 같은 두 필드를 가진 전용 input을 쓴다. */
 export type CursorInput = {
   /** 이전 페이지의 nextCursor. 불투명 토큰이라 정렬 기준이 바뀌면 무효. 형식이 어긋나면 BAD_USER_INPUT. */
@@ -103,6 +122,20 @@ export type SellerProductListInput = {
   search?: string | null | undefined;
 };
 
+/**
+ * 판매자 메시지 발송 입력. bodyFormat에 맞는 본문 필드가 비어 있으면 BAD_USER_INPUT.
+ * 내 매장의 대화방이 아니면 NOT_FOUND.
+ */
+export type SellerSendConversationMessageInput = {
+  /** 본문 형식. 이 값에 해당하는 본문 필드가 필수다(다른 쪽을 함께 넘기면 그대로 저장된다). */
+  bodyFormat: ConversationBodyFormat;
+  /** 서식 본문(최대 100000자). bodyFormat이 HTML이면 필수. */
+  bodyHtml?: string | null | undefined;
+  /** 평문 본문(최대 2000자). bodyFormat이 TEXT면 필수. */
+  bodyText?: string | null | undefined;
+  conversationId: string | number;
+};
+
 /** 상품 노출 여부 변경 입력. */
 export type SellerSetProductActiveInput = {
   /** true면 구매자 화면에 노출한다. */
@@ -126,6 +159,54 @@ export type SellerAuthMeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type SellerAuthMeQuery = { sellerMe: { accountId: string, username: string | null, displayName: string | null, storeId: string | null, mustChangePassword: boolean, accountStatus: AccountStatus } };
+
+export type SellerChatsConversationsQueryVariables = Exact<{
+  input?: CursorInput | null | undefined;
+}>;
+
+
+export type SellerChatsConversationsQuery = { sellerConversations: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, accountId: string, buyerNickname: string | null, lastMessagePreview: string | null, lastMessageAt: string | null, sellerLastReadAt: string | null, unreadCount: number, updatedAt: string }> } };
+
+export type SellerChatsConversationUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerChatsConversationUpdatedSubscription = { sellerConversationUpdated: { conversationId: string, accountId: string, buyerNickname: string | null, lastMessagePreview: string | null, lastMessageAt: string, sellerLastReadAt: string | null, unreadCount: number } };
+
+export type SellerChatsMessagesQueryVariables = Exact<{
+  conversationId: string | number;
+  input?: CursorInput | null | undefined;
+}>;
+
+
+export type SellerChatsMessagesQuery = { sellerConversationMessages: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string }> } };
+
+export type SellerChatsSendMessageMutationVariables = Exact<{
+  input: SellerSendConversationMessageInput;
+}>;
+
+
+export type SellerChatsSendMessageMutation = { sellerSendConversationMessage: { id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string } };
+
+export type SellerChatsMarkReadMutationVariables = Exact<{
+  conversationId: string | number;
+}>;
+
+
+export type SellerChatsMarkReadMutation = { sellerMarkConversationRead: { id: string, accountId: string, buyerNickname: string | null, lastMessagePreview: string | null, lastMessageAt: string | null, sellerLastReadAt: string | null, unreadCount: number, updatedAt: string } };
+
+export type SellerChatsMessageAddedSubscriptionVariables = Exact<{
+  conversationId: string | number;
+}>;
+
+
+export type SellerChatsMessageAddedSubscription = { conversationMessageAdded: { id: string, conversationId: string, senderType: ConversationSenderType, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string } };
+
+export type SellerChatsBuyerOrderQueryVariables = Exact<{
+  input?: SellerOrderListInput | null | undefined;
+}>;
+
+
+export type SellerChatsBuyerOrderQuery = { sellerOrderList: { items: Array<{ id: string, buyerName: string, pickupAt: string, firstItemName: string | null }> } };
 
 export type SellerHomeStoreQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -259,6 +340,110 @@ export const SellerAuthMeDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerAuthMeQuery, SellerAuthMeQueryVariables>;
+export const SellerChatsConversationsDocument = new TypedDocumentString(`
+    query SellerChatsConversations($input: CursorInput) {
+  sellerConversations(input: $input) {
+    items {
+      id
+      accountId
+      buyerNickname
+      lastMessagePreview
+      lastMessageAt
+      sellerLastReadAt
+      unreadCount
+      updatedAt
+    }
+    totalCount
+    hasMore
+    nextCursor
+  }
+}
+    `) as unknown as TypedDocumentString<SellerChatsConversationsQuery, SellerChatsConversationsQueryVariables>;
+export const SellerChatsConversationUpdatedDocument = new TypedDocumentString(`
+    subscription SellerChatsConversationUpdated {
+  sellerConversationUpdated {
+    conversationId
+    accountId
+    buyerNickname
+    lastMessagePreview
+    lastMessageAt
+    sellerLastReadAt
+    unreadCount
+  }
+}
+    `) as unknown as TypedDocumentString<SellerChatsConversationUpdatedSubscription, SellerChatsConversationUpdatedSubscriptionVariables>;
+export const SellerChatsMessagesDocument = new TypedDocumentString(`
+    query SellerChatsMessages($conversationId: ID!, $input: CursorInput) {
+  sellerConversationMessages(conversationId: $conversationId, input: $input) {
+    items {
+      id
+      conversationId
+      senderType
+      senderAccountId
+      bodyFormat
+      bodyText
+      bodyHtml
+      createdAt
+    }
+    totalCount
+    hasMore
+    nextCursor
+  }
+}
+    `) as unknown as TypedDocumentString<SellerChatsMessagesQuery, SellerChatsMessagesQueryVariables>;
+export const SellerChatsSendMessageDocument = new TypedDocumentString(`
+    mutation SellerChatsSendMessage($input: SellerSendConversationMessageInput!) {
+  sellerSendConversationMessage(input: $input) {
+    id
+    conversationId
+    senderType
+    senderAccountId
+    bodyFormat
+    bodyText
+    bodyHtml
+    createdAt
+  }
+}
+    `) as unknown as TypedDocumentString<SellerChatsSendMessageMutation, SellerChatsSendMessageMutationVariables>;
+export const SellerChatsMarkReadDocument = new TypedDocumentString(`
+    mutation SellerChatsMarkRead($conversationId: ID!) {
+  sellerMarkConversationRead(conversationId: $conversationId) {
+    id
+    accountId
+    buyerNickname
+    lastMessagePreview
+    lastMessageAt
+    sellerLastReadAt
+    unreadCount
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<SellerChatsMarkReadMutation, SellerChatsMarkReadMutationVariables>;
+export const SellerChatsMessageAddedDocument = new TypedDocumentString(`
+    subscription SellerChatsMessageAdded($conversationId: ID!) {
+  conversationMessageAdded(conversationId: $conversationId) {
+    id
+    conversationId
+    senderType
+    bodyFormat
+    bodyText
+    bodyHtml
+    createdAt
+  }
+}
+    `) as unknown as TypedDocumentString<SellerChatsMessageAddedSubscription, SellerChatsMessageAddedSubscriptionVariables>;
+export const SellerChatsBuyerOrderDocument = new TypedDocumentString(`
+    query SellerChatsBuyerOrder($input: SellerOrderListInput) {
+  sellerOrderList(input: $input) {
+    items {
+      id
+      buyerName
+      pickupAt
+      firstItemName
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<SellerChatsBuyerOrderQuery, SellerChatsBuyerOrderQueryVariables>;
 export const SellerHomeStoreDocument = new TypedDocumentString(`
     query SellerHomeStore {
   sellerMyStore {
