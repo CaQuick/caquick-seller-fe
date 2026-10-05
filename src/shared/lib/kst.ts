@@ -102,3 +102,23 @@ export function formatRelativeKst(iso: string, now: Date = new Date()): string {
   if (t.y !== today.y) return ymd;
   return `${p(t.m)}-${p(t.d)}`;
 }
+
+export interface YearMonth {
+  y: number;
+  m: number; // 1~12
+}
+
+export function addMonths({ y, m }: YearMonth, months: number): YearMonth {
+  const k = new Date(Date.UTC(y, m - 1 + months, 1));
+  return { y: k.getUTCFullYear(), m: k.getUTCMonth() + 1 };
+}
+
+/** 월 달력 7×6 칸(일요일 시작). 앞뒤 달 날짜는 inMonth false */
+export function monthGrid(month: YearMonth): (YmdDate & { inMonth: boolean })[] {
+  const first = { ...month, d: 1 };
+  const start = addDays(first, -new Date(Date.UTC(month.y, month.m - 1, 1)).getUTCDay());
+  return Array.from({ length: 42 }, (_, i) => {
+    const date = addDays(start, i);
+    return { ...date, inMonth: date.m === month.m };
+  });
+}
