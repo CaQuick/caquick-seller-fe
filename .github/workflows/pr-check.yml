@@ -79,8 +79,9 @@ jobs:
       - name: CI scripts (node:test)
         run: node --test '.github/scripts/__tests__/*.spec.mjs'
 
+      # pnpm doctor는 pnpm 내장 명령으로 해석돼 expo-doctor가 돌지 않는다
       - name: Expo doctor
-        run: pnpm doctor
+        run: pnpm run doctor
 
       - name: Bundle smoke (expo export)
         run: pnpm export
