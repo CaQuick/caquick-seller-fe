@@ -48,7 +48,7 @@ pnpm start           # Metro(localhost:8081). 끝나면 종료합니다
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `pnpm validate`               | lint → typecheck → codegen:check → knip → test:cov → expo-doctor → expo export. pre-push 훅과 동일합니다     |
 | `pnpm test` / `pnpm test:cov` | Jest(jest-expo). 네트워크는 MSW가 흉내 냅니다                                                                |
-| `pnpm lint` / `pnpm format`   | ESLint(경계 규칙 포함) / Prettier                                                                            |
+| `pnpm lint` / `pnpm format`   | typed routes 선언을 만든 뒤 ESLint(경계 규칙 포함) / Prettier                                                |
 | `pnpm typecheck`              | typed routes 선언을 만든 뒤 `tsc --noEmit`                                                                   |
 | `pnpm schema:pull [ref]`      | 백엔드 SDL 스냅샷(`schema/schema.graphql`) 갱신. 기본 `develop`, `BE_DIR=../caquick-be`로 로컬 체크아웃 사용 |
 | `pnpm codegen`                | 스냅샷 + 문서 → `src/graphql/generated`(커밋 대상)                                                           |
