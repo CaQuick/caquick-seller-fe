@@ -1,0 +1,13 @@
+export interface ProductListFilter {
+  isActive?: boolean;
+  categoryId?: string;
+  search?: string;
+}
+
+export const productsKeys = {
+  all: ['products'] as const,
+  list: (filter: ProductListFilter) => [...productsKeys.all, 'list', filter] as const,
+  detail: (id: string) => [...productsKeys.all, 'detail', id] as const,
+  categories: () => [...productsKeys.all, 'categories'] as const,
+  tagSearch: (keyword: string) => [...productsKeys.all, 'tags', keyword] as const,
+};
