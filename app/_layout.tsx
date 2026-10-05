@@ -9,6 +9,7 @@ import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { BootSplash, useProactiveRefresh, useSessionStore } from '@/features/auth';
+import { usePushNotifications } from '@/features/push';
 import { useOtaUpdate } from '@/features/settings';
 import { bindOnlineManager, disposeWsClient } from '@/shared/api';
 import { colors } from '@/shared/config/tokens';
@@ -34,6 +35,7 @@ useSessionStore.subscribe((s, prev) => {
 export default function RootLayout() {
   useProactiveRefresh();
   useOtaUpdate();
+  usePushNotifications(queryClient);
   useEffect(() => () => focusManager.setFocused(undefined), []);
   return (
     <GestureHandlerRootView className="flex-1">

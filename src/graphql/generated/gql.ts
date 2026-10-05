@@ -45,10 +45,13 @@ type Documents = {
     "\n  mutation SellerProductCreateOptionGroup($input: SellerCreateOptionGroupInput!) {\n    sellerCreateOptionGroup(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductCreateOptionGroupDocument,
     "\n  mutation SellerProductCreateOptionItem($input: SellerCreateOptionItemInput!) {\n    sellerCreateOptionItem(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductCreateOptionItemDocument,
     "\n  query SellerProductTagSearch($input: SellerTagSearchInput!) {\n    sellerSearchTags(input: $input) {\n      id\n      name\n      isExactMatch\n      productCount\n    }\n  }\n": typeof types.SellerProductTagSearchDocument,
+    "\n  mutation SellerPushRegisterToken($input: SellerRegisterPushTokenInput!) {\n    sellerRegisterPushToken(input: $input)\n  }\n": typeof types.SellerPushRegisterTokenDocument,
+    "\n  mutation SellerPushUnregisterToken($input: SellerUnregisterPushTokenInput!) {\n    sellerUnregisterPushToken(input: $input)\n  }\n": typeof types.SellerPushUnregisterTokenDocument,
     "\n  fragment SellerReviewMediaFields on ReviewMedia {\n    mediaType\n    mediaUrl\n    thumbnailUrl\n    sortOrder\n  }\n": typeof types.SellerReviewMediaFieldsFragmentDoc,
     "\n  query SellerReviewsList($input: StoreReviewsInput!) {\n    storeReviews(input: $input) {\n      items {\n        id\n        rating\n        content\n        media {\n          ...SellerReviewMediaFields\n        }\n        likeCount\n        authorNickname\n        productName\n        createdAt\n      }\n      totalCount\n      photoTotalCount\n      hasMore\n      nextCursor\n    }\n  }\n": typeof types.SellerReviewsListDocument,
     "\n  query SellerReviewsDetail($reviewId: ID!) {\n    reviewDetail(reviewId: $reviewId) {\n      review {\n        id\n        rating\n        content\n        media {\n          ...SellerReviewMediaFields\n        }\n        likeCount\n        commentCount\n        authorNickname\n        customOptions {\n          groupName\n          optionTitle\n        }\n        createdAt\n      }\n      product {\n        productId\n        name\n        thumbnailUrl\n        regularPrice\n        salePrice\n      }\n    }\n  }\n": typeof types.SellerReviewsDetailDocument,
     "\n  query SellerReviewsComments($input: ReviewCommentsInput!) {\n    reviewComments(input: $input) {\n      items {\n        id\n        content\n        authorNickname\n        createdAt\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": typeof types.SellerReviewsCommentsDocument,
+    "\n  query SellerSettingsStore {\n    sellerMyStore {\n      id\n      storeName\n    }\n  }\n": typeof types.SellerSettingsStoreDocument,
     "\n  query SellerStoreAuditLogs($input: SellerAuditLogListInput) {\n    sellerAuditLogs(input: $input) {\n      items {\n        id\n        targetType\n        targetId\n        action\n        beforeJson\n        afterJson\n        createdAt\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": typeof types.SellerStoreAuditLogsDocument,
     "\n  mutation SellerStoreCreateFaqTopic($input: SellerCreateFaqTopicInput!) {\n    sellerCreateFaqTopic(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerStoreCreateFaqTopicDocument,
     "\n  mutation SellerStoreUpdateFaqTopic($input: SellerUpdateFaqTopicInput!) {\n    sellerUpdateFaqTopic(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerStoreUpdateFaqTopicDocument,
@@ -110,10 +113,13 @@ const documents: Documents = {
     "\n  mutation SellerProductCreateOptionGroup($input: SellerCreateOptionGroupInput!) {\n    sellerCreateOptionGroup(input: $input) {\n      id\n    }\n  }\n": types.SellerProductCreateOptionGroupDocument,
     "\n  mutation SellerProductCreateOptionItem($input: SellerCreateOptionItemInput!) {\n    sellerCreateOptionItem(input: $input) {\n      id\n    }\n  }\n": types.SellerProductCreateOptionItemDocument,
     "\n  query SellerProductTagSearch($input: SellerTagSearchInput!) {\n    sellerSearchTags(input: $input) {\n      id\n      name\n      isExactMatch\n      productCount\n    }\n  }\n": types.SellerProductTagSearchDocument,
+    "\n  mutation SellerPushRegisterToken($input: SellerRegisterPushTokenInput!) {\n    sellerRegisterPushToken(input: $input)\n  }\n": types.SellerPushRegisterTokenDocument,
+    "\n  mutation SellerPushUnregisterToken($input: SellerUnregisterPushTokenInput!) {\n    sellerUnregisterPushToken(input: $input)\n  }\n": types.SellerPushUnregisterTokenDocument,
     "\n  fragment SellerReviewMediaFields on ReviewMedia {\n    mediaType\n    mediaUrl\n    thumbnailUrl\n    sortOrder\n  }\n": types.SellerReviewMediaFieldsFragmentDoc,
     "\n  query SellerReviewsList($input: StoreReviewsInput!) {\n    storeReviews(input: $input) {\n      items {\n        id\n        rating\n        content\n        media {\n          ...SellerReviewMediaFields\n        }\n        likeCount\n        authorNickname\n        productName\n        createdAt\n      }\n      totalCount\n      photoTotalCount\n      hasMore\n      nextCursor\n    }\n  }\n": types.SellerReviewsListDocument,
     "\n  query SellerReviewsDetail($reviewId: ID!) {\n    reviewDetail(reviewId: $reviewId) {\n      review {\n        id\n        rating\n        content\n        media {\n          ...SellerReviewMediaFields\n        }\n        likeCount\n        commentCount\n        authorNickname\n        customOptions {\n          groupName\n          optionTitle\n        }\n        createdAt\n      }\n      product {\n        productId\n        name\n        thumbnailUrl\n        regularPrice\n        salePrice\n      }\n    }\n  }\n": types.SellerReviewsDetailDocument,
     "\n  query SellerReviewsComments($input: ReviewCommentsInput!) {\n    reviewComments(input: $input) {\n      items {\n        id\n        content\n        authorNickname\n        createdAt\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": types.SellerReviewsCommentsDocument,
+    "\n  query SellerSettingsStore {\n    sellerMyStore {\n      id\n      storeName\n    }\n  }\n": types.SellerSettingsStoreDocument,
     "\n  query SellerStoreAuditLogs($input: SellerAuditLogListInput) {\n    sellerAuditLogs(input: $input) {\n      items {\n        id\n        targetType\n        targetId\n        action\n        beforeJson\n        afterJson\n        createdAt\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": types.SellerStoreAuditLogsDocument,
     "\n  mutation SellerStoreCreateFaqTopic($input: SellerCreateFaqTopicInput!) {\n    sellerCreateFaqTopic(input: $input) {\n      id\n    }\n  }\n": types.SellerStoreCreateFaqTopicDocument,
     "\n  mutation SellerStoreUpdateFaqTopic($input: SellerUpdateFaqTopicInput!) {\n    sellerUpdateFaqTopic(input: $input) {\n      id\n    }\n  }\n": types.SellerStoreUpdateFaqTopicDocument,
@@ -268,6 +274,14 @@ export function graphql(source: "\n  query SellerProductTagSearch($input: Seller
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
+export function graphql(source: "\n  mutation SellerPushRegisterToken($input: SellerRegisterPushTokenInput!) {\n    sellerRegisterPushToken(input: $input)\n  }\n"): typeof import('./graphql').SellerPushRegisterTokenDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerPushUnregisterToken($input: SellerUnregisterPushTokenInput!) {\n    sellerUnregisterPushToken(input: $input)\n  }\n"): typeof import('./graphql').SellerPushUnregisterTokenDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
 export function graphql(source: "\n  fragment SellerReviewMediaFields on ReviewMedia {\n    mediaType\n    mediaUrl\n    thumbnailUrl\n    sortOrder\n  }\n"): typeof import('./graphql').SellerReviewMediaFieldsFragmentDoc;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
@@ -281,6 +295,10 @@ export function graphql(source: "\n  query SellerReviewsDetail($reviewId: ID!) {
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query SellerReviewsComments($input: ReviewCommentsInput!) {\n    reviewComments(input: $input) {\n      items {\n        id\n        content\n        authorNickname\n        createdAt\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n"): typeof import('./graphql').SellerReviewsCommentsDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerSettingsStore {\n    sellerMyStore {\n      id\n      storeName\n    }\n  }\n"): typeof import('./graphql').SellerSettingsStoreDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

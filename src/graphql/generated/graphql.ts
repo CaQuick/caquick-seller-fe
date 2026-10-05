@@ -125,6 +125,13 @@ export type ProductReviewsInput = {
   sort?: ReviewSort | null | undefined;
 };
 
+/** 푸시 디바이스 플랫폼 */
+export type PushPlatform =
+  /** Android(FCM 경유) */
+  | 'ANDROID'
+  /** iOS(APNs 경유) */
+  | 'IOS';
+
 /** 리뷰 댓글 목록 조회 조건. */
 export type ReviewCommentsInput = {
   /** 이전 페이지 마지막 댓글 id(이후부터 조회). */
@@ -310,6 +317,16 @@ export type SellerProductListInput = {
   search?: string | null | undefined;
 };
 
+/** 푸시 토큰 등록 입력 */
+export type SellerRegisterPushTokenInput = {
+  /** 앱이 부여한 디바이스 식별자(선택, 최대 128자). 같은 기기의 토큰 교체 추적용이며 서버 로직은 토큰만 본다 */
+  deviceId?: string | null | undefined;
+  /** 디바이스 플랫폼 */
+  platform: PushPlatform;
+  /** Expo 푸시 토큰. ExponentPushToken[...] 또는 ExpoPushToken[...] 형식, 최대 200자 */
+  token: string;
+};
+
 /**
  * 판매자 메시지 발송 입력. bodyFormat에 맞는 본문 필드가 비어 있으면 BAD_USER_INPUT.
  * 내 매장의 대화방이 아니면 NOT_FOUND.
@@ -357,6 +374,12 @@ export type SellerTagSearchInput = {
   keyword: string;
   /** 최대 건수. 기본 10, 1~20만 허용하며 벗어나면 BAD_USER_INPUT. */
   limit?: number | null | undefined;
+};
+
+/** 푸시 토큰 해제 입력 */
+export type SellerUnregisterPushTokenInput = {
+  /** 해제할 Expo 푸시 토큰 */
+  token: string;
 };
 
 /** FAQ 항목 수정 입력. 전달한 필드만 변경된다(부분 수정). */
@@ -710,6 +733,20 @@ export type SellerProductTagSearchQueryVariables = Exact<{
 
 export type SellerProductTagSearchQuery = { sellerSearchTags: Array<{ id: string, name: string, isExactMatch: boolean, productCount: number }> };
 
+export type SellerPushRegisterTokenMutationVariables = Exact<{
+  input: SellerRegisterPushTokenInput;
+}>;
+
+
+export type SellerPushRegisterTokenMutation = { sellerRegisterPushToken: boolean };
+
+export type SellerPushUnregisterTokenMutationVariables = Exact<{
+  input: SellerUnregisterPushTokenInput;
+}>;
+
+
+export type SellerPushUnregisterTokenMutation = { sellerUnregisterPushToken: boolean };
+
 export type SellerReviewMediaFieldsFragment = { mediaType: ReviewMediaType, mediaUrl: string, thumbnailUrl: string | null, sortOrder: number };
 
 export type SellerReviewsListQueryVariables = Exact<{
@@ -732,6 +769,11 @@ export type SellerReviewsCommentsQueryVariables = Exact<{
 
 
 export type SellerReviewsCommentsQuery = { reviewComments: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, content: string, authorNickname: string | null, createdAt: string }> } };
+
+export type SellerSettingsStoreQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerSettingsStoreQuery = { sellerMyStore: { id: string, storeName: string } };
 
 export type SellerStoreAuditLogsQueryVariables = Exact<{
   input?: SellerAuditLogListInput | null | undefined;
@@ -1416,6 +1458,16 @@ export const SellerProductTagSearchDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerProductTagSearchQuery, SellerProductTagSearchQueryVariables>;
+export const SellerPushRegisterTokenDocument = new TypedDocumentString(`
+    mutation SellerPushRegisterToken($input: SellerRegisterPushTokenInput!) {
+  sellerRegisterPushToken(input: $input)
+}
+    `) as unknown as TypedDocumentString<SellerPushRegisterTokenMutation, SellerPushRegisterTokenMutationVariables>;
+export const SellerPushUnregisterTokenDocument = new TypedDocumentString(`
+    mutation SellerPushUnregisterToken($input: SellerUnregisterPushTokenInput!) {
+  sellerUnregisterPushToken(input: $input)
+}
+    `) as unknown as TypedDocumentString<SellerPushUnregisterTokenMutation, SellerPushUnregisterTokenMutationVariables>;
 export const SellerReviewsListDocument = new TypedDocumentString(`
     query SellerReviewsList($input: StoreReviewsInput!) {
   storeReviews(input: $input) {
@@ -1492,6 +1544,14 @@ export const SellerReviewsCommentsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerReviewsCommentsQuery, SellerReviewsCommentsQueryVariables>;
+export const SellerSettingsStoreDocument = new TypedDocumentString(`
+    query SellerSettingsStore {
+  sellerMyStore {
+    id
+    storeName
+  }
+}
+    `) as unknown as TypedDocumentString<SellerSettingsStoreQuery, SellerSettingsStoreQueryVariables>;
 export const SellerStoreAuditLogsDocument = new TypedDocumentString(`
     query SellerStoreAuditLogs($input: SellerAuditLogListInput) {
   sellerAuditLogs(input: $input) {
