@@ -86,3 +86,8 @@ jest.mock('expo-file-system', () => {
 
 /** @native-html/render가 끌어오는 ESM 전용 패키지(jest 변환 대상 밖). 디버그 직렬화에만 쓰여 그대로 돌려준다 */
 jest.mock('stringify-entities', () => ({ stringifyEntities: (value: string) => value }));
+
+/** AsyncStorage(상품 등록 임시저장): 패키지가 주는 메모리 구현. 네이티브 모듈이 없으면 import 시점에 던진다 */
+jest.mock('@react-native-async-storage/async-storage', () =>
+  jest.requireActual<object>('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
