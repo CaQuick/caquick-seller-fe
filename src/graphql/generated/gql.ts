@@ -15,12 +15,18 @@ import * as types from './graphql';
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
+    "\n  query SellerAuthMe {\n    sellerMe {\n      accountId\n      username\n      displayName\n      storeId\n      mustChangePassword\n      accountStatus\n    }\n  }\n": typeof types.SellerAuthMeDocument,
     "\n  query Ping {\n    ping\n  }\n": typeof types.PingDocument,
 };
 const documents: Documents = {
+    "\n  query SellerAuthMe {\n    sellerMe {\n      accountId\n      username\n      displayName\n      storeId\n      mustChangePassword\n      accountStatus\n    }\n  }\n": types.SellerAuthMeDocument,
     "\n  query Ping {\n    ping\n  }\n": types.PingDocument,
 };
 
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerAuthMe {\n    sellerMe {\n      accountId\n      username\n      displayName\n      storeId\n      mustChangePassword\n      accountStatus\n    }\n  }\n"): typeof import('./graphql').SellerAuthMeDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

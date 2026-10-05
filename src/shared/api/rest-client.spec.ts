@@ -228,6 +228,25 @@ describe('authRequest', () => {
     });
   });
 
+  describe('auth 요청의 403 분기', () => {
+    it.each([
+      [true, 'ACCOUNT_NOT_ACTIVE', 1],
+      [true, 'ACCOUNT_TYPE_NOT_ALLOWED', 1],
+      [true, 'PASSWORD_CHANGE_REQUIRED', 1],
+      [true, 'ROLE_MISMATCH', 0],
+      [false, 'ACCOUNT_NOT_ACTIVE', 0],
+    ] as const)('auth=%s·%s면 onForbidden %d회 뒤 던진다', async (auth, code, calls) => {
+      const onForbidden = jest.fn();
+      registerSessionHooks({ onForbidden });
+      server.use(restError('/seller/change-password', 403, 'x', code));
+      await expect(
+        authRequest('/seller/change-password', { auth, body: {} }),
+      ).rejects.toMatchObject({ classification: 'FORBIDDEN', code });
+      expect(onForbidden).toHaveBeenCalledTimes(calls);
+      if (calls) expect(onForbidden).toHaveBeenCalledWith(code);
+    });
+  });
+
   it('네트워크 실패는 NETWORK', async () => {
     server.use(http.post(`${AUTH_URL}/seller/login`, () => HttpResponse.error()));
     await expect(authRequest('/seller/login', { body: {} })).rejects.toMatchObject({

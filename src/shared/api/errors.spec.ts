@@ -4,6 +4,7 @@ import {
   MESSAGES,
   classifyStatus,
   isForbiddenCode,
+  isTransientError,
   messageFor,
 } from './errors';
 
@@ -33,6 +34,23 @@ describe('isForbiddenCode', () => {
   });
 });
 
+describe('isTransientError', () => {
+  it.each([
+    ['NETWORK', 0, true],
+    ['INTERNAL_SERVER_ERROR', 500, true],
+    ['INTERNAL_SERVER_ERROR', 503, true],
+    ['UNAUTHENTICATED', 401, false],
+    ['FORBIDDEN', 403, false],
+    ['TOO_MANY_REQUESTS', 429, false],
+  ] as const)('%s·%d → %s', (classification, status, expected) => {
+    expect(isTransientError(new ApiError('x', classification, null, status))).toBe(expected);
+  });
+
+  it('반증: ApiError가 아니면 장애로 보지 않는다', () => {
+    expect(isTransientError(new Error('boom'))).toBe(false);
+  });
+});
+
 describe('messageFor', () => {
   it('표에 있는 코드는 한국어 문구로 바꾼다', () => {
     const e = new ApiError('Invalid credentials', 'UNAUTHENTICATED', 'INVALID_CREDENTIALS', 401);
@@ -46,6 +64,7 @@ describe('messageFor', () => {
     'ACCOUNT_NOT_ACTIVE',
     'ACCOUNT_TYPE_NOT_ALLOWED',
     'LOGIN_RATE_LIMITED',
+    'CURRENT_PASSWORD_INVALID',
     'PASSWORD_CHANGE_REQUIRED',
     'STORE_NOT_FOUND',
     'INVALID_PUSH_TOKEN',

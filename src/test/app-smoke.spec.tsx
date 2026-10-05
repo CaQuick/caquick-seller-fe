@@ -5,7 +5,7 @@ import { AppState } from 'react-native';
 import { useSessionStore } from '@/features/auth';
 import { resetSessionHooks } from '@/shared/api';
 import { mockSecureStore } from '@/test/mocks';
-import { restOk } from '@/test/msw/graphql';
+import { gqlOk, restOk } from '@/test/msw/graphql';
 import { server } from '@/test/msw/server';
 
 import R_layout from '../../app/_layout';
@@ -86,6 +86,17 @@ const routes = {
   '(auth)/login': R_auth_login,
 };
 
+const sellerMe = gqlOk('SellerAuthMe', {
+  sellerMe: {
+    accountId: '7',
+    username: 'seller01',
+    displayName: null,
+    storeId: '3',
+    mustChangePassword: false,
+    accountStatus: 'ACTIVE',
+  },
+});
+
 const session = (mustChangePassword = false) => ({
   accessToken: 'at',
   tokenType: 'Bearer' as const,
@@ -107,13 +118,13 @@ describe('앱 셸', () => {
   it('저장된 세션이 없으면 로그인 화면으로 보낸다', async () => {
     const router = open('/');
     await router;
-    expect(await screen.findByText('판매자 계정으로 로그인합니다.')).toBeTruthy();
+    expect(await screen.findByText('관리자에게 받은 매장 계정으로 로그인해 주세요')).toBeTruthy();
     expect(router.getPathname()).toBe('/login');
   });
 
   it('refreshToken이 있으면 복원해 홈 탭을 띄우고, 세션이 끝나면 로그인으로 돌아간다', async () => {
     mockSecureStore.set('caquick.refreshToken', 'rt');
-    server.use(restOk('/seller/refresh', session()));
+    server.use(restOk('/seller/refresh', session()), sellerMe);
     const router = open('/');
     await router;
     expect(await screen.findByText('오늘의 현황')).toBeTruthy();
@@ -130,12 +141,12 @@ describe('앱 셸', () => {
     const router = open('/');
     await router;
     await waitFor(() => expect(router.getPathname()).toBe('/change-password'));
-    expect(screen.getByText('계속하려면 먼저 비밀번호를 바꿔야 합니다.')).toBeTruthy();
+    expect(screen.getByText(/초기 비밀번호로 로그인했어요/)).toBeTruthy();
   });
 
   it('로그인된 상태로 로그인 화면에 오면 앱으로 보낸다', async () => {
     mockSecureStore.set('caquick.refreshToken', 'rt');
-    server.use(restOk('/seller/refresh', session()));
+    server.use(restOk('/seller/refresh', session()), sellerMe);
     const router = open('/login');
     await router;
     await waitFor(() => expect(router.getPathname()).toBe('/'));
@@ -149,9 +160,9 @@ describe('앱 셸', () => {
       .mock.calls.filter(([type]) => type === 'change')
       .map(([, fn]) => fn as (s: string) => void);
     expect(listeners.length).toBeGreaterThan(0);
-    listeners.forEach((fn) => fn('background'));
+    act(() => listeners.forEach((fn) => fn('background')));
     expect(focusManager.isFocused()).toBe(false);
-    listeners.forEach((fn) => fn('active'));
+    act(() => listeners.forEach((fn) => fn('active')));
     expect(focusManager.isFocused()).toBe(true);
   });
 });
