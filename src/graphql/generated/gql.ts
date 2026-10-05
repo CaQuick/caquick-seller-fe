@@ -69,6 +69,7 @@ type Documents = {
     "\n  query SellerStoreRegionGroups {\n    regionGroups {\n      id\n      name\n      hasChildren\n    }\n  }\n": typeof types.SellerStoreRegionGroupsDocument,
     "\n  query SellerStoreRegions($parentId: ID!) {\n    regions(parentId: $parentId) {\n      id\n      name\n    }\n  }\n": typeof types.SellerStoreRegionsDocument,
     "\n  query SellerStoreSearchRegions($input: SearchRegionsInput!) {\n    searchRegions(input: $input) {\n      id\n      name\n      parentName\n      level\n    }\n  }\n": typeof types.SellerStoreSearchRegionsDocument,
+    "\n  query SellerStoreRegionByLocation($input: RegionByLocationInput!) {\n    regionByLocation(input: $input) {\n      group {\n        id\n        name\n      }\n      region {\n        id\n        name\n      }\n    }\n  }\n": typeof types.SellerStoreRegionByLocationDocument,
     "\n  query SellerStoreBusinessHours {\n    sellerStoreBusinessHours {\n      id\n      dayOfWeek\n      isClosed\n      openTime\n      closeTime\n    }\n  }\n": typeof types.SellerStoreBusinessHoursDocument,
     "\n  mutation SellerStoreUpsertBusinessHour($input: SellerUpsertStoreBusinessHourInput!) {\n    sellerUpsertStoreBusinessHour(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerStoreUpsertBusinessHourDocument,
     "\n  query SellerStoreSpecialClosures($input: CursorInput) {\n    sellerStoreSpecialClosures(input: $input) {\n      items {\n        id\n        closureDate\n        reason\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": typeof types.SellerStoreSpecialClosuresDocument,
@@ -137,6 +138,7 @@ const documents: Documents = {
     "\n  query SellerStoreRegionGroups {\n    regionGroups {\n      id\n      name\n      hasChildren\n    }\n  }\n": types.SellerStoreRegionGroupsDocument,
     "\n  query SellerStoreRegions($parentId: ID!) {\n    regions(parentId: $parentId) {\n      id\n      name\n    }\n  }\n": types.SellerStoreRegionsDocument,
     "\n  query SellerStoreSearchRegions($input: SearchRegionsInput!) {\n    searchRegions(input: $input) {\n      id\n      name\n      parentName\n      level\n    }\n  }\n": types.SellerStoreSearchRegionsDocument,
+    "\n  query SellerStoreRegionByLocation($input: RegionByLocationInput!) {\n    regionByLocation(input: $input) {\n      group {\n        id\n        name\n      }\n      region {\n        id\n        name\n      }\n    }\n  }\n": types.SellerStoreRegionByLocationDocument,
     "\n  query SellerStoreBusinessHours {\n    sellerStoreBusinessHours {\n      id\n      dayOfWeek\n      isClosed\n      openTime\n      closeTime\n    }\n  }\n": types.SellerStoreBusinessHoursDocument,
     "\n  mutation SellerStoreUpsertBusinessHour($input: SellerUpsertStoreBusinessHourInput!) {\n    sellerUpsertStoreBusinessHour(input: $input) {\n      id\n    }\n  }\n": types.SellerStoreUpsertBusinessHourDocument,
     "\n  query SellerStoreSpecialClosures($input: CursorInput) {\n    sellerStoreSpecialClosures(input: $input) {\n      items {\n        id\n        closureDate\n        reason\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": types.SellerStoreSpecialClosuresDocument,
@@ -367,6 +369,10 @@ export function graphql(source: "\n  query SellerStoreRegions($parentId: ID!) {\
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query SellerStoreSearchRegions($input: SearchRegionsInput!) {\n    searchRegions(input: $input) {\n      id\n      name\n      parentName\n      level\n    }\n  }\n"): typeof import('./graphql').SellerStoreSearchRegionsDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerStoreRegionByLocation($input: RegionByLocationInput!) {\n    regionByLocation(input: $input) {\n      group {\n        id\n        name\n      }\n      region {\n        id\n        name\n      }\n    }\n  }\n"): typeof import('./graphql').SellerStoreRegionByLocationDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

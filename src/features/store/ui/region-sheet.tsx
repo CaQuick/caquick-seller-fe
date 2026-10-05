@@ -1,12 +1,13 @@
 import { type BottomSheetModal } from '@gorhom/bottom-sheet';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { type ReactNode, type RefObject, useEffect, useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 
 import { colors } from '@/shared/config/tokens';
 import {
   AppBottomSheet,
+  Button,
   Empty,
   ErrorState,
   Icon,
@@ -21,6 +22,8 @@ import {
   regionsQueryOptions,
   searchRegionsQueryOptions,
 } from '../api/regions';
+import { LOCATION_COPY, locateErrorMessage, locateRegion } from '../model/location';
+import { InfoBox } from './parts';
 
 export interface RegionPick {
   name: string;
@@ -41,7 +44,7 @@ function useDebounced(value: string, ms = 300) {
   return debounced;
 }
 
-/** 시·군·구만 고른다. 검색어가 없으면 광역 → 시군구 순으로 훑는다 */
+/** 시·군·구만 고른다. 검색어가 없으면 광역 → 시군구 순으로 훑고, 현재 위치로도 찾는다 */
 export function RegionSheet({ ref, onPick }: Props) {
   const [keyword, setKeyword] = useState('');
   const [group, setGroup] = useState<{ id: string; name: string } | null>(null);
@@ -49,6 +52,7 @@ export function RegionSheet({ ref, onPick }: Props) {
   const search = useQuery({ ...searchRegionsQueryOptions(term), enabled: term.length > 0 });
   const groups = useQuery({ ...regionGroupsQueryOptions(), enabled: !term && !group });
   const regions = useQuery({ ...regionsQueryOptions(group?.id ?? ''), enabled: !term && !!group });
+  const locate = useMutation({ mutationFn: locateRegion });
 
   const pick = (region: RegionPick) => {
     onPick(region);
@@ -57,7 +61,15 @@ export function RegionSheet({ ref, onPick }: Props) {
   const reset = () => {
     setKeyword('');
     setGroup(null);
+    locate.reset();
   };
+  // mutate 콜백이라 시트를 닫아 reset된 뒤 늦게 온 결과는 적용되지 않는다
+  const findByLocation = () =>
+    locate.mutate(undefined, {
+      onSuccess: (result) => {
+        if (result.status === 'found') pick(result.pick);
+      },
+    });
 
   let rows: ReactNode[] | undefined;
   if (term) {
@@ -98,6 +110,7 @@ export function RegionSheet({ ref, onPick }: Props) {
       ));
   }
   const active = term ? search : group ? regions : groups;
+  const outcome = locate.data?.status;
 
   return (
     <AppBottomSheet ref={ref} onDismiss={reset}>
@@ -134,6 +147,42 @@ export function RegionSheet({ ref, onPick }: Props) {
           <MenuGroup>{rows}</MenuGroup>
         )}
       </ScrollView>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={LOCATION_COPY.find}
+        accessibilityState={{ busy: locate.isPending, disabled: locate.isPending }}
+        disabled={locate.isPending}
+        onPress={findByLocation}
+        className="h-12 flex-row items-center justify-center gap-1.5 rounded-sm border border-line2 bg-surface"
+      >
+        {locate.isPending ? (
+          <ActivityIndicator color={colors.label} />
+        ) : (
+          <>
+            <Icon name="location" size={16} color={colors.label} />
+            <Text className="font-sans text-lg tracking-tight text-label">
+              {LOCATION_COPY.find}
+            </Text>
+          </>
+        )}
+      </Pressable>
+      {locate.error ? (
+        <InfoBox tone="danger" className="mt-3">
+          {locateErrorMessage(locate.error)}
+        </InfoBox>
+      ) : outcome === 'notFound' ? (
+        <InfoBox className="mt-3">{LOCATION_COPY.notFound}</InfoBox>
+      ) : outcome === 'denied' ? (
+        <View className="mt-3 gap-2">
+          <InfoBox>{LOCATION_COPY.denied}</InfoBox>
+          <Button
+            size="sm"
+            variant="secondary"
+            title={LOCATION_COPY.openSettings}
+            onPress={() => void Linking.openSettings().catch(() => undefined)}
+          />
+        </View>
+      ) : null}
     </AppBottomSheet>
   );
 }

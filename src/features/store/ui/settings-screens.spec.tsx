@@ -334,6 +334,31 @@ describe('기본 정보', () => {
     });
   });
 
+  it('현재 위치로 찾은 지역을 지역 선택과 같이 반영하고 이전 동을 비운다', async () => {
+    server.use(
+      myStore({ addressCity: '서울 남부', addressDistrict: '강남구' }),
+      query('SellerStoreRegionByLocation', {
+        regionByLocation: { group: { id: 'g2', name: '인천' }, region: { id: 'r9', name: '서구' } },
+      }),
+    );
+    regionData();
+    const calls = record('SellerStoreUpdateBasicInfo', () => ({
+      sellerUpdateStoreBasicInfo: STORE,
+    }));
+    await open('/store/basic-info');
+    await fireEvent.press(await screen.findByRole('button', { name: '현재 위치로 찾기' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '주소' })).toHaveAccessibilityValue({
+        text: '인천 서구',
+      }),
+    );
+    await fireEvent.press(saveButton());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toEqual({
+      input: { addressCity: '인천', addressDistrict: '서구', addressNeighborhood: null },
+    });
+  });
+
   it('로고를 고르면 STORE_IMAGE로 올리고 저장 때 publicUrl을 보낸다', async () => {
     mockFileSizes.set('file:///cache/logo.jpg', 1234);
     jest.mocked(launchImageLibraryAsync).mockResolvedValueOnce({
