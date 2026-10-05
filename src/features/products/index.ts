@@ -9,5 +9,5 @@ export {
   ProductNewOptionsScreen,
   ProductNewPreviewScreen,
   ProductOptionsScreen,
-  ProductsScreen,
 } from './ui/screens';
+export { ProductsScreen } from './ui/list-screen';

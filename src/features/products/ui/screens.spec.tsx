@@ -10,11 +10,9 @@ import {
   ProductNewOptionsScreen,
   ProductNewPreviewScreen,
   ProductOptionsScreen,
-  ProductsScreen,
 } from './screens';
 
 const routes = {
-  products: ProductsScreen,
   'products/new/_layout': ProductNewLayout,
   'products/new/basic': ProductNewBasicScreen,
   'products/new/options': ProductNewOptionsScreen,
@@ -28,7 +26,6 @@ const routes = {
 
 describe('상품 화면 골격', () => {
   it.each([
-    ['/products', '등록한 상품이 없습니다'],
     ['/products/new/basic', '사진·이름·가격·카테고리·태그를 입력합니다.'],
     ['/products/new/options', '옵션'],
     ['/products/new/preview', '미리보기'],

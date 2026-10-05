@@ -13,6 +13,15 @@ export type AccountStatus =
   /** 운영자가 정지한 상태. 모든 API 접근이 FORBIDDEN이고 refresh 세션도 폐기된다. */
   | 'SUSPENDED';
 
+/** 상품 카테고리 분류. */
+export type CategoryType =
+  /** 상황·이벤트 기준 분류(생일, 기념일 등). 홈 화면 칩에는 이 분류만 노출된다. */
+  | 'EVENT'
+  /** 위 둘로 분류되지 않는 그 밖의 분류. 조회 필터로도 쓸 수 있다. */
+  | 'OTHER'
+  /** 디자인·스타일 기준 분류. */
+  | 'STYLE';
+
 /** 커서 페이지네이션 공통 입력. 필터가 필요한 목록은 같은 두 필드를 가진 전용 input을 쓴다. */
 export type CursorInput = {
   /** 이전 페이지의 nextCursor. 불투명 토큰이라 정렬 기준이 바뀌면 무효. 형식이 어긋나면 BAD_USER_INPUT. */
@@ -40,6 +49,26 @@ export type OrderStatusType =
   /** 구매자가 주문을 넣은 직후의 초기 상태. 판매자 확인 대기. */
   | 'SUBMITTED';
 
+/** 상품 리뷰 목록 조회 조건. */
+export type ProductReviewsInput = {
+  /** 이전 페이지의 nextCursor 값(불투명 토큰). 동일 sort에서만 유효. */
+  cursor?: string | null | undefined;
+  /** 한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
+  /** true면 사진(미디어) 있는 리뷰만(사진후기 그리드/사진후기 상세). */
+  photoOnly?: boolean | null | undefined;
+  productId: string | number;
+  /** 정렬 기준. 기본 최신순. 정렬을 바꾸면 기존 cursor는 무효다. */
+  sort?: ReviewSort | null | undefined;
+};
+
+/** 리뷰 목록 정렬. 상품 리뷰·매장 리뷰가 공용으로 쓴다. */
+export type ReviewSort =
+  /** 최신순. */
+  | 'LATEST'
+  /** 좋아요순(동률이면 최신순). */
+  | 'LIKES';
+
 /** 주문 목록 조회 조건. 모든 필터는 AND로 결합되고, 미지정 필터는 적용되지 않는다. */
 export type SellerOrderListInput = {
   /** 이전 응답의 nextCursor. 첫 페이지는 생략한다. */
@@ -58,6 +87,27 @@ export type SellerOrderListInput = {
   toCreatedAt?: string | null | undefined;
   /** 픽업 일시 상한(이하). */
   toPickupAt?: string | null | undefined;
+};
+
+/** 상품 목록 조회 조건. 필터는 AND로 결합되고 미지정 필터는 적용되지 않는다. */
+export type SellerProductListInput = {
+  /** 카테고리 필터. 해당 카테고리가 연결된 상품만. */
+  categoryId?: string | number | null | undefined;
+  /** 이전 응답의 nextCursor. 첫 페이지는 생략한다. */
+  cursor?: string | null | undefined;
+  /** 노출 여부 필터. 생략하면 서버가 활성 상품만 반환한다(SDL 기본값이 아니라 서비스 기본 동작). */
+  isActive?: boolean | null | undefined;
+  /** 한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
+  /** 상품명 또는 연결된 태그명 부분일치 검색. 둘 중 하나만 맞아도 포함된다. */
+  search?: string | null | undefined;
+};
+
+/** 상품 노출 여부 변경 입력. */
+export type SellerSetProductActiveInput = {
+  /** true면 구매자 화면에 노출한다. */
+  isActive: boolean;
+  productId: string | number;
 };
 
 /**
@@ -131,6 +181,47 @@ export type SellerOrdersUpdatedSubscriptionVariables = Exact<{ [key: string]: ne
 
 
 export type SellerOrdersUpdatedSubscription = { sellerOrderUpdated: { orderId: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, productName: string, updatedAt: string } };
+
+export type SellerProductsListQueryVariables = Exact<{
+  input?: SellerProductListInput | null | undefined;
+}>;
+
+
+export type SellerProductsListQuery = { sellerProducts: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, name: string, regularPrice: number, salePrice: number | null, isActive: boolean, images: Array<{ id: string, imageUrl: string }>, categories: Array<{ id: string, name: string }> }> } };
+
+export type SellerProductDetailQueryVariables = Exact<{
+  productId: string | number;
+}>;
+
+
+export type SellerProductDetailQuery = { sellerProduct: { id: string, name: string, description: string | null, purchaseNotice: string | null, regularPrice: number, salePrice: number | null, preparationTimeMinutes: number, isActive: boolean, images: Array<{ id: string, imageUrl: string, sortOrder: number }>, categories: Array<{ id: string, name: string }>, tags: Array<{ id: string, name: string }>, optionGroups: Array<{ id: string, name: string, isRequired: boolean, minSelect: number, maxSelect: number, isActive: boolean, optionItems: Array<{ id: string }> }>, customTemplate: { id: string, isActive: boolean, textTokens: Array<{ id: string }> } | null } };
+
+export type SellerProductsFilterCategoriesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerProductsFilterCategoriesQuery = { categories: Array<{ id: string, name: string, categoryType: CategoryType, sortOrder: number }> };
+
+export type SellerProductBuyerPreviewQueryVariables = Exact<{
+  productId: string | number;
+  reviews: ProductReviewsInput;
+}>;
+
+
+export type SellerProductBuyerPreviewQuery = { productDetail: { id: string, name: string, description: string | null, purchaseNotice: string | null, images: Array<string>, regularPrice: number, salePrice: number | null, discountRate: number, optionGroups: Array<{ id: string, name: string, description: string | null, items: Array<{ id: string, title: string, description: string | null, priceDelta: number }> }> }, productReviews: { totalCount: number } };
+
+export type SellerProductSetActiveMutationVariables = Exact<{
+  input: SellerSetProductActiveInput;
+}>;
+
+
+export type SellerProductSetActiveMutation = { sellerSetProductActive: { id: string, isActive: boolean } };
+
+export type SellerProductDeleteMutationVariables = Exact<{
+  productId: string | number;
+}>;
+
+
+export type SellerProductDeleteMutation = { sellerDeleteProduct: boolean };
 
 export type PingQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -327,6 +418,126 @@ export const SellerOrdersUpdatedDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerOrdersUpdatedSubscription, SellerOrdersUpdatedSubscriptionVariables>;
+export const SellerProductsListDocument = new TypedDocumentString(`
+    query SellerProductsList($input: SellerProductListInput) {
+  sellerProducts(input: $input) {
+    items {
+      id
+      name
+      regularPrice
+      salePrice
+      isActive
+      images {
+        id
+        imageUrl
+      }
+      categories {
+        id
+        name
+      }
+    }
+    totalCount
+    hasMore
+    nextCursor
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductsListQuery, SellerProductsListQueryVariables>;
+export const SellerProductDetailDocument = new TypedDocumentString(`
+    query SellerProductDetail($productId: ID!) {
+  sellerProduct(productId: $productId) {
+    id
+    name
+    description
+    purchaseNotice
+    regularPrice
+    salePrice
+    preparationTimeMinutes
+    isActive
+    images {
+      id
+      imageUrl
+      sortOrder
+    }
+    categories {
+      id
+      name
+    }
+    tags {
+      id
+      name
+    }
+    optionGroups {
+      id
+      name
+      isRequired
+      minSelect
+      maxSelect
+      isActive
+      optionItems {
+        id
+      }
+    }
+    customTemplate {
+      id
+      isActive
+      textTokens {
+        id
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductDetailQuery, SellerProductDetailQueryVariables>;
+export const SellerProductsFilterCategoriesDocument = new TypedDocumentString(`
+    query SellerProductsFilterCategories {
+  categories {
+    id
+    name
+    categoryType
+    sortOrder
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductsFilterCategoriesQuery, SellerProductsFilterCategoriesQueryVariables>;
+export const SellerProductBuyerPreviewDocument = new TypedDocumentString(`
+    query SellerProductBuyerPreview($productId: ID!, $reviews: ProductReviewsInput!) {
+  productDetail(productId: $productId) {
+    id
+    name
+    description
+    purchaseNotice
+    images
+    regularPrice
+    salePrice
+    discountRate
+    optionGroups {
+      id
+      name
+      description
+      items {
+        id
+        title
+        description
+        priceDelta
+      }
+    }
+  }
+  productReviews(input: $reviews) {
+    totalCount
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductBuyerPreviewQuery, SellerProductBuyerPreviewQueryVariables>;
+export const SellerProductSetActiveDocument = new TypedDocumentString(`
+    mutation SellerProductSetActive($input: SellerSetProductActiveInput!) {
+  sellerSetProductActive(input: $input) {
+    id
+    isActive
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductSetActiveMutation, SellerProductSetActiveMutationVariables>;
+export const SellerProductDeleteDocument = new TypedDocumentString(`
+    mutation SellerProductDelete($productId: ID!) {
+  sellerDeleteProduct(productId: $productId)
+}
+    `) as unknown as TypedDocumentString<SellerProductDeleteMutation, SellerProductDeleteMutationVariables>;
 export const PingDocument = new TypedDocumentString(`
     query Ping {
   ping
