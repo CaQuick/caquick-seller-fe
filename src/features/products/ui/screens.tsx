@@ -3,15 +3,6 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { EmptyState } from '@/features/home';
 import { colors, fontFamily, fontWeight } from '@/shared/config/tokens';
 
-export function ProductsScreen() {
-  return (
-    <EmptyState
-      title="등록한 상품이 없습니다"
-      message="오른쪽 아래 버튼으로 상품을 등록해 보세요."
-    />
-  );
-}
-
 /** 등록 3단계 Stack. 뒤로가기 제스처를 꺼 단계 밖으로 새지 않게 한다 */
 export function ProductNewLayout() {
   return (
@@ -45,10 +36,6 @@ export function ProductNewPreviewScreen() {
 
 function useProductId(): string {
   return useLocalSearchParams<{ id: string }>().id;
-}
-
-export function ProductDetailScreen() {
-  return <EmptyState title="상품 상세" message={`상품 #${useProductId()}의 내용을 불러옵니다.`} />;
 }
 
 export function ProductEditScreen() {

@@ -25,6 +25,12 @@ type Documents = {
     "\n  mutation SellerUpdateOrderStatus($input: SellerUpdateOrderStatusInput!) {\n    sellerUpdateOrderStatus(input: $input) {\n      id\n      status\n    }\n  }\n": typeof types.SellerUpdateOrderStatusDocument,
     "\n  query SellerOrderConversations($input: CursorInput) {\n    sellerConversations(input: $input) {\n      items {\n        id\n        accountId\n        unreadCount\n      }\n      hasMore\n      nextCursor\n    }\n  }\n": typeof types.SellerOrderConversationsDocument,
     "\n  subscription SellerOrdersUpdated {\n    sellerOrderUpdated {\n      orderId\n      status\n      pickupAt\n      buyerName\n      totalPrice\n      productName\n      updatedAt\n    }\n  }\n": typeof types.SellerOrdersUpdatedDocument,
+    "\n  query SellerProductsList($input: SellerProductListInput) {\n    sellerProducts(input: $input) {\n      items {\n        id\n        name\n        regularPrice\n        salePrice\n        isActive\n        images {\n          id\n          imageUrl\n        }\n        categories {\n          id\n          name\n        }\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": typeof types.SellerProductsListDocument,
+    "\n  query SellerProductDetail($productId: ID!) {\n    sellerProduct(productId: $productId) {\n      id\n      name\n      description\n      purchaseNotice\n      regularPrice\n      salePrice\n      preparationTimeMinutes\n      isActive\n      images {\n        id\n        imageUrl\n        sortOrder\n      }\n      categories {\n        id\n        name\n      }\n      tags {\n        id\n        name\n      }\n      optionGroups {\n        id\n        name\n        isRequired\n        minSelect\n        maxSelect\n        isActive\n        optionItems {\n          id\n        }\n      }\n      customTemplate {\n        id\n        isActive\n        textTokens {\n          id\n        }\n      }\n    }\n  }\n": typeof types.SellerProductDetailDocument,
+    "\n  query SellerProductsFilterCategories {\n    categories {\n      id\n      name\n      categoryType\n      sortOrder\n    }\n  }\n": typeof types.SellerProductsFilterCategoriesDocument,
+    "\n  query SellerProductBuyerPreview($productId: ID!, $reviews: ProductReviewsInput!) {\n    productDetail(productId: $productId) {\n      id\n      name\n      description\n      purchaseNotice\n      images\n      regularPrice\n      salePrice\n      discountRate\n      optionGroups {\n        id\n        name\n        description\n        items {\n          id\n          title\n          description\n          priceDelta\n        }\n      }\n    }\n    productReviews(input: $reviews) {\n      totalCount\n    }\n  }\n": typeof types.SellerProductBuyerPreviewDocument,
+    "\n  mutation SellerProductSetActive($input: SellerSetProductActiveInput!) {\n    sellerSetProductActive(input: $input) {\n      id\n      isActive\n    }\n  }\n": typeof types.SellerProductSetActiveDocument,
+    "\n  mutation SellerProductDelete($productId: ID!) {\n    sellerDeleteProduct(productId: $productId)\n  }\n": typeof types.SellerProductDeleteDocument,
     "\n  query Ping {\n    ping\n  }\n": typeof types.PingDocument,
 };
 const documents: Documents = {
@@ -38,6 +44,12 @@ const documents: Documents = {
     "\n  mutation SellerUpdateOrderStatus($input: SellerUpdateOrderStatusInput!) {\n    sellerUpdateOrderStatus(input: $input) {\n      id\n      status\n    }\n  }\n": types.SellerUpdateOrderStatusDocument,
     "\n  query SellerOrderConversations($input: CursorInput) {\n    sellerConversations(input: $input) {\n      items {\n        id\n        accountId\n        unreadCount\n      }\n      hasMore\n      nextCursor\n    }\n  }\n": types.SellerOrderConversationsDocument,
     "\n  subscription SellerOrdersUpdated {\n    sellerOrderUpdated {\n      orderId\n      status\n      pickupAt\n      buyerName\n      totalPrice\n      productName\n      updatedAt\n    }\n  }\n": types.SellerOrdersUpdatedDocument,
+    "\n  query SellerProductsList($input: SellerProductListInput) {\n    sellerProducts(input: $input) {\n      items {\n        id\n        name\n        regularPrice\n        salePrice\n        isActive\n        images {\n          id\n          imageUrl\n        }\n        categories {\n          id\n          name\n        }\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": types.SellerProductsListDocument,
+    "\n  query SellerProductDetail($productId: ID!) {\n    sellerProduct(productId: $productId) {\n      id\n      name\n      description\n      purchaseNotice\n      regularPrice\n      salePrice\n      preparationTimeMinutes\n      isActive\n      images {\n        id\n        imageUrl\n        sortOrder\n      }\n      categories {\n        id\n        name\n      }\n      tags {\n        id\n        name\n      }\n      optionGroups {\n        id\n        name\n        isRequired\n        minSelect\n        maxSelect\n        isActive\n        optionItems {\n          id\n        }\n      }\n      customTemplate {\n        id\n        isActive\n        textTokens {\n          id\n        }\n      }\n    }\n  }\n": types.SellerProductDetailDocument,
+    "\n  query SellerProductsFilterCategories {\n    categories {\n      id\n      name\n      categoryType\n      sortOrder\n    }\n  }\n": types.SellerProductsFilterCategoriesDocument,
+    "\n  query SellerProductBuyerPreview($productId: ID!, $reviews: ProductReviewsInput!) {\n    productDetail(productId: $productId) {\n      id\n      name\n      description\n      purchaseNotice\n      images\n      regularPrice\n      salePrice\n      discountRate\n      optionGroups {\n        id\n        name\n        description\n        items {\n          id\n          title\n          description\n          priceDelta\n        }\n      }\n    }\n    productReviews(input: $reviews) {\n      totalCount\n    }\n  }\n": types.SellerProductBuyerPreviewDocument,
+    "\n  mutation SellerProductSetActive($input: SellerSetProductActiveInput!) {\n    sellerSetProductActive(input: $input) {\n      id\n      isActive\n    }\n  }\n": types.SellerProductSetActiveDocument,
+    "\n  mutation SellerProductDelete($productId: ID!) {\n    sellerDeleteProduct(productId: $productId)\n  }\n": types.SellerProductDeleteDocument,
     "\n  query Ping {\n    ping\n  }\n": types.PingDocument,
 };
 
@@ -81,6 +93,30 @@ export function graphql(source: "\n  query SellerOrderConversations($input: Curs
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  subscription SellerOrdersUpdated {\n    sellerOrderUpdated {\n      orderId\n      status\n      pickupAt\n      buyerName\n      totalPrice\n      productName\n      updatedAt\n    }\n  }\n"): typeof import('./graphql').SellerOrdersUpdatedDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerProductsList($input: SellerProductListInput) {\n    sellerProducts(input: $input) {\n      items {\n        id\n        name\n        regularPrice\n        salePrice\n        isActive\n        images {\n          id\n          imageUrl\n        }\n        categories {\n          id\n          name\n        }\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n"): typeof import('./graphql').SellerProductsListDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerProductDetail($productId: ID!) {\n    sellerProduct(productId: $productId) {\n      id\n      name\n      description\n      purchaseNotice\n      regularPrice\n      salePrice\n      preparationTimeMinutes\n      isActive\n      images {\n        id\n        imageUrl\n        sortOrder\n      }\n      categories {\n        id\n        name\n      }\n      tags {\n        id\n        name\n      }\n      optionGroups {\n        id\n        name\n        isRequired\n        minSelect\n        maxSelect\n        isActive\n        optionItems {\n          id\n        }\n      }\n      customTemplate {\n        id\n        isActive\n        textTokens {\n          id\n        }\n      }\n    }\n  }\n"): typeof import('./graphql').SellerProductDetailDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerProductsFilterCategories {\n    categories {\n      id\n      name\n      categoryType\n      sortOrder\n    }\n  }\n"): typeof import('./graphql').SellerProductsFilterCategoriesDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerProductBuyerPreview($productId: ID!, $reviews: ProductReviewsInput!) {\n    productDetail(productId: $productId) {\n      id\n      name\n      description\n      purchaseNotice\n      images\n      regularPrice\n      salePrice\n      discountRate\n      optionGroups {\n        id\n        name\n        description\n        items {\n          id\n          title\n          description\n          priceDelta\n        }\n      }\n    }\n    productReviews(input: $reviews) {\n      totalCount\n    }\n  }\n"): typeof import('./graphql').SellerProductBuyerPreviewDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductSetActive($input: SellerSetProductActiveInput!) {\n    sellerSetProductActive(input: $input) {\n      id\n      isActive\n    }\n  }\n"): typeof import('./graphql').SellerProductSetActiveDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductDelete($productId: ID!) {\n    sellerDeleteProduct(productId: $productId)\n  }\n"): typeof import('./graphql').SellerProductDeleteDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
