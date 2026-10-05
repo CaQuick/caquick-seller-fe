@@ -38,6 +38,7 @@ describe('디자인 토큰', () => {
       shadowRadius: 14,
       shadowOffset: { width: 0, height: 4 },
     });
+    expect(colors.homeTabFill).toBe('#E8E4FF');
   });
 
   it('tracking은 글자 크기에 em 비율을 곱한 px를 준다(기본 -0.01em)', () => {

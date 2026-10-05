@@ -50,6 +50,7 @@ export const colors = {
   danger: '#E5484D',
   dangerBg: '#FFF1F1',
   star: '#FFC43D',
+  homeTabFill: '#E8E4FF', // 홈 활성 탭 집 채움(점은 stepLast)
 } as const;
 
 /** CSS linear-gradient(angle, 색 위치…) 그대로. RN 스타일에는 그라디언트가 없어 SVG로 그린다 */

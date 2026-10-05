@@ -53,7 +53,15 @@ const ICONS = {
   location: { d: `M12 21s7-6 7-11a7 7 0 0 0-14 0c0 5 7 11 7 11z${circle(12, 10, 2.5)}` },
 } satisfies Record<string, { d: string; stroke?: number }>;
 
-export type IconName = keyof typeof ICONS;
+/** 색이 박힌 채움 아이콘(획 없음). 홈 활성 탭은 시안대로 집 채움 + 가운데 점 */
+const FILLED = {
+  homeActive: [
+    { d: 'M3 10.5 12 3l9 7.5V21H3z', fill: colors.homeTabFill },
+    { d: circle(12, 15, 2.5), fill: colors.stepLast },
+  ],
+} satisfies Record<string, { d: string; fill: string }[]>;
+
+export type IconName = keyof typeof ICONS | keyof typeof FILLED;
 
 interface Props {
   name: IconName;
@@ -65,9 +73,26 @@ interface Props {
   testID?: string;
 }
 
+const isFilled = (name: IconName): name is keyof typeof FILLED => name in FILLED;
+
 /** 장식 아이콘. 누를 수 있는 곳은 감싼 Pressable이 접근성 라벨을 갖는다 */
 export function Icon({ name, size = 20, color = colors.text2, fill, strokeWidth, testID }: Props) {
-  const icon: { d: string; stroke?: number } = ICONS[name];
+  let body;
+  if (isFilled(name)) {
+    body = FILLED[name].map((p) => <Path key={p.d} d={p.d} fill={p.fill} />);
+  } else {
+    const icon: { d: string; stroke?: number } = ICONS[name];
+    body = (
+      <Path
+        d={icon.d}
+        fill={fill ?? 'none'}
+        stroke={color}
+        strokeWidth={strokeWidth ?? icon.stroke ?? 2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    );
+  }
   return (
     <Svg
       testID={testID}
@@ -77,14 +102,7 @@ export function Icon({ name, size = 20, color = colors.text2, fill, strokeWidth,
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <Path
-        d={icon.d}
-        fill={fill ?? 'none'}
-        stroke={color}
-        strokeWidth={strokeWidth ?? icon.stroke ?? 2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      {body}
     </Svg>
   );
 }

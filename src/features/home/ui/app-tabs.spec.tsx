@@ -1,8 +1,9 @@
-import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
+import { fireEvent, renderRouter, screen, waitFor, within } from 'expo-router/testing-library';
 import { HttpResponse, graphql } from 'msw';
 import { type ReactNode } from 'react';
 import { Text } from 'react-native';
 
+import { colors } from '@/shared/config/tokens';
 import { server } from '@/test/msw/server';
 import { Providers } from '@/test/render';
 
@@ -71,5 +72,52 @@ describe('AppTabs', () => {
     await waitFor(() => expect(served).toBe(1));
     expect(await screen.findByLabelText('채팅')).toBeTruthy();
     expect(screen.queryAllByText('0')).toHaveLength(0);
+  });
+
+  // 탭바는 탭마다 활성·비활성 아이콘을 둘 다 그리고 투명도로 바꾼다 — [활성, 비활성] 순서
+  const iconPaths = (tab: string) =>
+    screen
+      .getAllByTestId(`tab-icon-${tab}`, { includeHiddenElements: true })
+      .map((icon) => icon.queryAll((n) => n.type === 'RNSVGPath'));
+  const argb = (brush: unknown) => (brush as { payload: number }).payload >>> 0;
+  const hex = (color: string) => Number.parseInt(`ff${color.slice(1)}`, 16);
+
+  it('홈 탭의 활성 아이콘은 전용 채움 아이콘(집 + 점)이고 비활성은 라인 아이콘이다', async () => {
+    serve(0);
+    await open();
+    expect(await screen.findByText('홈 본문')).toBeTruthy();
+    const [on, off] = iconPaths('index');
+    expect(on?.map((p) => argb(p.props.fill))).toEqual([
+      hex(colors.homeTabFill),
+      hex(colors.stepLast),
+    ]);
+    expect(on?.[0]?.props.stroke).toBeUndefined();
+    expect(off).toHaveLength(1);
+    expect(off?.[0]?.props.stroke).toBeDefined();
+    // 반증: 전용 아이콘이 없는 탭은 활성이어도 라인 + 연보라 채움
+    const [productsOn] = iconPaths('products');
+    expect(productsOn).toHaveLength(1);
+    expect(argb(productsOn?.[0]?.props.fill)).toBe(hex(colors.tint));
+  });
+
+  it('목록 탭은 뒤로가기 없는 가운데 제목(.hdr), 매장은 큰 제목, 홈은 헤더가 없다', async () => {
+    serve(0);
+    const router = open();
+    await router;
+    expect(await screen.findByText('홈 본문')).toBeTruthy();
+    expect(screen.queryByTestId('tab-header')).toBeNull();
+
+    for (const [label, path] of [
+      ['상품', '/products'],
+      ['주문', '/orders'],
+      ['채팅', '/chats'],
+      ['매장', '/store'],
+    ] as const) {
+      await fireEvent.press(screen.getByLabelText(label));
+      await waitFor(() => expect(router.getPathname()).toBe(path));
+      const header = within(screen.getByTestId('tab-header'));
+      expect(header.getByRole('header', { name: label })).toBeTruthy();
+      expect(header.queryByRole('button', { name: '뒤로 가기' })).toBeNull();
+    }
   });
 });
