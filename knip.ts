@@ -8,17 +8,10 @@ const config: KnipConfig = {
   ignoreExportsUsedInFile: true,
   // global.css는 metro(withNativeWind)가 처리한다 — knip이 따라갈 import가 없다
   ignoreDependencies: [
-    // app.config.ts plugins로만 쓰인다
+    // expo-router의 SplashScreen이 쓰는 네이티브 모듈 — 직접 import하지 않는다
     'expo-splash-screen',
     // 폰트 파일 복사 원본(assets/fonts)
     'pretendard',
-    // 스캐폴드 단계에 미리 핀한 런타임 의존성 — 해당 기능 PR이 import하면 여기서 뺀다
-    '@native-html/render',
-    '@react-native-async-storage/async-storage',
-    '@react-native-community/datetimepicker',
-    'expo-image',
-    'react-native-calendars',
-    'react-native-sortables',
   ],
 };
 
