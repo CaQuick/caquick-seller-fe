@@ -14,6 +14,7 @@ import { LoginScreen } from './login-screen';
 const session = (mustChangePassword = false) => ({
   accessToken: 'at',
   tokenType: 'Bearer' as const,
+  expiresInSeconds: 900,
   accountStatus: 'ACTIVE' as const,
   mustChangePassword,
   refreshToken: 'rt',
@@ -33,6 +34,8 @@ async function submit(username: string, password: string) {
   await fireEvent.changeText(screen.getByLabelText('비밀번호'), password);
   await fireEvent.press(screen.getByRole('button', { name: '로그인' }));
 }
+
+const loginButton = () => screen.getByRole('button', { name: '로그인' });
 
 describe('LoginScreen', () => {
   beforeEach(() => {
@@ -58,17 +61,43 @@ describe('LoginScreen', () => {
     expect(router.getPathname()).toBe('/login');
   });
 
-  it('성공하면 refreshToken을 SecureStore에 두고 홈으로 간다', async () => {
-    server.use(restOk('/seller/login', session()));
+  it('X-Client: mobile로 보내고, 성공하면 refreshToken을 SecureStore에 두고 홈으로 간다', async () => {
+    let xClient: string | null = null;
+    server.use(
+      http.post(`${AUTH_URL}/seller/login`, ({ request }) => {
+        xClient = request.headers.get('x-client');
+        return HttpResponse.json(session());
+      }),
+    );
     const router = open();
     await router;
     await submit('seller01', 'Password1!');
     await waitFor(() => expect(router.getPathname()).toBe('/'));
+    expect(xClient).toBe('mobile');
     expect(useSessionStore.getState()).toMatchObject({
       status: 'authenticated',
       accessToken: 'at',
     });
     expect(mockSecureStore.get('caquick.refreshToken')).toBe('rt');
+  });
+
+  it('응답을 기다리는 동안 버튼이 진행 문구로 바뀌고 눌리지 않는다', async () => {
+    let release!: () => void;
+    server.use(
+      http.post(`${AUTH_URL}/seller/login`, async () => {
+        await new Promise<void>((r) => {
+          release = r;
+        });
+        return HttpResponse.json(session());
+      }),
+    );
+    const router = open();
+    await router;
+    await submit('seller01', 'Password1!');
+    expect(await screen.findByText('로그인 중…')).toBeTruthy();
+    expect(loginButton()).toBeDisabled();
+    release();
+    await waitFor(() => expect(router.getPathname()).toBe('/'));
   });
 
   it('비밀번호 변경이 강제된 계정은 변경 화면으로 간다', async () => {
@@ -85,8 +114,46 @@ describe('LoginScreen', () => {
     await router;
     await submit('seller01', 'Password1!');
     expect(await screen.findByText('아이디 또는 비밀번호가 올바르지 않습니다.')).toBeTruthy();
+    expect(loginButton()).toBeEnabled();
     expect(useSessionStore.getState().status).toBe('anonymous');
     expect(mockSecureStore.has('caquick.refreshToken')).toBe(false);
     expect(router.getPathname()).toBe('/login');
+  });
+
+  it('정지된 계정은 정지 안내를 보여준다', async () => {
+    server.use(
+      restError('/seller/login', 403, '활성 상태의 계정이 아닙니다.', 'ACCOUNT_NOT_ACTIVE'),
+    );
+    await open();
+    await submit('seller01', 'Password1!');
+    expect(
+      await screen.findByText('이용이 정지된 계정입니다. 관리자에게 문의해 주세요.'),
+    ).toBeTruthy();
+    expect(useSessionStore.getState().status).toBe('anonymous');
+  });
+
+  it('시도가 너무 많으면 잠금 문구와 함께 버튼을 막고, 입력을 고치면 푼다', async () => {
+    server.use(restError('/seller/login', 429, '너무 많음', 'LOGIN_RATE_LIMITED'));
+    await open();
+    await submit('seller01', 'Password1!');
+    expect(
+      await screen.findByText('로그인 시도가 너무 많습니다. 15분 뒤 다시 시도해 주세요.'),
+    ).toBeTruthy();
+    expect(loginButton()).toBeDisabled();
+
+    await fireEvent.changeText(screen.getByLabelText('비밀번호'), 'Password2!');
+    expect(loginButton()).toBeEnabled();
+    expect(
+      screen.queryByText('로그인 시도가 너무 많습니다. 15분 뒤 다시 시도해 주세요.'),
+    ).toBeNull();
+  });
+
+  it('눈 버튼으로 비밀번호 가림을 토글한다', async () => {
+    await open();
+    expect(screen.getByLabelText('비밀번호')).toHaveProp('secureTextEntry', true);
+    await fireEvent.press(screen.getByRole('button', { name: '비밀번호 보기' }));
+    expect(screen.getByLabelText('비밀번호')).toHaveProp('secureTextEntry', false);
+    await fireEvent.press(screen.getByRole('button', { name: '비밀번호 가리기' }));
+    expect(screen.getByLabelText('비밀번호')).toHaveProp('secureTextEntry', true);
   });
 });
