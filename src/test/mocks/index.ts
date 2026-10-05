@@ -38,6 +38,11 @@ jest.mock('expo-notifications', () => ({
   AndroidImportance: { DEFAULT: 3, HIGH: 4, MAX: 5 },
 }));
 
+/** expo-network: jest-expo 자동 mock은 구독 객체를 돌려주지 않는다 — onlineManager 해제가 remove를 부른다 */
+jest.mock('expo-network', () => ({
+  addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
+}));
+
 jest.mock('expo-updates', () => ({
   useUpdates: jest.fn(() => ({
     isUpdateAvailable: false,
