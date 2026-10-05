@@ -124,7 +124,8 @@ src/
 - **Pretendard** 정적 4종(400·500·600·700)을 `expo-font` 플러그인으로 빌드에 임베드합니다. 양쪽 모두 `fontFamily: 'Pretendard'` + `fontWeight`로 씁니다.
 - **접근성 기본**: 터치 타깃 44pt(`size.touchTarget`), 아이콘 버튼에는 `accessibilityLabel`. 안전 영역은 `useSafeAreaInsets`.
 - **문구**는 한국어이며 feature별 상수 1곳에 둡니다. 조사는 `shared/lib/josa.ts`.
-- **이미지 표시는 RN `Image`**, 월 달력은 자체 `MonthCalendar`(`shared/ui`), 시간 선택은 `@react-native-community/datetimepicker`(`TimeRow`), 드래그 정렬은 `react-native-sortables`입니다. `react-native-calendars`는 쓰지 않아 뺐습니다(D50).
+- **원격 이미지는 `expo-image`**(D51)로 그립니다. S3 직접 URL이고 CDN이 없어 디스크 캐시가 필요하므로 공용 `RemoteImage`(`shared/ui`, `cachePolicy="memory-disk"`)를 거치고, RN `Image`는 번들 로고 PNG에만 씁니다.
+- 월 달력은 자체 `MonthCalendar`(`shared/ui`), 시간 선택은 `@react-native-community/datetimepicker`(`TimeRow`), 드래그 정렬은 `react-native-sortables`입니다. `react-native-calendars`는 쓰지 않아 뺐습니다(D50).
 
 ## 7. 테스트
 
@@ -180,7 +181,7 @@ pnpm codegen           # 스냅샷 + 문서 → src/graphql/generated (커밋 �
 
 ## 출처
 
-- [docs/guide/decisions.md](./decisions.md) D1~D50
+- [docs/guide/decisions.md](./decisions.md) D1~D51
 - 관리자 FE `caquick-admin-fe`의 `docs/guide/architecture-conventions.md`(§2~§5·§7·§8의 골격)
 - Expo: [Local builds](https://docs.expo.dev/build-reference/local-builds/) · [Runtime versions](https://docs.expo.dev/eas-update/runtime-versions/) · [Typed routes](https://docs.expo.dev/router/reference/typed-routes/) · [expo-router #47687](https://github.com/expo/expo/issues/47687) · [expo-router #50309](https://github.com/expo/expo/issues/50309)
 - [RNTL v14 migration](https://oss.callstack.com/react-native-testing-library/docs/start/migration-v14) · [MSW React Native](https://mswjs.io/docs/integrations/react-native/) · [Hermes Intl APIs](https://github.com/facebook/hermes/blob/main/doc/IntlAPIs.md)

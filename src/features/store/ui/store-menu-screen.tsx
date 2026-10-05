@@ -1,10 +1,10 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { type Href, router } from 'expo-router';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { colors, shadow } from '@/shared/config/tokens';
 import { formatYmd, todayKst } from '@/shared/lib/kst';
-import { Icon, MenuGroup, MenuRow, SectionHeader, Stars } from '@/shared/ui';
+import { Icon, MenuGroup, MenuRow, RemoteImage, SectionHeader, Stars } from '@/shared/ui';
 
 import {
   faqTopicsQueryOptions,
@@ -46,9 +46,9 @@ function ProfileCard({ store, rating }: ProfileProps) {
     <View style={shadow.native.card} className="mt-4 flex-row gap-3.5 rounded-xl bg-surface p-4">
       <View className="h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-gray2">
         {store.profileImageUrl ? (
-          <Image
+          <RemoteImage
             accessibilityLabel="매장 로고"
-            source={{ uri: store.profileImageUrl }}
+            uri={store.profileImageUrl}
             style={{ width: 56, height: 56 }}
           />
         ) : (

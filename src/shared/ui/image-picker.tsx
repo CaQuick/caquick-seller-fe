@@ -1,9 +1,10 @@
-import { Image, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { colors } from '@/shared/config/tokens';
 import { cn } from '@/shared/lib/cn';
 
 import { Icon } from './icon';
+import { RemoteImage } from './remote-image';
 
 interface DropzoneProps {
   count: number;
@@ -49,7 +50,7 @@ interface ThumbProps {
 export function ImageThumb({ uri, onRemove, label, size = 82 }: ThumbProps) {
   return (
     <View className="overflow-hidden rounded-thumb bg-gray2" style={{ width: size, height: size }}>
-      <Image accessibilityLabel={label} source={{ uri }} style={{ width: size, height: size }} />
+      <RemoteImage accessibilityLabel={label} uri={uri} style={{ width: size, height: size }} />
       {onRemove ? (
         <Pressable
           accessibilityRole="button"

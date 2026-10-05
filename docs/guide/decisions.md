@@ -54,6 +54,7 @@
 | D48 | 2026-10-06 | EAS `projectId`·`updates.url`이 없는 빌드는 푸시 토큰 등록을 건너뛰고(경고 로그), OTA 확인도 건너뛴다(`Updates.isEnabled` false, 설정 행은 비활성 문구)                                                                                                 | Expo 조직 생성과 `eas init` 전이라 값이 없다. 없는 값으로 부팅이 막히면 안 됨                                           |
 | D49 | 2026-10-06 | 낙관적 갱신 예외: 노출 스위치(상품 목록·상세)와 조작마다 바로 저장하는 옵션 편집기는 화면을 먼저 바꾸고 실패하면 되돌린 뒤 토스트                                                                                                                       | 시안 승인 메모 "스위치는 낙관적 반영, 실패하면 되돌리고 토스트". 토글이 서버 왕복을 기다리면 눌렀는지 알 수 없음        |
 | D50 | 2026-10-06 | 안 쓰는 의존성 `react-native-calendars` 제거. 월 달력은 자체 `MonthCalendar`                                                                                                                                                                            | 스캐폴드 때 미리 핀했지만 화면이 쓰지 않음(knip). BE 픽업 캘린더 오버레이를 그리려고 자체 구현                          |
+| D51 | 2026-10-06 | 원격 이미지는 `expo-image`로 그린다. 공용 `RemoteImage`(`shared/ui`)가 `cachePolicy` memory-disk·`contentFit` cover·150ms 전환을 고정하고, 번들 로고 PNG만 RN `Image`                                                                                   | S3 직접 URL이고 CDN이 없어 디스크 캐시가 필요(D10). 정리 때 RN `Image` 화면만 보고 의존성을 뺐다가 되돌림               |
 
 ## 시안 대비 남은 차이
 

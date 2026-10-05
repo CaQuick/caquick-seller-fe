@@ -1,13 +1,20 @@
 import { type BottomSheetModal } from '@gorhom/bottom-sheet';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import Sortable from 'react-native-sortables';
 
 import { type SellerProductManageQuery } from '@/graphql/generated/graphql';
 import { messageFor } from '@/shared/api';
 import { colors, shadow } from '@/shared/config/tokens';
-import { ConfirmSheet, ImageDropzone, showToast, Switch, TextField } from '@/shared/ui';
+import {
+  ConfirmSheet,
+  ImageDropzone,
+  RemoteImage,
+  showToast,
+  Switch,
+  TextField,
+} from '@/shared/ui';
 
 import {
   deleteTextToken,
@@ -221,9 +228,9 @@ function TemplateBody({ product }: { product: Product }) {
               onLayout={(e) => setSide(e.nativeEvent.layout.width)}
               className="aspect-square w-full max-w-[285px] self-center rounded-lg bg-gray2"
             >
-              <Image
+              <RemoteImage
                 accessibilityLabel={TEMPLATE_COPY.base}
-                source={{ uri: baseImageUrl }}
+                uri={baseImageUrl}
                 className="h-full w-full rounded-lg"
               />
               {slots.map((slot) => (

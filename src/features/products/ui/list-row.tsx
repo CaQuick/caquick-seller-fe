@@ -1,7 +1,7 @@
-import { Image, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { shadow } from '@/shared/config/tokens';
-import { StatusChip, Switch } from '@/shared/ui';
+import { RemoteImage, StatusChip, Switch } from '@/shared/ui';
 
 import { type ProductListItem, priceView } from '../model/browse';
 
@@ -26,7 +26,7 @@ export function ProductRow({ product, onPress, onToggleActive }: Props) {
     >
       <View className="h-16 w-16 overflow-hidden rounded-lg bg-gray2">
         {thumb ? (
-          <Image accessibilityIgnoresInvertColors source={{ uri: thumb }} className="h-16 w-16" />
+          <RemoteImage accessibilityIgnoresInvertColors uri={thumb} className="h-16 w-16" />
         ) : null}
       </View>
       <View className="flex-1">

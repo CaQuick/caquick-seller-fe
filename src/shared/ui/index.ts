@@ -12,6 +12,7 @@ export { Icon, type IconName } from './icon';
 export { ImageDropzone, ImageThumb } from './image-picker';
 export { MenuGroup, MenuRow } from './menu';
 export { MonthCalendar } from './month-calendar';
+export { RemoteImage } from './remote-image';
 export { Screen } from './screen';
 export { SearchBar } from './search-bar';
 export { SectionHeader } from './section-header';

@@ -5,7 +5,6 @@ import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,7 +15,15 @@ import {
 
 import { ApiError } from '@/shared/api';
 import { colors } from '@/shared/config/tokens';
-import { ActionBar, Icon, Segmented, SelectField, showToast, TextField } from '@/shared/ui';
+import {
+  ActionBar,
+  Icon,
+  RemoteImage,
+  Segmented,
+  SelectField,
+  showToast,
+  TextField,
+} from '@/shared/ui';
 
 import { myStoreQueryOptions, updateBasicInfo } from '../api/my-store';
 import { storeKeys } from '../api/queryKeys';
@@ -131,9 +138,9 @@ function BasicInfoForm({ initial }: { initial: BasicInfoValues }) {
           >
             <View className="h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-gray2">
               {logo ? (
-                <Image
+                <RemoteImage
                   accessibilityLabel="매장 로고"
-                  source={{ uri: logo }}
+                  uri={logo}
                   style={{ width: 80, height: 80 }}
                 />
               ) : (

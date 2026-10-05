@@ -2,7 +2,7 @@ import { type BottomSheetModal } from '@gorhom/bottom-sheet';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import {
   type SellerProductDetailQuery,
@@ -10,7 +10,7 @@ import {
 } from '@/graphql/generated/graphql';
 import { messageFor } from '@/shared/api';
 import { josa } from '@/shared/lib/josa';
-import { showToast, TextField } from '@/shared/ui';
+import { RemoteImage, showToast, TextField } from '@/shared/ui';
 
 import { categoriesQueryOptions, productDetailQueryOptions } from '../api/browse';
 import { setProductCategories, setProductTags } from '../api/create';
@@ -132,10 +132,10 @@ function EditBody({ product, categories }: { product: Product; categories: Categ
           contentContainerClassName="gap-2.5"
         >
           {product.images.map((img, i) => (
-            <Image
+            <RemoteImage
               key={img.id}
               accessibilityLabel={`상품 이미지 ${i + 1}`}
-              source={{ uri: img.imageUrl }}
+              uri={img.imageUrl}
               className="h-[82px] w-[82px] rounded-thumb bg-gray2"
             />
           ))}
