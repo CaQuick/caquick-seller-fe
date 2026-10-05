@@ -124,7 +124,7 @@ src/
 - **Pretendard** 정적 4종(400·500·600·700)을 `expo-font` 플러그인으로 빌드에 임베드합니다. 양쪽 모두 `fontFamily: 'Pretendard'` + `fontWeight`로 씁니다.
 - **접근성 기본**: 터치 타깃 44pt(`size.touchTarget`), 아이콘 버튼에는 `accessibilityLabel`. 안전 영역은 `useSafeAreaInsets`.
 - **문구**는 한국어이며 feature별 상수 1곳에 둡니다. 조사는 `shared/lib/josa.ts`.
-- **이미지 표시는 RN `Image`**, 월 달력은 자체 `MonthCalendar`(`shared/ui`), 시간 선택은 `@react-native-community/datetimepicker`(`TimeRow`), 드래그 정렬은 `react-native-sortables`입니다. `expo-image`·`react-native-calendars`는 쓰지 않아 뺐습니다(D50).
+- **이미지 표시는 RN `Image`**, 월 달력은 자체 `MonthCalendar`(`shared/ui`), 시간 선택은 `@react-native-community/datetimepicker`(`TimeRow`), 드래그 정렬은 `react-native-sortables`입니다. `react-native-calendars`는 쓰지 않아 뺐습니다(D50).
 
 ## 7. 테스트
 
