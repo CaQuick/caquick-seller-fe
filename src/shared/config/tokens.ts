@@ -43,6 +43,7 @@ export const colors = {
   mintText: '#4ED88A',
   tagDark: '#555555',
   chevron: '#CDCDCD',
+  switchOff: '#D9D9E3',
   dim: 'rgba(0,0,0,0.52)',
   keyboard: '#D1D2D9',
   keyDark: '#AAB0BB',
@@ -51,13 +52,16 @@ export const colors = {
   star: '#FFC43D',
 } as const;
 
+/** 둥근 사각형을 pill로 그리지 않는다(D43). full은 원(아바타·점·스위치)과 pill 예외(홈 CTA·'# 태그')에만 */
 export const radius = {
   xs: 4,
-  sm: 8, // 입력·버튼·칩
-  md: 10, // 세그먼트·검색바·메뉴 아이콘
+  badge: 6, // 미읽음 배지·스켈레톤 줄
+  sm: 8, // 입력·버튼·선택 칩·상태 칩·스테퍼
+  md: 10, // 세그먼트·검색바·필터 칩·메뉴 아이콘·달력 칸
   lg: 12, // 뒤로가기 박스·미리보기 버튼
+  thumb: 14, // 이미지 썸네일
   xl: 16, // 카드·옵션 그룹·드롭존
-  '2xl': 20,
+  '2xl': 20, // FAB
   sheet: 28, // 바텀시트 상단
   full: 999,
 } as const;
@@ -107,6 +111,8 @@ export const fontWeight = {
 
 /** 크기 단계와 행간(px). 시안 행 피치 계측값 */
 export const fontSize = {
+  '3xs': { size: 10, lineHeight: 12 },
+  '2xs': { size: 11, lineHeight: 14 },
   xs: { size: 12, lineHeight: 16 },
   sm: { size: 13, lineHeight: 18 },
   base: { size: 14, lineHeight: 20 },
@@ -117,6 +123,7 @@ export const fontSize = {
   '3xl': { size: 20, lineHeight: 26 },
   '4xl': { size: 22, lineHeight: 28 },
   '5xl': { size: 24, lineHeight: 28 },
+  '6xl': { size: 28, lineHeight: 32 },
 } as const;
 
 /** 시안 글자가 기본값보다 미세하게 좁다 — Pretendard 본문 기본 -0.01em */
@@ -135,6 +142,7 @@ export const shadow = {
     card: '0 4px 12px rgba(0,0,0,0.05)',
     field: '0 2px 6px rgba(0,0,0,0.03)',
     fab: '0 8px 16px rgba(109,91,255,0.3)',
+    segment: '0 1px 3px rgba(0,0,0,0.08)',
   },
   /** RN style 객체 */
   native: {
@@ -158,6 +166,13 @@ export const shadow = {
       shadowRadius: 16,
       shadowOffset: { width: 0, height: 8 },
       elevation: 6,
+    },
+    segment: {
+      shadowColor: '#000000',
+      shadowOpacity: 0.08,
+      shadowRadius: 3,
+      shadowOffset: { width: 0, height: 1 },
+      elevation: 1,
     },
   },
 } as const;
