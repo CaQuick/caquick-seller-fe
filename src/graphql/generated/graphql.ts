@@ -13,6 +13,14 @@ export type AccountStatus =
   /** 운영자가 정지한 상태. 모든 API 접근이 FORBIDDEN이고 refresh 세션도 폐기된다. */
   | 'SUSPENDED';
 
+/** 커서 페이지네이션 공통 입력. 필터가 필요한 목록은 같은 두 필드를 가진 전용 input을 쓴다. */
+export type CursorInput = {
+  /** 이전 페이지의 nextCursor. 불투명 토큰이라 정렬 기준이 바뀌면 무효. 형식이 어긋나면 BAD_USER_INPUT. */
+  cursor?: string | null | undefined;
+  /** 페이지 크기. 1~100, 기본 20. 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
+};
+
 /**
  * 주문 상태. 구매자·판매자 API가 공용으로 쓴다.
  *
@@ -52,6 +60,18 @@ export type SellerOrderListInput = {
   toPickupAt?: string | null | undefined;
 };
 
+/**
+ * 주문 상태 변경 입력. 전이 규칙은 OrderStatusType 설명을 따르며, 규칙에 어긋나면
+ * BAD_USER_INPUT으로 거절된다.
+ */
+export type SellerUpdateOrderStatusInput = {
+  /** 변경 사유 메모. toStatus가 CANCELED면 필수이고, 없으면 BAD_USER_INPUT. */
+  note?: string | null | undefined;
+  orderId: string | number;
+  /** 변경할 상태. 현재 상태에서 진입 가능한 값이어야 한다. */
+  toStatus: OrderStatusType;
+};
+
 export type SellerAuthMeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -78,6 +98,39 @@ export type SellerHomeOrderUpdatedSubscriptionVariables = Exact<{ [key: string]:
 
 
 export type SellerHomeOrderUpdatedSubscription = { sellerOrderUpdated: { orderId: string, updatedAt: string } };
+
+export type SellerOrdersListQueryVariables = Exact<{
+  input?: SellerOrderListInput | null | undefined;
+}>;
+
+
+export type SellerOrdersListQuery = { sellerOrderList: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, orderNumber: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, firstItemName: string | null, firstItemImageUrl: string | null }> } };
+
+export type SellerOrderDetailQueryVariables = Exact<{
+  orderId: string | number;
+}>;
+
+
+export type SellerOrderDetailQuery = { sellerOrder: { id: string, orderNumber: string, accountId: string, status: OrderStatusType, pickupAt: string, buyerName: string, buyerPhone: string, subtotalPrice: number, discountPrice: number, totalPrice: number, submittedAt: string | null, confirmedAt: string | null, madeAt: string | null, pickedUpAt: string | null, canceledAt: string | null, createdAt: string, updatedAt: string, items: Array<{ id: string, productName: string, quantity: number, optionItems: Array<{ id: string, groupName: string, optionTitle: string, priceDelta: number }>, customTexts: Array<{ id: string, tokenKey: string, defaultText: string, valueText: string, sortOrder: number }>, freeEdits: Array<{ id: string, cropImageUrl: string, descriptionText: string, sortOrder: number, attachments: Array<{ id: string, imageUrl: string, sortOrder: number }> }> }>, statusHistories: Array<{ id: string, toStatus: OrderStatusType, changedAt: string, note: string | null }> } };
+
+export type SellerUpdateOrderStatusMutationVariables = Exact<{
+  input: SellerUpdateOrderStatusInput;
+}>;
+
+
+export type SellerUpdateOrderStatusMutation = { sellerUpdateOrderStatus: { id: string, status: OrderStatusType } };
+
+export type SellerOrderConversationsQueryVariables = Exact<{
+  input?: CursorInput | null | undefined;
+}>;
+
+
+export type SellerOrderConversationsQuery = { sellerConversations: { hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, accountId: string, unreadCount: number }> } };
+
+export type SellerOrdersUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerOrdersUpdatedSubscription = { sellerOrderUpdated: { orderId: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, productName: string, updatedAt: string } };
 
 export type PingQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -163,6 +216,117 @@ export const SellerHomeOrderUpdatedDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerHomeOrderUpdatedSubscription, SellerHomeOrderUpdatedSubscriptionVariables>;
+export const SellerOrdersListDocument = new TypedDocumentString(`
+    query SellerOrdersList($input: SellerOrderListInput) {
+  sellerOrderList(input: $input) {
+    items {
+      id
+      orderNumber
+      status
+      pickupAt
+      buyerName
+      totalPrice
+      firstItemName
+      firstItemImageUrl
+    }
+    totalCount
+    hasMore
+    nextCursor
+  }
+}
+    `) as unknown as TypedDocumentString<SellerOrdersListQuery, SellerOrdersListQueryVariables>;
+export const SellerOrderDetailDocument = new TypedDocumentString(`
+    query SellerOrderDetail($orderId: ID!) {
+  sellerOrder(orderId: $orderId) {
+    id
+    orderNumber
+    accountId
+    status
+    pickupAt
+    buyerName
+    buyerPhone
+    subtotalPrice
+    discountPrice
+    totalPrice
+    submittedAt
+    confirmedAt
+    madeAt
+    pickedUpAt
+    canceledAt
+    createdAt
+    updatedAt
+    items {
+      id
+      productName
+      quantity
+      optionItems {
+        id
+        groupName
+        optionTitle
+        priceDelta
+      }
+      customTexts {
+        id
+        tokenKey
+        defaultText
+        valueText
+        sortOrder
+      }
+      freeEdits {
+        id
+        cropImageUrl
+        descriptionText
+        sortOrder
+        attachments {
+          id
+          imageUrl
+          sortOrder
+        }
+      }
+    }
+    statusHistories {
+      id
+      toStatus
+      changedAt
+      note
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<SellerOrderDetailQuery, SellerOrderDetailQueryVariables>;
+export const SellerUpdateOrderStatusDocument = new TypedDocumentString(`
+    mutation SellerUpdateOrderStatus($input: SellerUpdateOrderStatusInput!) {
+  sellerUpdateOrderStatus(input: $input) {
+    id
+    status
+  }
+}
+    `) as unknown as TypedDocumentString<SellerUpdateOrderStatusMutation, SellerUpdateOrderStatusMutationVariables>;
+export const SellerOrderConversationsDocument = new TypedDocumentString(`
+    query SellerOrderConversations($input: CursorInput) {
+  sellerConversations(input: $input) {
+    items {
+      id
+      accountId
+      unreadCount
+    }
+    hasMore
+    nextCursor
+  }
+}
+    `) as unknown as TypedDocumentString<SellerOrderConversationsQuery, SellerOrderConversationsQueryVariables>;
+export const SellerOrdersUpdatedDocument = new TypedDocumentString(`
+    subscription SellerOrdersUpdated {
+  sellerOrderUpdated {
+    orderId
+    status
+    pickupAt
+    buyerName
+    totalPrice
+    productName
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<SellerOrdersUpdatedSubscription, SellerOrdersUpdatedSubscriptionVariables>;
 export const PingDocument = new TypedDocumentString(`
     query Ping {
   ping

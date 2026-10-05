@@ -20,6 +20,11 @@ type Documents = {
     "\n  query SellerHomeDashboard {\n    sellerDashboard {\n      date\n      newOrderCount\n      pickupDay {\n        salesAmount\n      }\n      createdDay {\n        orderCount\n      }\n      remainingCapacity\n      activeProductCount\n      unansweredConversationCount\n    }\n  }\n": typeof types.SellerHomeDashboardDocument,
     "\n  query SellerHomeRecentOrders($input: SellerOrderListInput) {\n    sellerOrderList(input: $input) {\n      items {\n        id\n        status\n        pickupAt\n        buyerName\n        firstItemName\n        firstItemImageUrl\n      }\n    }\n  }\n": typeof types.SellerHomeRecentOrdersDocument,
     "\n  subscription SellerHomeOrderUpdated {\n    sellerOrderUpdated {\n      orderId\n      updatedAt\n    }\n  }\n": typeof types.SellerHomeOrderUpdatedDocument,
+    "\n  query SellerOrdersList($input: SellerOrderListInput) {\n    sellerOrderList(input: $input) {\n      items {\n        id\n        orderNumber\n        status\n        pickupAt\n        buyerName\n        totalPrice\n        firstItemName\n        firstItemImageUrl\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": typeof types.SellerOrdersListDocument,
+    "\n  query SellerOrderDetail($orderId: ID!) {\n    sellerOrder(orderId: $orderId) {\n      id\n      orderNumber\n      accountId\n      status\n      pickupAt\n      buyerName\n      buyerPhone\n      subtotalPrice\n      discountPrice\n      totalPrice\n      submittedAt\n      confirmedAt\n      madeAt\n      pickedUpAt\n      canceledAt\n      createdAt\n      updatedAt\n      items {\n        id\n        productName\n        quantity\n        optionItems {\n          id\n          groupName\n          optionTitle\n          priceDelta\n        }\n        customTexts {\n          id\n          tokenKey\n          defaultText\n          valueText\n          sortOrder\n        }\n        freeEdits {\n          id\n          cropImageUrl\n          descriptionText\n          sortOrder\n          attachments {\n            id\n            imageUrl\n            sortOrder\n          }\n        }\n      }\n      statusHistories {\n        id\n        toStatus\n        changedAt\n        note\n      }\n    }\n  }\n": typeof types.SellerOrderDetailDocument,
+    "\n  mutation SellerUpdateOrderStatus($input: SellerUpdateOrderStatusInput!) {\n    sellerUpdateOrderStatus(input: $input) {\n      id\n      status\n    }\n  }\n": typeof types.SellerUpdateOrderStatusDocument,
+    "\n  query SellerOrderConversations($input: CursorInput) {\n    sellerConversations(input: $input) {\n      items {\n        id\n        accountId\n        unreadCount\n      }\n      hasMore\n      nextCursor\n    }\n  }\n": typeof types.SellerOrderConversationsDocument,
+    "\n  subscription SellerOrdersUpdated {\n    sellerOrderUpdated {\n      orderId\n      status\n      pickupAt\n      buyerName\n      totalPrice\n      productName\n      updatedAt\n    }\n  }\n": typeof types.SellerOrdersUpdatedDocument,
     "\n  query Ping {\n    ping\n  }\n": typeof types.PingDocument,
 };
 const documents: Documents = {
@@ -28,6 +33,11 @@ const documents: Documents = {
     "\n  query SellerHomeDashboard {\n    sellerDashboard {\n      date\n      newOrderCount\n      pickupDay {\n        salesAmount\n      }\n      createdDay {\n        orderCount\n      }\n      remainingCapacity\n      activeProductCount\n      unansweredConversationCount\n    }\n  }\n": types.SellerHomeDashboardDocument,
     "\n  query SellerHomeRecentOrders($input: SellerOrderListInput) {\n    sellerOrderList(input: $input) {\n      items {\n        id\n        status\n        pickupAt\n        buyerName\n        firstItemName\n        firstItemImageUrl\n      }\n    }\n  }\n": types.SellerHomeRecentOrdersDocument,
     "\n  subscription SellerHomeOrderUpdated {\n    sellerOrderUpdated {\n      orderId\n      updatedAt\n    }\n  }\n": types.SellerHomeOrderUpdatedDocument,
+    "\n  query SellerOrdersList($input: SellerOrderListInput) {\n    sellerOrderList(input: $input) {\n      items {\n        id\n        orderNumber\n        status\n        pickupAt\n        buyerName\n        totalPrice\n        firstItemName\n        firstItemImageUrl\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": types.SellerOrdersListDocument,
+    "\n  query SellerOrderDetail($orderId: ID!) {\n    sellerOrder(orderId: $orderId) {\n      id\n      orderNumber\n      accountId\n      status\n      pickupAt\n      buyerName\n      buyerPhone\n      subtotalPrice\n      discountPrice\n      totalPrice\n      submittedAt\n      confirmedAt\n      madeAt\n      pickedUpAt\n      canceledAt\n      createdAt\n      updatedAt\n      items {\n        id\n        productName\n        quantity\n        optionItems {\n          id\n          groupName\n          optionTitle\n          priceDelta\n        }\n        customTexts {\n          id\n          tokenKey\n          defaultText\n          valueText\n          sortOrder\n        }\n        freeEdits {\n          id\n          cropImageUrl\n          descriptionText\n          sortOrder\n          attachments {\n            id\n            imageUrl\n            sortOrder\n          }\n        }\n      }\n      statusHistories {\n        id\n        toStatus\n        changedAt\n        note\n      }\n    }\n  }\n": types.SellerOrderDetailDocument,
+    "\n  mutation SellerUpdateOrderStatus($input: SellerUpdateOrderStatusInput!) {\n    sellerUpdateOrderStatus(input: $input) {\n      id\n      status\n    }\n  }\n": types.SellerUpdateOrderStatusDocument,
+    "\n  query SellerOrderConversations($input: CursorInput) {\n    sellerConversations(input: $input) {\n      items {\n        id\n        accountId\n        unreadCount\n      }\n      hasMore\n      nextCursor\n    }\n  }\n": types.SellerOrderConversationsDocument,
+    "\n  subscription SellerOrdersUpdated {\n    sellerOrderUpdated {\n      orderId\n      status\n      pickupAt\n      buyerName\n      totalPrice\n      productName\n      updatedAt\n    }\n  }\n": types.SellerOrdersUpdatedDocument,
     "\n  query Ping {\n    ping\n  }\n": types.PingDocument,
 };
 
@@ -51,6 +61,26 @@ export function graphql(source: "\n  query SellerHomeRecentOrders($input: Seller
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  subscription SellerHomeOrderUpdated {\n    sellerOrderUpdated {\n      orderId\n      updatedAt\n    }\n  }\n"): typeof import('./graphql').SellerHomeOrderUpdatedDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerOrdersList($input: SellerOrderListInput) {\n    sellerOrderList(input: $input) {\n      items {\n        id\n        orderNumber\n        status\n        pickupAt\n        buyerName\n        totalPrice\n        firstItemName\n        firstItemImageUrl\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n"): typeof import('./graphql').SellerOrdersListDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerOrderDetail($orderId: ID!) {\n    sellerOrder(orderId: $orderId) {\n      id\n      orderNumber\n      accountId\n      status\n      pickupAt\n      buyerName\n      buyerPhone\n      subtotalPrice\n      discountPrice\n      totalPrice\n      submittedAt\n      confirmedAt\n      madeAt\n      pickedUpAt\n      canceledAt\n      createdAt\n      updatedAt\n      items {\n        id\n        productName\n        quantity\n        optionItems {\n          id\n          groupName\n          optionTitle\n          priceDelta\n        }\n        customTexts {\n          id\n          tokenKey\n          defaultText\n          valueText\n          sortOrder\n        }\n        freeEdits {\n          id\n          cropImageUrl\n          descriptionText\n          sortOrder\n          attachments {\n            id\n            imageUrl\n            sortOrder\n          }\n        }\n      }\n      statusHistories {\n        id\n        toStatus\n        changedAt\n        note\n      }\n    }\n  }\n"): typeof import('./graphql').SellerOrderDetailDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerUpdateOrderStatus($input: SellerUpdateOrderStatusInput!) {\n    sellerUpdateOrderStatus(input: $input) {\n      id\n      status\n    }\n  }\n"): typeof import('./graphql').SellerUpdateOrderStatusDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerOrderConversations($input: CursorInput) {\n    sellerConversations(input: $input) {\n      items {\n        id\n        accountId\n        unreadCount\n      }\n      hasMore\n      nextCursor\n    }\n  }\n"): typeof import('./graphql').SellerOrderConversationsDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  subscription SellerOrdersUpdated {\n    sellerOrderUpdated {\n      orderId\n      status\n      pickupAt\n      buyerName\n      totalPrice\n      productName\n      updatedAt\n    }\n  }\n"): typeof import('./graphql').SellerOrdersUpdatedDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
