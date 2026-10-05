@@ -25,8 +25,7 @@ import {
   TextField,
 } from '@/shared/ui';
 
-import { myStoreQueryOptions, updateBasicInfo } from '../api/my-store';
-import { storeKeys } from '../api/queryKeys';
+import { myStoreQueryOptions, syncSavedStore, updateBasicInfo } from '../api/my-store';
 import {
   type BasicInfoValues,
   basicInfoSchema,
@@ -65,8 +64,7 @@ function BasicInfoForm({ initial }: { initial: BasicInfoValues }) {
   const save = useMutation({
     mutationFn: updateBasicInfo,
     onSuccess: (store) => {
-      queryClient.setQueryData(storeKeys.myStore(), store);
-      void queryClient.invalidateQueries({ queryKey: storeKeys.myStore() });
+      void syncSavedStore(queryClient, store);
       const next = toBasicInfoValues(store);
       setBase(next);
       form.reset(next);

@@ -1,10 +1,11 @@
-import { focusManager, onlineManager } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { focusManager, onlineManager, useQuery } from '@tanstack/react-query';
+import { router, Slot } from 'expo-router';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import { type Sink } from 'graphql-ws';
 import { type ReactNode } from 'react';
 import { HttpResponse, graphql } from 'msw';
 
+import { homeKeys } from '@/features/home';
 import { disposeWsClient } from '@/shared/api';
 import { showToast } from '@/shared/ui';
 import { gqlError, gqlOk } from '@/test/msw/graphql';
@@ -154,6 +155,21 @@ const open = () =>
     { initialUrl: '/chats/c1', ...withProviders() },
   );
 
+/** 탭바 배지처럼 홈 대시보드 키를 지켜보며 조회 횟수를 센다 */
+let dashboardFetches = 0;
+function BadgeLayout() {
+  useQuery({
+    queryKey: homeKeys.dashboard(),
+    queryFn: () => ({ unansweredConversationCount: ++dashboardFetches }),
+  });
+  return <Slot />;
+}
+const openWithBadge = () =>
+  renderRouter(
+    { _layout: BadgeLayout, 'chats/[conversationId]': ChatRoomScreen },
+    { initialUrl: '/chats/c1', ...withProviders() },
+  );
+
 describe('ChatRoomScreen', () => {
   beforeEach(() => {
     readCalls = 0;
@@ -216,6 +232,46 @@ describe('ChatRoomScreen', () => {
     await inAct(() => focusManager.setFocused(true));
     await waitFor(() => expect(readCalls).toBe(2));
     focusManager.setFocused(undefined);
+  });
+
+  it('읽음 처리가 끝나면 탭바 배지·홈 KPI가 읽는 대시보드를 다시 부른다', async () => {
+    dashboardFetches = 0;
+    await openWithBadge();
+    await screen.findByText('네, 가능합니다.');
+    await waitFor(() => expect(readCalls).toBe(1));
+    await waitFor(() => expect(dashboardFetches).toBe(2));
+  });
+
+  it('답장을 보내면 대시보드를 다시 부르고, 실패한 전송은 부르지 않는다', async () => {
+    let sends = 0;
+    server.use(
+      graphql.mutation('SellerChatsSendMessage', () =>
+        ++sends === 1
+          ? HttpResponse.error()
+          : HttpResponse.json({
+              data: {
+                sellerSendConversationMessage: msg('9', {
+                  senderType: 'STORE',
+                  senderAccountId: 's1',
+                  bodyText: '확인했습니다',
+                }),
+              },
+            }),
+      ),
+    );
+    const toast = jest.spyOn(showToast, 'error').mockImplementation(() => 'id');
+    dashboardFetches = 0;
+    await openWithBadge();
+    await screen.findByText('네, 가능합니다.');
+    await waitFor(() => expect(dashboardFetches).toBe(2));
+    await fireEvent.changeText(screen.getByLabelText('메시지 입력'), '확인했습니다');
+    await fireEvent.press(screen.getByRole('button', { name: '보내기' }));
+    const retry = await screen.findByRole('button', { name: '재시도: 확인했습니다' });
+    expect(dashboardFetches).toBe(2);
+    await fireEvent.press(retry);
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^재시도/ })).toBeNull());
+    await waitFor(() => expect(dashboardFetches).toBe(3));
+    toast.mockRestore();
   });
 
   it('뒤로 가기는 이전 화면으로 돌아가고, 메뉴 닫기는 시트를 내린다', async () => {

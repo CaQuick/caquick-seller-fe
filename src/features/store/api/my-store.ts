@@ -1,5 +1,6 @@
-import { queryOptions } from '@tanstack/react-query';
+import { type QueryClient, queryOptions } from '@tanstack/react-query';
 
+import { homeKeys } from '@/features/home';
 import { graphql } from '@/graphql/generated';
 import {
   type SellerUpdatePickupPolicyInput,
@@ -84,6 +85,18 @@ const SellerStoreUpdatePickupPolicyDocument = graphql(`
 
 export const updatePickupPolicy = async (input: SellerUpdatePickupPolicyInput) =>
   (await gqlRequest(SellerStoreUpdatePickupPolicyDocument, { input })).sellerUpdatePickupPolicy;
+
+/** 저장 응답으로 내 매장 캐시를 덮고, 같은 매장을 그리는 매장 허브·홈(매장명·운영 상태)을 다시 부른다 */
+export async function syncSavedStore(
+  queryClient: QueryClient,
+  store: Awaited<ReturnType<typeof updateBasicInfo>>,
+) {
+  queryClient.setQueryData(storeKeys.myStore(), store);
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: storeKeys.all }),
+    queryClient.invalidateQueries({ queryKey: homeKeys.store() }),
+  ]);
+}
 
 const SellerStoreCreateUploadUrlDocument = graphql(`
   mutation SellerStoreCreateUploadUrl($input: SellerCreateUploadUrlInput!) {

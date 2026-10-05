@@ -2,6 +2,8 @@ import { focusManager, useMutation, useQueryClient } from '@tanstack/react-query
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 
+import { homeKeys } from '@/features/home';
+
 import { type Conversation, type ConversationPages } from '../api/conversations';
 import { markConversationRead } from '../api/messages';
 import { chatsKeys } from '../api/queryKeys';
@@ -24,6 +26,8 @@ export function useMarkRead(conversationId: string, onRead: (conversation: Conve
         chatsKeys.conversations(),
         (old) => old && applyReadState(old, conversation),
       );
+      // 탭바 '답변 필요' 배지·홈 KPI가 같은 대시보드 키를 읽는다
+      void queryClient.invalidateQueries({ queryKey: homeKeys.dashboard() });
       onRead(conversation);
     },
   });
