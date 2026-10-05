@@ -52,6 +52,19 @@ export const colors = {
   star: '#FFC43D',
 } as const;
 
+/** CSS linear-gradient(angle, 색 위치…) 그대로. RN 스타일에는 그라디언트가 없어 SVG로 그린다 */
+export const gradient = {
+  hero: {
+    angle: 45,
+    stops: [
+      [0, '#D8D3FF'],
+      [0.4, '#F6F5FF'],
+      [0.6, '#FBFBFE'],
+      [1, '#F5F5EB'],
+    ],
+  },
+} as const;
+
 /** 둥근 사각형을 pill로 그리지 않는다(D43). full은 원(아바타·점·스위치)과 pill 예외(홈 CTA·'# 태그')에만 */
 export const radius = {
   xs: 4,
@@ -143,6 +156,7 @@ export const shadow = {
     field: '0 2px 6px rgba(0,0,0,0.03)',
     fab: '0 8px 16px rgba(109,91,255,0.3)',
     segment: '0 1px 3px rgba(0,0,0,0.08)',
+    hero: '0 4px 14px rgba(0,0,0,0.06)',
   },
   /** RN style 객체 */
   native: {
@@ -173,6 +187,13 @@ export const shadow = {
       shadowRadius: 3,
       shadowOffset: { width: 0, height: 1 },
       elevation: 1,
+    },
+    hero: {
+      shadowColor: '#000000',
+      shadowOpacity: 0.06,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 3,
     },
   },
 } as const;
