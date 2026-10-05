@@ -106,7 +106,11 @@ jobs:
           fi
           if [ "$PLATFORM" != ios ]; then
             java -version 2>&1 | head -1
-            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list_installed | grep -E 'ndk;|build-tools;36|platforms;android-36'
+            # cmdline-tools 23부터 목록이 `ndk/…`처럼 `/`로 나온다 — 두 구분자를 다 받고, 패키지마다 따로 확인한다
+            installed=$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list_installed)
+            for pkg in 'ndk[;/]' 'build-tools[;/]36' 'platforms[;/]android-36'; do
+              grep -Eq "$pkg" <<< "$installed" || { echo "::error::Android SDK 패키지 없음: $pkg"; exit 1; }
+            done
           fi
 
       - name: Republish (rollback) and exit
