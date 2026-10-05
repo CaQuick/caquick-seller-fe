@@ -24,6 +24,12 @@ describe('toast', () => {
     expect(toast.dismiss).toHaveBeenCalledTimes(1);
   });
 
+  it('info에 onPress를 주면 누를 수 있는 토스트로 띄운다', () => {
+    const onPress = jest.fn();
+    showToast.info('새 주문', onPress);
+    expect(toast).toHaveBeenLastCalledWith('새 주문', { onPress });
+  });
+
   it('AppToaster는 상단·라이트 고정으로 Toaster를 그린다', async () => {
     await render(<AppToaster />);
     expect(Toaster).toHaveBeenCalledTimes(1);
