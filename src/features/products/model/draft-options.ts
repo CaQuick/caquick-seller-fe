@@ -4,6 +4,8 @@ export interface ItemFields {
   description: string;
   priceDelta: number;
   imageUrl: string | null;
+  /** 상품 관리만 쓴다. 꺼진 옵션은 구매자에게 숨는다 */
+  isActive?: boolean;
 }
 
 export interface GroupFields {
