@@ -26,7 +26,7 @@
     "coverage:merge": "tsx scripts/merge-coverage.ts",
     "doctor": "expo-doctor",
     "export": "expo export --platform all --output-dir .expo/export",
-    "validate": "pnpm lint && pnpm typecheck && pnpm codegen:check && pnpm knip:check && pnpm test:cov && pnpm doctor && pnpm export",
+    "validate": "pnpm lint && pnpm typecheck && pnpm codegen:check && pnpm knip:check && pnpm test:cov && pnpm run doctor && pnpm export",
     "prepare": "husky",
     "knip:check": "knip"
   },
