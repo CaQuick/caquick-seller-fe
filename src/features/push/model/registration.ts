@@ -55,10 +55,13 @@ export function ensurePushToken({ prompt }: { prompt: boolean }): Promise<string
 
 export const hasPushToken = () => registered !== null;
 
-/** 로그아웃 전 콜백. 진행 중인 등록을 기다린 뒤 해제한다 — 실패는 호출자(logout)가 삼킨다 */
-export async function releasePushToken(): Promise<void> {
+/**
+ * 진행 중인 등록을 기다린 뒤 토큰을 잊는다. notify면 서버에서도 해제한다 — 실패는 호출자(logout)가 삼킨다.
+ * 서버가 막는 세션(비밀번호 변경 강제·이미 끝난 세션)은 notify 없이 잊기만 하고 서버 쪽 정리는 BE에 맡긴다
+ */
+export async function releasePushToken({ notify = true } = {}): Promise<void> {
   await inflight?.catch(() => null);
   const token = registered;
   registered = null;
-  if (token) await unregisterPushToken(token);
+  if (token && notify) await unregisterPushToken(token);
 }

@@ -51,12 +51,18 @@ export function usePushNotifications(queryClient: QueryClient) {
     const unsubscribe = useSessionStore.subscribe((s, prev) => {
       // 로그인 직후에만 권한을 묻는다(세션 복원은 anonymous를 거치지 않는다)
       if (isReady(s) && !isReady(prev)) sync(prev.status === 'anonymous');
+      // 비밀번호 변경·정지로 끝난 세션은 해제를 부를 수 없다(토큰이 이미 무효)
+      else if (s.status === 'anonymous' && prev.status === 'authenticated')
+        void releasePushToken({ notify: false });
     });
     // 설정에서 권한을 켜고 돌아온 경우
     const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active' && isReady(useSessionStore.getState()) && !hasPushToken()) sync(false);
     });
-    const release = onBeforeLogout(releasePushToken);
+    // 비밀번호 변경이 강제된 세션은 GraphQL이 PASSWORD_CHANGE_REQUIRED로 막는다
+    const release = onBeforeLogout(() =>
+      releasePushToken({ notify: isReady(useSessionStore.getState()) }),
+    );
     return () => {
       unsubscribe();
       appState.remove();

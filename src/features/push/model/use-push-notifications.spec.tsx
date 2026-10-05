@@ -5,11 +5,11 @@ import { type Sink } from 'graphql-ws';
 import { AppState } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { useSessionStore } from '@/features/auth';
+import { logout, useSessionStore } from '@/features/auth';
 import { useNewOrderNotices } from '@/features/orders';
 import { createTestQueryClient, Providers } from '@/test/render';
 
-import { ensurePushToken, hasPushToken } from './registration';
+import { ensurePushToken, hasPushToken, releasePushToken } from './registration';
 import { usePushNotifications } from './use-push-notifications';
 
 jest.mock('./registration', () => ({
@@ -200,6 +200,30 @@ describe('usePushNotifications', () => {
     await open();
     await signIn({ ...signedIn, mustChangePassword: true });
     expect(ensurePushToken).not.toHaveBeenCalled();
+  });
+
+  it('로그아웃은 서버에서 토큰을 해제한 뒤 끝낸다', async () => {
+    await open();
+    await act(() => logout());
+    expect(jest.mocked(releasePushToken).mock.calls[0]).toEqual([{ notify: true }]);
+  });
+
+  it('비밀번호 변경이 강제된 세션의 로그아웃은 서버 해제를 부르지 않고 토큰만 잊는다', async () => {
+    await open();
+    await signIn({ mustChangePassword: true });
+    await act(() => logout());
+    expect(jest.mocked(releasePushToken).mock.calls).toEqual([
+      [{ notify: false }],
+      [{ notify: false }],
+    ]);
+    expect(useSessionStore.getState().status).toBe('anonymous');
+  });
+
+  it('비밀번호 변경·정지로 세션이 끝나면 서버 해제 없이 토큰을 잊는다', async () => {
+    await open();
+    expect(releasePushToken).not.toHaveBeenCalled();
+    await act(() => Promise.resolve(useSessionStore.getState().clear()));
+    expect(jest.mocked(releasePushToken).mock.calls).toEqual([[{ notify: false }]]);
   });
 
   it('토큰이 없으면 포그라운드 복귀 때 다시 등록한다(설정에서 권한을 켠 경우)', async () => {
