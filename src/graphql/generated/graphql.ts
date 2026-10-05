@@ -88,6 +88,36 @@ export type ReviewSort =
   /** 좋아요순(동률이면 최신순). */
   | 'LIKES';
 
+/** 지역 자동검색 입력. */
+export type SearchRegionsInput = {
+  /** 검색어. 1·2차 지역명 모두를 대상으로 부분일치 검색한다. */
+  keyword: string;
+  /** 한 번에 가져올 개수. 기본 20, 1~50만 허용하며 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
+};
+
+/** 판매자 업로드 URL 발급 입력. */
+export type SellerCreateUploadUrlInput = {
+  /** 파일 크기(바이트). 1 이상 5MB 이하, 아니면 BAD_USER_INPUT. */
+  contentLength: number;
+  /** 파일 MIME 타입. image/jpeg·image/png·image/webp만 허용, 아니면 BAD_USER_INPUT. */
+  contentType: string;
+  /** 업로드 용도. */
+  purpose: UploadPurpose;
+};
+
+/** 날짜 범위 필터가 붙은 커서 목록 입력. 일별 생산 수량 조회에 쓴다. */
+export type SellerDateCursorInput = {
+  /** 이전 응답의 nextCursor. 첫 페이지는 생략한다. */
+  cursor?: string | null | undefined;
+  /** 조회 시작 날짜(이상). 미지정 시 하한 없음. */
+  fromDate?: string | null | undefined;
+  /** 한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
+  /** 조회 종료 날짜(이하). 미지정 시 상한 없음. */
+  toDate?: string | null | undefined;
+};
+
 /** 주문 목록 조회 조건. 모든 필터는 AND로 결합되고, 미지정 필터는 적용되지 않는다. */
 export type SellerOrderListInput = {
   /** 이전 응답의 nextCursor. 첫 페이지는 생략한다. */
@@ -154,6 +184,108 @@ export type SellerUpdateOrderStatusInput = {
   /** 변경할 상태. 현재 상태에서 진입 가능한 값이어야 한다. */
   toStatus: OrderStatusType;
 };
+
+/**
+ * 픽업 정책 수정 입력. 세 값이 함께 픽업 달력·시간 슬롯 생성 규칙을 이룬다.
+ * 범위를 벗어나면 BAD_USER_INPUT.
+ */
+export type SellerUpdatePickupPolicyInput = {
+  /** 예약 가능 범위(일). 오늘부터 이 일수까지 달력이 열린다. */
+  maxDaysAhead: number;
+  /** 최소 리드타임(분). 지금부터 이 시간 이후의 슬롯만 열린다. */
+  minLeadTimeMinutes: number;
+  /** 픽업 예약 시간 슬롯 간격(분). */
+  pickupSlotIntervalMinutes: number;
+};
+
+/**
+ * 매장 기본 정보 수정 입력. 모든 필드가 선택이며, 전달한 필드만 변경된다
+ * (부분 수정). 전달하지 않은 필드는 기존 값을 유지한다.
+ */
+export type SellerUpdateStoreBasicInfoInput = {
+  /** 시·도 단위. */
+  addressCity?: string | null | undefined;
+  /** 시·군·구 단위. */
+  addressDistrict?: string | null | undefined;
+  /** 전체 주소 문자열. */
+  addressFull?: string | null | undefined;
+  /** 읍·면·동 단위. */
+  addressNeighborhood?: string | null | undefined;
+  /** 영업시간 안내 문구(자유 입력). */
+  businessHoursText?: string | null | undefined;
+  /** 문의 채팅 인사말 템플릿. 빈 문자열이면 기본 문구로 되돌린다(null 저장). */
+  greetingMessage?: string | null | undefined;
+  /** 위도. 정밀도 손실을 피하려고 문자열로 받는다. */
+  latitude?: string | null | undefined;
+  /** 경도. 정밀도 손실을 피하려고 문자열로 받는다. */
+  longitude?: string | null | undefined;
+  /** 지도 진입에 쓸 provider. */
+  mapProvider?: StoreMapProvider | null | undefined;
+  /** 매장 프로필(로고) 이미지 URL. null 전달 시 제거. sellerCreateUploadUrl(STORE_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT. */
+  profileImageUrl?: string | null | undefined;
+  /** 매장명. */
+  storeName?: string | null | undefined;
+  /** 매장 대표 연락처. */
+  storePhone?: string | null | undefined;
+  /** 매장 홈페이지·SNS URL. */
+  websiteUrl?: string | null | undefined;
+};
+
+/**
+ * 요일별 영업시간 등록·수정 입력. dayOfWeek 기준으로 upsert되므로 같은 요일을 다시
+ * 보내면 덮어쓴다.
+ */
+export type SellerUpsertStoreBusinessHourInput = {
+  /** 영업 종료 시각. 시:분:초만 저장된다. */
+  closeTime?: string | null | undefined;
+  /** 요일. 0=일요일 ~ 6=토요일. */
+  dayOfWeek: number;
+  /** 정기 휴무 여부. true면 openTime·closeTime을 보내지 않아도 된다. */
+  isClosed: boolean;
+  /** 영업 시작 시각. 시:분:초만 저장된다. */
+  openTime?: string | null | undefined;
+};
+
+/** 일별 생산 가능 수량 등록·수정 입력. */
+export type SellerUpsertStoreDailyCapacityInput = {
+  /** 그날 받을 수 있는 최대 주문 수량. */
+  capacity: number;
+  /** 대상 날짜. 날짜 부분만 저장된다. */
+  capacityDate: string;
+  /** 수정할 수량 설정 ID. 생략하면 새로 등록한다. */
+  capacityId?: string | number | null | undefined;
+};
+
+/** 특별휴무 등록·수정 입력. */
+export type SellerUpsertStoreSpecialClosureInput = {
+  /** 휴무 날짜. 날짜 부분만 저장된다. */
+  closureDate: string;
+  /** 수정할 특별휴무 ID. 생략하면 새로 등록한다. */
+  closureId?: string | number | null | undefined;
+  /** 휴무 사유. */
+  reason?: string | null | undefined;
+};
+
+/** 매장 지도 연동 provider. 구매자·판매자 API가 공용으로 쓴다. */
+export type StoreMapProvider =
+  /** 카카오맵 딥링크를 쓴다. */
+  | 'KAKAO'
+  /** 네이버 지도 딥링크를 쓴다. */
+  | 'NAVER'
+  /** 지도 연결 없음. 지도 진입 동선을 노출하지 않는다. */
+  | 'NONE';
+
+/**
+ * 업로드 용도. 용도마다 저장 경로가 다르고, 저장 입력은 같은 용도로 발급된 URL만 받는다.
+ * 역할별 허용 범위: 판매자 PRODUCT_IMAGE·STORE_IMAGE, 관리자 BANNER_IMAGE·STORE_IMAGE(밖이면 BAD_USER_INPUT).
+ */
+export type UploadPurpose =
+  /** 플랫폼 배너 이미지(관리자). */
+  | 'BANNER_IMAGE'
+  /** 상품 이미지·커스텀 도안 바탕·옵션 선택지 이미지·커스텀 템플릿 바탕(판매자). */
+  | 'PRODUCT_IMAGE'
+  /** 매장 프로필(로고) 이미지(판매자·관리자). */
+  | 'STORE_IMAGE';
 
 export type SellerAuthMeQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -304,6 +436,135 @@ export type SellerProductDeleteMutationVariables = Exact<{
 
 export type SellerProductDeleteMutation = { sellerDeleteProduct: boolean };
 
+export type SellerStoreFieldsFragment = { id: string, storeName: string, storePhone: string, addressFull: string, addressCity: string | null, addressDistrict: string | null, addressNeighborhood: string | null, mapProvider: StoreMapProvider, websiteUrl: string | null, businessHoursText: string | null, profileImageUrl: string | null, greetingMessage: string | null, pickupSlotIntervalMinutes: number, minLeadTimeMinutes: number, maxDaysAhead: number, isActive: boolean };
+
+export type SellerStoreMyStoreQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerStoreMyStoreQuery = { sellerMyStore: { id: string, storeName: string, storePhone: string, addressFull: string, addressCity: string | null, addressDistrict: string | null, addressNeighborhood: string | null, mapProvider: StoreMapProvider, websiteUrl: string | null, businessHoursText: string | null, profileImageUrl: string | null, greetingMessage: string | null, pickupSlotIntervalMinutes: number, minLeadTimeMinutes: number, maxDaysAhead: number, isActive: boolean } };
+
+export type SellerStoreRatingQueryVariables = Exact<{
+  storeId: string | number;
+}>;
+
+
+export type SellerStoreRatingQuery = { storeDetail: { id: string, ratingAverage: number, reviewCount: number } };
+
+export type SellerStoreUpdateBasicInfoMutationVariables = Exact<{
+  input: SellerUpdateStoreBasicInfoInput;
+}>;
+
+
+export type SellerStoreUpdateBasicInfoMutation = { sellerUpdateStoreBasicInfo: { id: string, storeName: string, storePhone: string, addressFull: string, addressCity: string | null, addressDistrict: string | null, addressNeighborhood: string | null, mapProvider: StoreMapProvider, websiteUrl: string | null, businessHoursText: string | null, profileImageUrl: string | null, greetingMessage: string | null, pickupSlotIntervalMinutes: number, minLeadTimeMinutes: number, maxDaysAhead: number, isActive: boolean } };
+
+export type SellerStoreUpdatePickupPolicyMutationVariables = Exact<{
+  input: SellerUpdatePickupPolicyInput;
+}>;
+
+
+export type SellerStoreUpdatePickupPolicyMutation = { sellerUpdatePickupPolicy: { id: string, storeName: string, storePhone: string, addressFull: string, addressCity: string | null, addressDistrict: string | null, addressNeighborhood: string | null, mapProvider: StoreMapProvider, websiteUrl: string | null, businessHoursText: string | null, profileImageUrl: string | null, greetingMessage: string | null, pickupSlotIntervalMinutes: number, minLeadTimeMinutes: number, maxDaysAhead: number, isActive: boolean } };
+
+export type SellerStoreCreateUploadUrlMutationVariables = Exact<{
+  input: SellerCreateUploadUrlInput;
+}>;
+
+
+export type SellerStoreCreateUploadUrlMutation = { sellerCreateUploadUrl: { uploadUrl: string, publicUrl: string } };
+
+export type SellerStoreFaqTopicsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerStoreFaqTopicsQuery = { sellerFaqTopics: Array<{ id: string, storeId: string, title: string, answerHtml: string, sortOrder: number, isActive: boolean, createdAt: string, updatedAt: string }> };
+
+export type SellerStoreRegionGroupsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerStoreRegionGroupsQuery = { regionGroups: Array<{ id: string, name: string, hasChildren: boolean }> };
+
+export type SellerStoreRegionsQueryVariables = Exact<{
+  parentId: string | number;
+}>;
+
+
+export type SellerStoreRegionsQuery = { regions: Array<{ id: string, name: string }> };
+
+export type SellerStoreSearchRegionsQueryVariables = Exact<{
+  input: SearchRegionsInput;
+}>;
+
+
+export type SellerStoreSearchRegionsQuery = { searchRegions: Array<{ id: string, name: string, parentName: string | null, level: number }> };
+
+export type SellerStoreBusinessHoursQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerStoreBusinessHoursQuery = { sellerStoreBusinessHours: Array<{ id: string, dayOfWeek: number, isClosed: boolean, openTime: string | null, closeTime: string | null }> };
+
+export type SellerStoreUpsertBusinessHourMutationVariables = Exact<{
+  input: SellerUpsertStoreBusinessHourInput;
+}>;
+
+
+export type SellerStoreUpsertBusinessHourMutation = { sellerUpsertStoreBusinessHour: { id: string } };
+
+export type SellerStoreSpecialClosuresQueryVariables = Exact<{
+  input?: CursorInput | null | undefined;
+}>;
+
+
+export type SellerStoreSpecialClosuresQuery = { sellerStoreSpecialClosures: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, closureDate: string, reason: string | null }> } };
+
+export type SellerStoreUpsertSpecialClosureMutationVariables = Exact<{
+  input: SellerUpsertStoreSpecialClosureInput;
+}>;
+
+
+export type SellerStoreUpsertSpecialClosureMutation = { sellerUpsertStoreSpecialClosure: { id: string } };
+
+export type SellerStoreDeleteSpecialClosureMutationVariables = Exact<{
+  closureId: string | number;
+}>;
+
+
+export type SellerStoreDeleteSpecialClosureMutation = { sellerDeleteStoreSpecialClosure: boolean };
+
+export type SellerStoreDailyCapacitiesQueryVariables = Exact<{
+  input?: SellerDateCursorInput | null | undefined;
+}>;
+
+
+export type SellerStoreDailyCapacitiesQuery = { sellerStoreDailyCapacities: { totalCount: number, items: Array<{ id: string, capacityDate: string, capacity: number }> } };
+
+export type SellerStoreUpsertDailyCapacityMutationVariables = Exact<{
+  input: SellerUpsertStoreDailyCapacityInput;
+}>;
+
+
+export type SellerStoreUpsertDailyCapacityMutation = { sellerUpsertStoreDailyCapacity: { id: string } };
+
+export type SellerStoreDeleteDailyCapacityMutationVariables = Exact<{
+  capacityId: string | number;
+}>;
+
+
+export type SellerStoreDeleteDailyCapacityMutation = { sellerDeleteStoreDailyCapacity: boolean };
+
+export type SellerStorePickupCalendarQueryVariables = Exact<{
+  storeId: string | number;
+  yearMonth: string;
+}>;
+
+
+export type SellerStorePickupCalendarQuery = { pickupCalendar: { yearMonth: string, days: Array<{ date: string, selectable: boolean, reason: string | null }> } };
+
+export type SellerStorePickupTimeSlotsQueryVariables = Exact<{
+  storeId: string | number;
+  date: string;
+}>;
+
+
+export type SellerStorePickupTimeSlotsQuery = { pickupTimeSlots: { date: string, morning: Array<{ time: string, available: boolean }>, afternoon: Array<{ time: string, available: boolean }> } };
+
 export type PingQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -327,7 +588,26 @@ export class TypedDocumentString<TResult, TVariables>
     return this.value;
   }
 }
-
+export const SellerStoreFieldsFragmentDoc = new TypedDocumentString(`
+    fragment SellerStoreFields on SellerStore {
+  id
+  storeName
+  storePhone
+  addressFull
+  addressCity
+  addressDistrict
+  addressNeighborhood
+  mapProvider
+  websiteUrl
+  businessHoursText
+  profileImageUrl
+  greetingMessage
+  pickupSlotIntervalMinutes
+  minLeadTimeMinutes
+  maxDaysAhead
+  isActive
+}
+    `, {"fragmentName":"SellerStoreFields"}) as unknown as TypedDocumentString<SellerStoreFieldsFragment, unknown>;
 export const SellerAuthMeDocument = new TypedDocumentString(`
     query SellerAuthMe {
   sellerMe {
@@ -723,6 +1003,231 @@ export const SellerProductDeleteDocument = new TypedDocumentString(`
   sellerDeleteProduct(productId: $productId)
 }
     `) as unknown as TypedDocumentString<SellerProductDeleteMutation, SellerProductDeleteMutationVariables>;
+export const SellerStoreMyStoreDocument = new TypedDocumentString(`
+    query SellerStoreMyStore {
+  sellerMyStore {
+    ...SellerStoreFields
+  }
+}
+    fragment SellerStoreFields on SellerStore {
+  id
+  storeName
+  storePhone
+  addressFull
+  addressCity
+  addressDistrict
+  addressNeighborhood
+  mapProvider
+  websiteUrl
+  businessHoursText
+  profileImageUrl
+  greetingMessage
+  pickupSlotIntervalMinutes
+  minLeadTimeMinutes
+  maxDaysAhead
+  isActive
+}`) as unknown as TypedDocumentString<SellerStoreMyStoreQuery, SellerStoreMyStoreQueryVariables>;
+export const SellerStoreRatingDocument = new TypedDocumentString(`
+    query SellerStoreRating($storeId: ID!) {
+  storeDetail(storeId: $storeId) {
+    id
+    ratingAverage
+    reviewCount
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreRatingQuery, SellerStoreRatingQueryVariables>;
+export const SellerStoreUpdateBasicInfoDocument = new TypedDocumentString(`
+    mutation SellerStoreUpdateBasicInfo($input: SellerUpdateStoreBasicInfoInput!) {
+  sellerUpdateStoreBasicInfo(input: $input) {
+    ...SellerStoreFields
+  }
+}
+    fragment SellerStoreFields on SellerStore {
+  id
+  storeName
+  storePhone
+  addressFull
+  addressCity
+  addressDistrict
+  addressNeighborhood
+  mapProvider
+  websiteUrl
+  businessHoursText
+  profileImageUrl
+  greetingMessage
+  pickupSlotIntervalMinutes
+  minLeadTimeMinutes
+  maxDaysAhead
+  isActive
+}`) as unknown as TypedDocumentString<SellerStoreUpdateBasicInfoMutation, SellerStoreUpdateBasicInfoMutationVariables>;
+export const SellerStoreUpdatePickupPolicyDocument = new TypedDocumentString(`
+    mutation SellerStoreUpdatePickupPolicy($input: SellerUpdatePickupPolicyInput!) {
+  sellerUpdatePickupPolicy(input: $input) {
+    ...SellerStoreFields
+  }
+}
+    fragment SellerStoreFields on SellerStore {
+  id
+  storeName
+  storePhone
+  addressFull
+  addressCity
+  addressDistrict
+  addressNeighborhood
+  mapProvider
+  websiteUrl
+  businessHoursText
+  profileImageUrl
+  greetingMessage
+  pickupSlotIntervalMinutes
+  minLeadTimeMinutes
+  maxDaysAhead
+  isActive
+}`) as unknown as TypedDocumentString<SellerStoreUpdatePickupPolicyMutation, SellerStoreUpdatePickupPolicyMutationVariables>;
+export const SellerStoreCreateUploadUrlDocument = new TypedDocumentString(`
+    mutation SellerStoreCreateUploadUrl($input: SellerCreateUploadUrlInput!) {
+  sellerCreateUploadUrl(input: $input) {
+    uploadUrl
+    publicUrl
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreCreateUploadUrlMutation, SellerStoreCreateUploadUrlMutationVariables>;
+export const SellerStoreFaqTopicsDocument = new TypedDocumentString(`
+    query SellerStoreFaqTopics {
+  sellerFaqTopics {
+    id
+    storeId
+    title
+    answerHtml
+    sortOrder
+    isActive
+    createdAt
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreFaqTopicsQuery, SellerStoreFaqTopicsQueryVariables>;
+export const SellerStoreRegionGroupsDocument = new TypedDocumentString(`
+    query SellerStoreRegionGroups {
+  regionGroups {
+    id
+    name
+    hasChildren
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreRegionGroupsQuery, SellerStoreRegionGroupsQueryVariables>;
+export const SellerStoreRegionsDocument = new TypedDocumentString(`
+    query SellerStoreRegions($parentId: ID!) {
+  regions(parentId: $parentId) {
+    id
+    name
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreRegionsQuery, SellerStoreRegionsQueryVariables>;
+export const SellerStoreSearchRegionsDocument = new TypedDocumentString(`
+    query SellerStoreSearchRegions($input: SearchRegionsInput!) {
+  searchRegions(input: $input) {
+    id
+    name
+    parentName
+    level
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreSearchRegionsQuery, SellerStoreSearchRegionsQueryVariables>;
+export const SellerStoreBusinessHoursDocument = new TypedDocumentString(`
+    query SellerStoreBusinessHours {
+  sellerStoreBusinessHours {
+    id
+    dayOfWeek
+    isClosed
+    openTime
+    closeTime
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreBusinessHoursQuery, SellerStoreBusinessHoursQueryVariables>;
+export const SellerStoreUpsertBusinessHourDocument = new TypedDocumentString(`
+    mutation SellerStoreUpsertBusinessHour($input: SellerUpsertStoreBusinessHourInput!) {
+  sellerUpsertStoreBusinessHour(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreUpsertBusinessHourMutation, SellerStoreUpsertBusinessHourMutationVariables>;
+export const SellerStoreSpecialClosuresDocument = new TypedDocumentString(`
+    query SellerStoreSpecialClosures($input: CursorInput) {
+  sellerStoreSpecialClosures(input: $input) {
+    items {
+      id
+      closureDate
+      reason
+    }
+    totalCount
+    hasMore
+    nextCursor
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreSpecialClosuresQuery, SellerStoreSpecialClosuresQueryVariables>;
+export const SellerStoreUpsertSpecialClosureDocument = new TypedDocumentString(`
+    mutation SellerStoreUpsertSpecialClosure($input: SellerUpsertStoreSpecialClosureInput!) {
+  sellerUpsertStoreSpecialClosure(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreUpsertSpecialClosureMutation, SellerStoreUpsertSpecialClosureMutationVariables>;
+export const SellerStoreDeleteSpecialClosureDocument = new TypedDocumentString(`
+    mutation SellerStoreDeleteSpecialClosure($closureId: ID!) {
+  sellerDeleteStoreSpecialClosure(closureId: $closureId)
+}
+    `) as unknown as TypedDocumentString<SellerStoreDeleteSpecialClosureMutation, SellerStoreDeleteSpecialClosureMutationVariables>;
+export const SellerStoreDailyCapacitiesDocument = new TypedDocumentString(`
+    query SellerStoreDailyCapacities($input: SellerDateCursorInput) {
+  sellerStoreDailyCapacities(input: $input) {
+    items {
+      id
+      capacityDate
+      capacity
+    }
+    totalCount
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreDailyCapacitiesQuery, SellerStoreDailyCapacitiesQueryVariables>;
+export const SellerStoreUpsertDailyCapacityDocument = new TypedDocumentString(`
+    mutation SellerStoreUpsertDailyCapacity($input: SellerUpsertStoreDailyCapacityInput!) {
+  sellerUpsertStoreDailyCapacity(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreUpsertDailyCapacityMutation, SellerStoreUpsertDailyCapacityMutationVariables>;
+export const SellerStoreDeleteDailyCapacityDocument = new TypedDocumentString(`
+    mutation SellerStoreDeleteDailyCapacity($capacityId: ID!) {
+  sellerDeleteStoreDailyCapacity(capacityId: $capacityId)
+}
+    `) as unknown as TypedDocumentString<SellerStoreDeleteDailyCapacityMutation, SellerStoreDeleteDailyCapacityMutationVariables>;
+export const SellerStorePickupCalendarDocument = new TypedDocumentString(`
+    query SellerStorePickupCalendar($storeId: ID!, $yearMonth: String!) {
+  pickupCalendar(storeId: $storeId, yearMonth: $yearMonth) {
+    yearMonth
+    days {
+      date
+      selectable
+      reason
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStorePickupCalendarQuery, SellerStorePickupCalendarQueryVariables>;
+export const SellerStorePickupTimeSlotsDocument = new TypedDocumentString(`
+    query SellerStorePickupTimeSlots($storeId: ID!, $date: String!) {
+  pickupTimeSlots(storeId: $storeId, date: $date) {
+    date
+    morning {
+      time
+      available
+    }
+    afternoon {
+      time
+      available
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStorePickupTimeSlotsQuery, SellerStorePickupTimeSlotsQueryVariables>;
 export const PingDocument = new TypedDocumentString(`
     query Ping {
   ping

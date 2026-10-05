@@ -38,6 +38,26 @@ type Documents = {
     "\n  query SellerProductBuyerPreview($productId: ID!, $reviews: ProductReviewsInput!) {\n    productDetail(productId: $productId) {\n      id\n      name\n      description\n      purchaseNotice\n      images\n      regularPrice\n      salePrice\n      discountRate\n      optionGroups {\n        id\n        name\n        description\n        items {\n          id\n          title\n          description\n          priceDelta\n        }\n      }\n    }\n    productReviews(input: $reviews) {\n      totalCount\n    }\n  }\n": typeof types.SellerProductBuyerPreviewDocument,
     "\n  mutation SellerProductSetActive($input: SellerSetProductActiveInput!) {\n    sellerSetProductActive(input: $input) {\n      id\n      isActive\n    }\n  }\n": typeof types.SellerProductSetActiveDocument,
     "\n  mutation SellerProductDelete($productId: ID!) {\n    sellerDeleteProduct(productId: $productId)\n  }\n": typeof types.SellerProductDeleteDocument,
+    "\n  fragment SellerStoreFields on SellerStore {\n    id\n    storeName\n    storePhone\n    addressFull\n    addressCity\n    addressDistrict\n    addressNeighborhood\n    mapProvider\n    websiteUrl\n    businessHoursText\n    profileImageUrl\n    greetingMessage\n    pickupSlotIntervalMinutes\n    minLeadTimeMinutes\n    maxDaysAhead\n    isActive\n  }\n": typeof types.SellerStoreFieldsFragmentDoc,
+    "\n  query SellerStoreMyStore {\n    sellerMyStore {\n      ...SellerStoreFields\n    }\n  }\n": typeof types.SellerStoreMyStoreDocument,
+    "\n  query SellerStoreRating($storeId: ID!) {\n    storeDetail(storeId: $storeId) {\n      id\n      ratingAverage\n      reviewCount\n    }\n  }\n": typeof types.SellerStoreRatingDocument,
+    "\n  mutation SellerStoreUpdateBasicInfo($input: SellerUpdateStoreBasicInfoInput!) {\n    sellerUpdateStoreBasicInfo(input: $input) {\n      ...SellerStoreFields\n    }\n  }\n": typeof types.SellerStoreUpdateBasicInfoDocument,
+    "\n  mutation SellerStoreUpdatePickupPolicy($input: SellerUpdatePickupPolicyInput!) {\n    sellerUpdatePickupPolicy(input: $input) {\n      ...SellerStoreFields\n    }\n  }\n": typeof types.SellerStoreUpdatePickupPolicyDocument,
+    "\n  mutation SellerStoreCreateUploadUrl($input: SellerCreateUploadUrlInput!) {\n    sellerCreateUploadUrl(input: $input) {\n      uploadUrl\n      publicUrl\n    }\n  }\n": typeof types.SellerStoreCreateUploadUrlDocument,
+    "\n  query SellerStoreFaqTopics {\n    sellerFaqTopics {\n      id\n      storeId\n      title\n      answerHtml\n      sortOrder\n      isActive\n      createdAt\n      updatedAt\n    }\n  }\n": typeof types.SellerStoreFaqTopicsDocument,
+    "\n  query SellerStoreRegionGroups {\n    regionGroups {\n      id\n      name\n      hasChildren\n    }\n  }\n": typeof types.SellerStoreRegionGroupsDocument,
+    "\n  query SellerStoreRegions($parentId: ID!) {\n    regions(parentId: $parentId) {\n      id\n      name\n    }\n  }\n": typeof types.SellerStoreRegionsDocument,
+    "\n  query SellerStoreSearchRegions($input: SearchRegionsInput!) {\n    searchRegions(input: $input) {\n      id\n      name\n      parentName\n      level\n    }\n  }\n": typeof types.SellerStoreSearchRegionsDocument,
+    "\n  query SellerStoreBusinessHours {\n    sellerStoreBusinessHours {\n      id\n      dayOfWeek\n      isClosed\n      openTime\n      closeTime\n    }\n  }\n": typeof types.SellerStoreBusinessHoursDocument,
+    "\n  mutation SellerStoreUpsertBusinessHour($input: SellerUpsertStoreBusinessHourInput!) {\n    sellerUpsertStoreBusinessHour(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerStoreUpsertBusinessHourDocument,
+    "\n  query SellerStoreSpecialClosures($input: CursorInput) {\n    sellerStoreSpecialClosures(input: $input) {\n      items {\n        id\n        closureDate\n        reason\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": typeof types.SellerStoreSpecialClosuresDocument,
+    "\n  mutation SellerStoreUpsertSpecialClosure($input: SellerUpsertStoreSpecialClosureInput!) {\n    sellerUpsertStoreSpecialClosure(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerStoreUpsertSpecialClosureDocument,
+    "\n  mutation SellerStoreDeleteSpecialClosure($closureId: ID!) {\n    sellerDeleteStoreSpecialClosure(closureId: $closureId)\n  }\n": typeof types.SellerStoreDeleteSpecialClosureDocument,
+    "\n  query SellerStoreDailyCapacities($input: SellerDateCursorInput) {\n    sellerStoreDailyCapacities(input: $input) {\n      items {\n        id\n        capacityDate\n        capacity\n      }\n      totalCount\n    }\n  }\n": typeof types.SellerStoreDailyCapacitiesDocument,
+    "\n  mutation SellerStoreUpsertDailyCapacity($input: SellerUpsertStoreDailyCapacityInput!) {\n    sellerUpsertStoreDailyCapacity(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerStoreUpsertDailyCapacityDocument,
+    "\n  mutation SellerStoreDeleteDailyCapacity($capacityId: ID!) {\n    sellerDeleteStoreDailyCapacity(capacityId: $capacityId)\n  }\n": typeof types.SellerStoreDeleteDailyCapacityDocument,
+    "\n  query SellerStorePickupCalendar($storeId: ID!, $yearMonth: String!) {\n    pickupCalendar(storeId: $storeId, yearMonth: $yearMonth) {\n      yearMonth\n      days {\n        date\n        selectable\n        reason\n      }\n    }\n  }\n": typeof types.SellerStorePickupCalendarDocument,
+    "\n  query SellerStorePickupTimeSlots($storeId: ID!, $date: String!) {\n    pickupTimeSlots(storeId: $storeId, date: $date) {\n      date\n      morning {\n        time\n        available\n      }\n      afternoon {\n        time\n        available\n      }\n    }\n  }\n": typeof types.SellerStorePickupTimeSlotsDocument,
     "\n  query Ping {\n    ping\n  }\n": typeof types.PingDocument,
 };
 const documents: Documents = {
@@ -64,6 +84,26 @@ const documents: Documents = {
     "\n  query SellerProductBuyerPreview($productId: ID!, $reviews: ProductReviewsInput!) {\n    productDetail(productId: $productId) {\n      id\n      name\n      description\n      purchaseNotice\n      images\n      regularPrice\n      salePrice\n      discountRate\n      optionGroups {\n        id\n        name\n        description\n        items {\n          id\n          title\n          description\n          priceDelta\n        }\n      }\n    }\n    productReviews(input: $reviews) {\n      totalCount\n    }\n  }\n": types.SellerProductBuyerPreviewDocument,
     "\n  mutation SellerProductSetActive($input: SellerSetProductActiveInput!) {\n    sellerSetProductActive(input: $input) {\n      id\n      isActive\n    }\n  }\n": types.SellerProductSetActiveDocument,
     "\n  mutation SellerProductDelete($productId: ID!) {\n    sellerDeleteProduct(productId: $productId)\n  }\n": types.SellerProductDeleteDocument,
+    "\n  fragment SellerStoreFields on SellerStore {\n    id\n    storeName\n    storePhone\n    addressFull\n    addressCity\n    addressDistrict\n    addressNeighborhood\n    mapProvider\n    websiteUrl\n    businessHoursText\n    profileImageUrl\n    greetingMessage\n    pickupSlotIntervalMinutes\n    minLeadTimeMinutes\n    maxDaysAhead\n    isActive\n  }\n": types.SellerStoreFieldsFragmentDoc,
+    "\n  query SellerStoreMyStore {\n    sellerMyStore {\n      ...SellerStoreFields\n    }\n  }\n": types.SellerStoreMyStoreDocument,
+    "\n  query SellerStoreRating($storeId: ID!) {\n    storeDetail(storeId: $storeId) {\n      id\n      ratingAverage\n      reviewCount\n    }\n  }\n": types.SellerStoreRatingDocument,
+    "\n  mutation SellerStoreUpdateBasicInfo($input: SellerUpdateStoreBasicInfoInput!) {\n    sellerUpdateStoreBasicInfo(input: $input) {\n      ...SellerStoreFields\n    }\n  }\n": types.SellerStoreUpdateBasicInfoDocument,
+    "\n  mutation SellerStoreUpdatePickupPolicy($input: SellerUpdatePickupPolicyInput!) {\n    sellerUpdatePickupPolicy(input: $input) {\n      ...SellerStoreFields\n    }\n  }\n": types.SellerStoreUpdatePickupPolicyDocument,
+    "\n  mutation SellerStoreCreateUploadUrl($input: SellerCreateUploadUrlInput!) {\n    sellerCreateUploadUrl(input: $input) {\n      uploadUrl\n      publicUrl\n    }\n  }\n": types.SellerStoreCreateUploadUrlDocument,
+    "\n  query SellerStoreFaqTopics {\n    sellerFaqTopics {\n      id\n      storeId\n      title\n      answerHtml\n      sortOrder\n      isActive\n      createdAt\n      updatedAt\n    }\n  }\n": types.SellerStoreFaqTopicsDocument,
+    "\n  query SellerStoreRegionGroups {\n    regionGroups {\n      id\n      name\n      hasChildren\n    }\n  }\n": types.SellerStoreRegionGroupsDocument,
+    "\n  query SellerStoreRegions($parentId: ID!) {\n    regions(parentId: $parentId) {\n      id\n      name\n    }\n  }\n": types.SellerStoreRegionsDocument,
+    "\n  query SellerStoreSearchRegions($input: SearchRegionsInput!) {\n    searchRegions(input: $input) {\n      id\n      name\n      parentName\n      level\n    }\n  }\n": types.SellerStoreSearchRegionsDocument,
+    "\n  query SellerStoreBusinessHours {\n    sellerStoreBusinessHours {\n      id\n      dayOfWeek\n      isClosed\n      openTime\n      closeTime\n    }\n  }\n": types.SellerStoreBusinessHoursDocument,
+    "\n  mutation SellerStoreUpsertBusinessHour($input: SellerUpsertStoreBusinessHourInput!) {\n    sellerUpsertStoreBusinessHour(input: $input) {\n      id\n    }\n  }\n": types.SellerStoreUpsertBusinessHourDocument,
+    "\n  query SellerStoreSpecialClosures($input: CursorInput) {\n    sellerStoreSpecialClosures(input: $input) {\n      items {\n        id\n        closureDate\n        reason\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": types.SellerStoreSpecialClosuresDocument,
+    "\n  mutation SellerStoreUpsertSpecialClosure($input: SellerUpsertStoreSpecialClosureInput!) {\n    sellerUpsertStoreSpecialClosure(input: $input) {\n      id\n    }\n  }\n": types.SellerStoreUpsertSpecialClosureDocument,
+    "\n  mutation SellerStoreDeleteSpecialClosure($closureId: ID!) {\n    sellerDeleteStoreSpecialClosure(closureId: $closureId)\n  }\n": types.SellerStoreDeleteSpecialClosureDocument,
+    "\n  query SellerStoreDailyCapacities($input: SellerDateCursorInput) {\n    sellerStoreDailyCapacities(input: $input) {\n      items {\n        id\n        capacityDate\n        capacity\n      }\n      totalCount\n    }\n  }\n": types.SellerStoreDailyCapacitiesDocument,
+    "\n  mutation SellerStoreUpsertDailyCapacity($input: SellerUpsertStoreDailyCapacityInput!) {\n    sellerUpsertStoreDailyCapacity(input: $input) {\n      id\n    }\n  }\n": types.SellerStoreUpsertDailyCapacityDocument,
+    "\n  mutation SellerStoreDeleteDailyCapacity($capacityId: ID!) {\n    sellerDeleteStoreDailyCapacity(capacityId: $capacityId)\n  }\n": types.SellerStoreDeleteDailyCapacityDocument,
+    "\n  query SellerStorePickupCalendar($storeId: ID!, $yearMonth: String!) {\n    pickupCalendar(storeId: $storeId, yearMonth: $yearMonth) {\n      yearMonth\n      days {\n        date\n        selectable\n        reason\n      }\n    }\n  }\n": types.SellerStorePickupCalendarDocument,
+    "\n  query SellerStorePickupTimeSlots($storeId: ID!, $date: String!) {\n    pickupTimeSlots(storeId: $storeId, date: $date) {\n      date\n      morning {\n        time\n        available\n      }\n      afternoon {\n        time\n        available\n      }\n    }\n  }\n": types.SellerStorePickupTimeSlotsDocument,
     "\n  query Ping {\n    ping\n  }\n": types.PingDocument,
 };
 
@@ -159,6 +199,86 @@ export function graphql(source: "\n  mutation SellerProductSetActive($input: Sel
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation SellerProductDelete($productId: ID!) {\n    sellerDeleteProduct(productId: $productId)\n  }\n"): typeof import('./graphql').SellerProductDeleteDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  fragment SellerStoreFields on SellerStore {\n    id\n    storeName\n    storePhone\n    addressFull\n    addressCity\n    addressDistrict\n    addressNeighborhood\n    mapProvider\n    websiteUrl\n    businessHoursText\n    profileImageUrl\n    greetingMessage\n    pickupSlotIntervalMinutes\n    minLeadTimeMinutes\n    maxDaysAhead\n    isActive\n  }\n"): typeof import('./graphql').SellerStoreFieldsFragmentDoc;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerStoreMyStore {\n    sellerMyStore {\n      ...SellerStoreFields\n    }\n  }\n"): typeof import('./graphql').SellerStoreMyStoreDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerStoreRating($storeId: ID!) {\n    storeDetail(storeId: $storeId) {\n      id\n      ratingAverage\n      reviewCount\n    }\n  }\n"): typeof import('./graphql').SellerStoreRatingDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerStoreUpdateBasicInfo($input: SellerUpdateStoreBasicInfoInput!) {\n    sellerUpdateStoreBasicInfo(input: $input) {\n      ...SellerStoreFields\n    }\n  }\n"): typeof import('./graphql').SellerStoreUpdateBasicInfoDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerStoreUpdatePickupPolicy($input: SellerUpdatePickupPolicyInput!) {\n    sellerUpdatePickupPolicy(input: $input) {\n      ...SellerStoreFields\n    }\n  }\n"): typeof import('./graphql').SellerStoreUpdatePickupPolicyDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerStoreCreateUploadUrl($input: SellerCreateUploadUrlInput!) {\n    sellerCreateUploadUrl(input: $input) {\n      uploadUrl\n      publicUrl\n    }\n  }\n"): typeof import('./graphql').SellerStoreCreateUploadUrlDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerStoreFaqTopics {\n    sellerFaqTopics {\n      id\n      storeId\n      title\n      answerHtml\n      sortOrder\n      isActive\n      createdAt\n      updatedAt\n    }\n  }\n"): typeof import('./graphql').SellerStoreFaqTopicsDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerStoreRegionGroups {\n    regionGroups {\n      id\n      name\n      hasChildren\n    }\n  }\n"): typeof import('./graphql').SellerStoreRegionGroupsDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerStoreRegions($parentId: ID!) {\n    regions(parentId: $parentId) {\n      id\n      name\n    }\n  }\n"): typeof import('./graphql').SellerStoreRegionsDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerStoreSearchRegions($input: SearchRegionsInput!) {\n    searchRegions(input: $input) {\n      id\n      name\n      parentName\n      level\n    }\n  }\n"): typeof import('./graphql').SellerStoreSearchRegionsDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerStoreBusinessHours {\n    sellerStoreBusinessHours {\n      id\n      dayOfWeek\n      isClosed\n      openTime\n      closeTime\n    }\n  }\n"): typeof import('./graphql').SellerStoreBusinessHoursDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerStoreUpsertBusinessHour($input: SellerUpsertStoreBusinessHourInput!) {\n    sellerUpsertStoreBusinessHour(input: $input) {\n      id\n    }\n  }\n"): typeof import('./graphql').SellerStoreUpsertBusinessHourDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerStoreSpecialClosures($input: CursorInput) {\n    sellerStoreSpecialClosures(input: $input) {\n      items {\n        id\n        closureDate\n        reason\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n"): typeof import('./graphql').SellerStoreSpecialClosuresDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerStoreUpsertSpecialClosure($input: SellerUpsertStoreSpecialClosureInput!) {\n    sellerUpsertStoreSpecialClosure(input: $input) {\n      id\n    }\n  }\n"): typeof import('./graphql').SellerStoreUpsertSpecialClosureDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerStoreDeleteSpecialClosure($closureId: ID!) {\n    sellerDeleteStoreSpecialClosure(closureId: $closureId)\n  }\n"): typeof import('./graphql').SellerStoreDeleteSpecialClosureDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerStoreDailyCapacities($input: SellerDateCursorInput) {\n    sellerStoreDailyCapacities(input: $input) {\n      items {\n        id\n        capacityDate\n        capacity\n      }\n      totalCount\n    }\n  }\n"): typeof import('./graphql').SellerStoreDailyCapacitiesDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerStoreUpsertDailyCapacity($input: SellerUpsertStoreDailyCapacityInput!) {\n    sellerUpsertStoreDailyCapacity(input: $input) {\n      id\n    }\n  }\n"): typeof import('./graphql').SellerStoreUpsertDailyCapacityDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerStoreDeleteDailyCapacity($capacityId: ID!) {\n    sellerDeleteStoreDailyCapacity(capacityId: $capacityId)\n  }\n"): typeof import('./graphql').SellerStoreDeleteDailyCapacityDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerStorePickupCalendar($storeId: ID!, $yearMonth: String!) {\n    pickupCalendar(storeId: $storeId, yearMonth: $yearMonth) {\n      yearMonth\n      days {\n        date\n        selectable\n        reason\n      }\n    }\n  }\n"): typeof import('./graphql').SellerStorePickupCalendarDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerStorePickupTimeSlots($storeId: ID!, $date: String!) {\n    pickupTimeSlots(storeId: $storeId, date: $date) {\n      date\n      morning {\n        time\n        available\n      }\n      afternoon {\n        time\n        available\n      }\n    }\n  }\n"): typeof import('./graphql').SellerStorePickupTimeSlotsDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

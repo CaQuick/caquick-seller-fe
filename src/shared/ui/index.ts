@@ -45,3 +45,4 @@ export { Timeline, type TimelineItem } from './timeline';
 /** @public */
 export { TimeRow } from './time-row';
 export { AppToaster, showToast } from './toast';
+export { type CalendarDay } from './month-calendar';
