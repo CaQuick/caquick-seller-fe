@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { create } from 'zustand';
 
+import { useSellerMe, useSessionStore } from '@/features/auth';
 import { type PickedImage } from '@/shared/lib/upload';
 
 import { newKey, type OptionGroupValue } from './draft-options';
@@ -120,12 +121,22 @@ export const useDraftStore = create<DraftState>()((set) => ({
   reset: () => set({ draft: EMPTY_DRAFT, progress: EMPTY_PROGRESS }),
 }));
 
+// 세션이 끝나면(로그아웃·강제 종료) 다음 계정에 작성 중이던 초안이 남지 않게 비운다
+useSessionStore.subscribe((s, prev) => {
+  if (s.status === 'anonymous' && prev.status !== 'anonymous') useDraftStore.getState().reset();
+});
+
 export const isPristine = (draft: ProductDraft) =>
   JSON.stringify(draft) === JSON.stringify(EMPTY_DRAFT);
 
-// ── 임시저장(D30): 기기 로컬 1벌. 이미지는 올라간 publicUrl만 남긴다 ──
+// ── 임시저장(D30): 기기 로컬, 계정마다 1벌. 이미지는 올라간 publicUrl만 남긴다 ──
 
-const STORAGE_KEY = 'caquick.productDraft';
+/** 초안 주인. 내 계정을 받기 전에는 undefined — 그동안은 읽지도 쓰지도 않는다 */
+export const useDraftOwner = () => useSellerMe().data?.accountId;
+
+/** 계정 구분 전의 단일 키. 누구의 초안인지 알 수 없어 읽지 않고 지운다 */
+const LEGACY_KEY = 'caquick.productDraft';
+const storageKey = (accountId: string) => `${LEGACY_KEY}.${accountId}`;
 
 const itemSchema = z.object({
   key: z.string(),
@@ -165,12 +176,16 @@ export interface SavedDraft {
   draft: ProductDraft;
 }
 
-export async function saveDraft(draft: ProductDraft, now = new Date()): Promise<boolean> {
+export async function saveDraft(
+  accountId: string,
+  draft: ProductDraft,
+  now = new Date(),
+): Promise<boolean> {
   const { images, ...rest } = draft;
   const imageUrls = images.flatMap((img) => (img.publicUrl ? [img.publicUrl] : []));
   try {
     await AsyncStorage.setItem(
-      STORAGE_KEY,
+      storageKey(accountId),
       JSON.stringify({ savedAt: now.toISOString(), draft: { ...rest, imageUrls } }),
     );
     return true;
@@ -180,9 +195,10 @@ export async function saveDraft(draft: ProductDraft, now = new Date()): Promise<
 }
 
 /** 없거나 읽을 수 없는 초안(앱 버전이 바뀌어 모양이 다른 것 포함)은 null */
-export async function loadDraft(): Promise<SavedDraft | null> {
+export async function loadDraft(accountId: string): Promise<SavedDraft | null> {
+  await AsyncStorage.removeItem(LEGACY_KEY).catch(() => undefined);
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const raw = await AsyncStorage.getItem(storageKey(accountId));
     if (!raw) return null;
     const parsed = storedSchema.safeParse(JSON.parse(raw));
     if (!parsed.success) return null;
@@ -200,9 +216,9 @@ export async function loadDraft(): Promise<SavedDraft | null> {
   }
 }
 
-export async function clearDraft(): Promise<void> {
+export async function clearDraft(accountId: string): Promise<void> {
   try {
-    await AsyncStorage.removeItem(STORAGE_KEY);
+    await AsyncStorage.removeItem(storageKey(accountId));
   } catch {
     // 지우지 못한 초안은 다음 진입 때 복원 여부를 다시 묻는다
   }

@@ -12,7 +12,7 @@ import {
   removeItem,
   reorderGroups,
 } from '../model/draft-options';
-import { useDraftStore } from '../model/draft-store';
+import { useDraftOwner, useDraftStore } from '../model/draft-store';
 import { CreateFrame, saveDraftWithToast } from './create-frame';
 import { OptionsEditor } from './options-editor';
 
@@ -20,6 +20,7 @@ import { OptionsEditor } from './options-editor';
 export function ProductNewOptionsScreen() {
   const groups = useDraftStore((s) => s.draft.optionGroups);
   const set = useDraftStore((s) => s.setOptionGroups);
+  const accountId = useDraftOwner();
   const [error, setError] = useState<string | null>(null);
   const edit = (fn: Parameters<typeof set>[0]) => {
     set(fn);
@@ -32,7 +33,10 @@ export function ProductNewOptionsScreen() {
       label={CREATE_COPY.step2}
       onBack={() => router.back()}
       actions={{
-        secondary: { title: CREATE_COPY.saveDraft, onPress: () => void saveDraftWithToast() },
+        secondary: {
+          title: CREATE_COPY.saveDraft,
+          onPress: () => void saveDraftWithToast(accountId),
+        },
         primary: {
           title: CREATE_COPY.next,
           onPress: () => {

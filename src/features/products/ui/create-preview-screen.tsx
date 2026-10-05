@@ -14,7 +14,13 @@ import { showToast } from '@/shared/ui';
 import { productsKeys } from '../api/queryKeys';
 import { priceView } from '../model/browse';
 import { CREATE_COPY, toPrice, uploadedUrls } from '../model/draft-form';
-import { clearDraft, EMPTY_PROGRESS, type ProductDraft, useDraftStore } from '../model/draft-store';
+import {
+  clearDraft,
+  EMPTY_PROGRESS,
+  type ProductDraft,
+  useDraftOwner,
+  useDraftStore,
+} from '../model/draft-store';
 import {
   abandonCreate,
   CreateChainError,
@@ -30,6 +36,7 @@ export function ProductNewPreviewScreen() {
   const queryClient = useQueryClient();
   const draft = useDraftStore((s) => s.draft);
   const progress = useDraftStore((s) => s.progress);
+  const accountId = useDraftOwner();
   const sheet = useRef<BottomSheetModal>(null);
   const [phase, setPhase] = useState<SubmitPhase | null>(null);
   const [current, setCurrent] = useState<CreateStepId | null>(null);
@@ -46,7 +53,7 @@ export function ProductNewPreviewScreen() {
         onProgress: store.setProgress,
         onStep: setCurrent,
       });
-      await clearDraft();
+      if (accountId !== undefined) await clearDraft(accountId);
       void queryClient.invalidateQueries({ queryKey: productsKeys.lists() });
       void queryClient.invalidateQueries({ queryKey: homeKeys.all });
       sheet.current?.dismiss();
