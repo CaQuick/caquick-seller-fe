@@ -125,6 +125,22 @@ export type ProductReviewsInput = {
   sort?: ReviewSort | null | undefined;
 };
 
+/** 리뷰 댓글 목록 조회 조건. */
+export type ReviewCommentsInput = {
+  /** 이전 페이지 마지막 댓글 id(이후부터 조회). */
+  cursor?: string | null | undefined;
+  /** 한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
+  reviewId: string | number;
+};
+
+/** 리뷰 첨부 미디어 종류. */
+export type ReviewMediaType =
+  /** 이미지. */
+  | 'IMAGE'
+  /** 동영상. thumbnailUrl이 있으면 대표 프레임으로 쓰지만 필수가 아니라 없을 수 있다. */
+  | 'VIDEO';
+
 /** 리뷰 목록 정렬. 상품 리뷰·매장 리뷰가 공용으로 쓴다. */
 export type ReviewSort =
   /** 최신순. */
@@ -471,6 +487,19 @@ export type StoreProductsInput = {
   storeId: string | number;
 };
 
+/** 매장 리뷰 목록 조회 조건. */
+export type StoreReviewsInput = {
+  /** 이전 페이지의 nextCursor 값(불투명 토큰). 동일 sort에서만 유효. */
+  cursor?: string | null | undefined;
+  /** 한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
+  /** true면 사진(미디어) 있는 리뷰만(사진후기 그리드). */
+  photoOnly?: boolean | null | undefined;
+  /** 정렬 기준. 기본 최신순. 정렬을 바꾸면 기존 cursor는 무효다. */
+  sort?: ReviewSort | null | undefined;
+  storeId: string | number;
+};
+
 /**
  * 업로드 용도. 용도마다 저장 경로가 다르고, 저장 입력은 같은 용도로 발급된 URL만 받는다.
  * 역할별 허용 범위: 판매자 PRODUCT_IMAGE·STORE_IMAGE, 관리자 BANNER_IMAGE·STORE_IMAGE(밖이면 BAD_USER_INPUT).
@@ -681,6 +710,29 @@ export type SellerProductTagSearchQueryVariables = Exact<{
 
 export type SellerProductTagSearchQuery = { sellerSearchTags: Array<{ id: string, name: string, isExactMatch: boolean, productCount: number }> };
 
+export type SellerReviewMediaFieldsFragment = { mediaType: ReviewMediaType, mediaUrl: string, thumbnailUrl: string | null, sortOrder: number };
+
+export type SellerReviewsListQueryVariables = Exact<{
+  input: StoreReviewsInput;
+}>;
+
+
+export type SellerReviewsListQuery = { storeReviews: { totalCount: number, photoTotalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, rating: number, content: string | null, likeCount: number, authorNickname: string | null, productName: string, createdAt: string, media: Array<{ mediaType: ReviewMediaType, mediaUrl: string, thumbnailUrl: string | null, sortOrder: number }> }> } };
+
+export type SellerReviewsDetailQueryVariables = Exact<{
+  reviewId: string | number;
+}>;
+
+
+export type SellerReviewsDetailQuery = { reviewDetail: { review: { id: string, rating: number, content: string | null, likeCount: number, commentCount: number, authorNickname: string | null, createdAt: string, media: Array<{ mediaType: ReviewMediaType, mediaUrl: string, thumbnailUrl: string | null, sortOrder: number }>, customOptions: Array<{ groupName: string, optionTitle: string }> }, product: { productId: string, name: string, thumbnailUrl: string | null, regularPrice: number, salePrice: number | null } } };
+
+export type SellerReviewsCommentsQueryVariables = Exact<{
+  input: ReviewCommentsInput;
+}>;
+
+
+export type SellerReviewsCommentsQuery = { reviewComments: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, content: string, authorNickname: string | null, createdAt: string }> } };
+
 export type SellerStoreAuditLogsQueryVariables = Exact<{
   input?: SellerAuditLogListInput | null | undefined;
 }>;
@@ -889,6 +941,14 @@ export class TypedDocumentString<TResult, TVariables>
     return this.value;
   }
 }
+export const SellerReviewMediaFieldsFragmentDoc = new TypedDocumentString(`
+    fragment SellerReviewMediaFields on ReviewMedia {
+  mediaType
+  mediaUrl
+  thumbnailUrl
+  sortOrder
+}
+    `, {"fragmentName":"SellerReviewMediaFields"}) as unknown as TypedDocumentString<SellerReviewMediaFieldsFragment, unknown>;
 export const SellerStoreFieldsFragmentDoc = new TypedDocumentString(`
     fragment SellerStoreFields on SellerStore {
   id
@@ -1356,6 +1416,82 @@ export const SellerProductTagSearchDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerProductTagSearchQuery, SellerProductTagSearchQueryVariables>;
+export const SellerReviewsListDocument = new TypedDocumentString(`
+    query SellerReviewsList($input: StoreReviewsInput!) {
+  storeReviews(input: $input) {
+    items {
+      id
+      rating
+      content
+      media {
+        ...SellerReviewMediaFields
+      }
+      likeCount
+      authorNickname
+      productName
+      createdAt
+    }
+    totalCount
+    photoTotalCount
+    hasMore
+    nextCursor
+  }
+}
+    fragment SellerReviewMediaFields on ReviewMedia {
+  mediaType
+  mediaUrl
+  thumbnailUrl
+  sortOrder
+}`) as unknown as TypedDocumentString<SellerReviewsListQuery, SellerReviewsListQueryVariables>;
+export const SellerReviewsDetailDocument = new TypedDocumentString(`
+    query SellerReviewsDetail($reviewId: ID!) {
+  reviewDetail(reviewId: $reviewId) {
+    review {
+      id
+      rating
+      content
+      media {
+        ...SellerReviewMediaFields
+      }
+      likeCount
+      commentCount
+      authorNickname
+      customOptions {
+        groupName
+        optionTitle
+      }
+      createdAt
+    }
+    product {
+      productId
+      name
+      thumbnailUrl
+      regularPrice
+      salePrice
+    }
+  }
+}
+    fragment SellerReviewMediaFields on ReviewMedia {
+  mediaType
+  mediaUrl
+  thumbnailUrl
+  sortOrder
+}`) as unknown as TypedDocumentString<SellerReviewsDetailQuery, SellerReviewsDetailQueryVariables>;
+export const SellerReviewsCommentsDocument = new TypedDocumentString(`
+    query SellerReviewsComments($input: ReviewCommentsInput!) {
+  reviewComments(input: $input) {
+    items {
+      id
+      content
+      authorNickname
+      createdAt
+    }
+    totalCount
+    hasMore
+    nextCursor
+  }
+}
+    `) as unknown as TypedDocumentString<SellerReviewsCommentsQuery, SellerReviewsCommentsQueryVariables>;
 export const SellerStoreAuditLogsDocument = new TypedDocumentString(`
     query SellerStoreAuditLogs($input: SellerAuditLogListInput) {
   sellerAuditLogs(input: $input) {
