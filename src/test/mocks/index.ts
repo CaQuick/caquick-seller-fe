@@ -83,3 +83,6 @@ jest.mock('expo-file-system', () => {
     Paths: { cache: { uri: 'file:///cache/' } },
   };
 });
+
+/** @native-html/render가 끌어오는 ESM 전용 패키지(jest 변환 대상 밖). 디버그 직렬화에만 쓰여 그대로 돌려준다 */
+jest.mock('stringify-entities', () => ({ stringifyEntities: (value: string) => value }));

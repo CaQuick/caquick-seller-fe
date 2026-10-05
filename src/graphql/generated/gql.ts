@@ -16,6 +16,13 @@ import * as types from './graphql';
  */
 type Documents = {
     "\n  query SellerAuthMe {\n    sellerMe {\n      accountId\n      username\n      displayName\n      storeId\n      mustChangePassword\n      accountStatus\n    }\n  }\n": typeof types.SellerAuthMeDocument,
+    "\n  query SellerChatsConversations($input: CursorInput) {\n    sellerConversations(input: $input) {\n      items {\n        id\n        accountId\n        buyerNickname\n        lastMessagePreview\n        lastMessageAt\n        sellerLastReadAt\n        unreadCount\n        updatedAt\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": typeof types.SellerChatsConversationsDocument,
+    "\n  subscription SellerChatsConversationUpdated {\n    sellerConversationUpdated {\n      conversationId\n      accountId\n      buyerNickname\n      lastMessagePreview\n      lastMessageAt\n      sellerLastReadAt\n      unreadCount\n    }\n  }\n": typeof types.SellerChatsConversationUpdatedDocument,
+    "\n  query SellerChatsMessages($conversationId: ID!, $input: CursorInput) {\n    sellerConversationMessages(conversationId: $conversationId, input: $input) {\n      items {\n        id\n        conversationId\n        senderType\n        senderAccountId\n        bodyFormat\n        bodyText\n        bodyHtml\n        createdAt\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": typeof types.SellerChatsMessagesDocument,
+    "\n  mutation SellerChatsSendMessage($input: SellerSendConversationMessageInput!) {\n    sellerSendConversationMessage(input: $input) {\n      id\n      conversationId\n      senderType\n      senderAccountId\n      bodyFormat\n      bodyText\n      bodyHtml\n      createdAt\n    }\n  }\n": typeof types.SellerChatsSendMessageDocument,
+    "\n  mutation SellerChatsMarkRead($conversationId: ID!) {\n    sellerMarkConversationRead(conversationId: $conversationId) {\n      id\n      accountId\n      buyerNickname\n      lastMessagePreview\n      lastMessageAt\n      sellerLastReadAt\n      unreadCount\n      updatedAt\n    }\n  }\n": typeof types.SellerChatsMarkReadDocument,
+    "\n  subscription SellerChatsMessageAdded($conversationId: ID!) {\n    conversationMessageAdded(conversationId: $conversationId) {\n      id\n      conversationId\n      senderType\n      bodyFormat\n      bodyText\n      bodyHtml\n      createdAt\n    }\n  }\n": typeof types.SellerChatsMessageAddedDocument,
+    "\n  query SellerChatsBuyerOrder($input: SellerOrderListInput) {\n    sellerOrderList(input: $input) {\n      items {\n        id\n        buyerName\n        pickupAt\n        firstItemName\n      }\n    }\n  }\n": typeof types.SellerChatsBuyerOrderDocument,
     "\n  query SellerHomeStore {\n    sellerMyStore {\n      id\n      storeName\n      isActive\n    }\n  }\n": typeof types.SellerHomeStoreDocument,
     "\n  query SellerHomeDashboard {\n    sellerDashboard {\n      date\n      newOrderCount\n      pickupDay {\n        salesAmount\n      }\n      createdDay {\n        orderCount\n      }\n      remainingCapacity\n      activeProductCount\n      unansweredConversationCount\n    }\n  }\n": typeof types.SellerHomeDashboardDocument,
     "\n  query SellerHomeRecentOrders($input: SellerOrderListInput) {\n    sellerOrderList(input: $input) {\n      items {\n        id\n        status\n        pickupAt\n        buyerName\n        firstItemName\n        firstItemImageUrl\n      }\n    }\n  }\n": typeof types.SellerHomeRecentOrdersDocument,
@@ -35,6 +42,13 @@ type Documents = {
 };
 const documents: Documents = {
     "\n  query SellerAuthMe {\n    sellerMe {\n      accountId\n      username\n      displayName\n      storeId\n      mustChangePassword\n      accountStatus\n    }\n  }\n": types.SellerAuthMeDocument,
+    "\n  query SellerChatsConversations($input: CursorInput) {\n    sellerConversations(input: $input) {\n      items {\n        id\n        accountId\n        buyerNickname\n        lastMessagePreview\n        lastMessageAt\n        sellerLastReadAt\n        unreadCount\n        updatedAt\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": types.SellerChatsConversationsDocument,
+    "\n  subscription SellerChatsConversationUpdated {\n    sellerConversationUpdated {\n      conversationId\n      accountId\n      buyerNickname\n      lastMessagePreview\n      lastMessageAt\n      sellerLastReadAt\n      unreadCount\n    }\n  }\n": types.SellerChatsConversationUpdatedDocument,
+    "\n  query SellerChatsMessages($conversationId: ID!, $input: CursorInput) {\n    sellerConversationMessages(conversationId: $conversationId, input: $input) {\n      items {\n        id\n        conversationId\n        senderType\n        senderAccountId\n        bodyFormat\n        bodyText\n        bodyHtml\n        createdAt\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n": types.SellerChatsMessagesDocument,
+    "\n  mutation SellerChatsSendMessage($input: SellerSendConversationMessageInput!) {\n    sellerSendConversationMessage(input: $input) {\n      id\n      conversationId\n      senderType\n      senderAccountId\n      bodyFormat\n      bodyText\n      bodyHtml\n      createdAt\n    }\n  }\n": types.SellerChatsSendMessageDocument,
+    "\n  mutation SellerChatsMarkRead($conversationId: ID!) {\n    sellerMarkConversationRead(conversationId: $conversationId) {\n      id\n      accountId\n      buyerNickname\n      lastMessagePreview\n      lastMessageAt\n      sellerLastReadAt\n      unreadCount\n      updatedAt\n    }\n  }\n": types.SellerChatsMarkReadDocument,
+    "\n  subscription SellerChatsMessageAdded($conversationId: ID!) {\n    conversationMessageAdded(conversationId: $conversationId) {\n      id\n      conversationId\n      senderType\n      bodyFormat\n      bodyText\n      bodyHtml\n      createdAt\n    }\n  }\n": types.SellerChatsMessageAddedDocument,
+    "\n  query SellerChatsBuyerOrder($input: SellerOrderListInput) {\n    sellerOrderList(input: $input) {\n      items {\n        id\n        buyerName\n        pickupAt\n        firstItemName\n      }\n    }\n  }\n": types.SellerChatsBuyerOrderDocument,
     "\n  query SellerHomeStore {\n    sellerMyStore {\n      id\n      storeName\n      isActive\n    }\n  }\n": types.SellerHomeStoreDocument,
     "\n  query SellerHomeDashboard {\n    sellerDashboard {\n      date\n      newOrderCount\n      pickupDay {\n        salesAmount\n      }\n      createdDay {\n        orderCount\n      }\n      remainingCapacity\n      activeProductCount\n      unansweredConversationCount\n    }\n  }\n": types.SellerHomeDashboardDocument,
     "\n  query SellerHomeRecentOrders($input: SellerOrderListInput) {\n    sellerOrderList(input: $input) {\n      items {\n        id\n        status\n        pickupAt\n        buyerName\n        firstItemName\n        firstItemImageUrl\n      }\n    }\n  }\n": types.SellerHomeRecentOrdersDocument,
@@ -57,6 +71,34 @@ const documents: Documents = {
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query SellerAuthMe {\n    sellerMe {\n      accountId\n      username\n      displayName\n      storeId\n      mustChangePassword\n      accountStatus\n    }\n  }\n"): typeof import('./graphql').SellerAuthMeDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerChatsConversations($input: CursorInput) {\n    sellerConversations(input: $input) {\n      items {\n        id\n        accountId\n        buyerNickname\n        lastMessagePreview\n        lastMessageAt\n        sellerLastReadAt\n        unreadCount\n        updatedAt\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n"): typeof import('./graphql').SellerChatsConversationsDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  subscription SellerChatsConversationUpdated {\n    sellerConversationUpdated {\n      conversationId\n      accountId\n      buyerNickname\n      lastMessagePreview\n      lastMessageAt\n      sellerLastReadAt\n      unreadCount\n    }\n  }\n"): typeof import('./graphql').SellerChatsConversationUpdatedDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerChatsMessages($conversationId: ID!, $input: CursorInput) {\n    sellerConversationMessages(conversationId: $conversationId, input: $input) {\n      items {\n        id\n        conversationId\n        senderType\n        senderAccountId\n        bodyFormat\n        bodyText\n        bodyHtml\n        createdAt\n      }\n      totalCount\n      hasMore\n      nextCursor\n    }\n  }\n"): typeof import('./graphql').SellerChatsMessagesDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerChatsSendMessage($input: SellerSendConversationMessageInput!) {\n    sellerSendConversationMessage(input: $input) {\n      id\n      conversationId\n      senderType\n      senderAccountId\n      bodyFormat\n      bodyText\n      bodyHtml\n      createdAt\n    }\n  }\n"): typeof import('./graphql').SellerChatsSendMessageDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerChatsMarkRead($conversationId: ID!) {\n    sellerMarkConversationRead(conversationId: $conversationId) {\n      id\n      accountId\n      buyerNickname\n      lastMessagePreview\n      lastMessageAt\n      sellerLastReadAt\n      unreadCount\n      updatedAt\n    }\n  }\n"): typeof import('./graphql').SellerChatsMarkReadDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  subscription SellerChatsMessageAdded($conversationId: ID!) {\n    conversationMessageAdded(conversationId: $conversationId) {\n      id\n      conversationId\n      senderType\n      bodyFormat\n      bodyText\n      bodyHtml\n      createdAt\n    }\n  }\n"): typeof import('./graphql').SellerChatsMessageAddedDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerChatsBuyerOrder($input: SellerOrderListInput) {\n    sellerOrderList(input: $input) {\n      items {\n        id\n        buyerName\n        pickupAt\n        firstItemName\n      }\n    }\n  }\n"): typeof import('./graphql').SellerChatsBuyerOrderDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
