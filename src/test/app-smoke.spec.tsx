@@ -44,6 +44,12 @@ import R_auth_layout from '../../app/(auth)/_layout';
 import R_auth_change_password from '../../app/(auth)/change-password';
 import R_auth_login from '../../app/(auth)/login';
 
+// 홈의 주문 구독이 실제 소켓을 열지 않게 한다
+jest.mock('@/shared/api/ws-client', () => ({
+  ...jest.requireActual<object>('@/shared/api/ws-client'),
+  subscribe: jest.fn(() => () => undefined),
+}));
+
 /**
  * 라우터·세션 부팅·NativeWind·RNTL 14가 jest에서 함께 도는지 — app/ 안에는 spec을 못 두므로 여기서.
  * app/ 전체를 올려 라우트 파일마다 Screen을 export하는지와 (app)/_layout의 Stack.Screen 목록이 실제 파일과 맞는지도 본다
@@ -97,6 +103,24 @@ const sellerMe = gqlOk('SellerAuthMe', {
   },
 });
 
+const home = [
+  gqlOk('SellerHomeStore', {
+    sellerMyStore: { id: '3', storeName: '해즈 케이크', isActive: true },
+  }),
+  gqlOk('SellerHomeDashboard', {
+    sellerDashboard: {
+      date: '2026-10-06',
+      newOrderCount: 0,
+      pickupDay: { salesAmount: 0 },
+      createdDay: { orderCount: 0 },
+      remainingCapacity: 12,
+      activeProductCount: 0,
+      unansweredConversationCount: 0,
+    },
+  }),
+  gqlOk('SellerHomeRecentOrders', { sellerOrderList: { items: [] } }),
+];
+
 const session = (mustChangePassword = false) => ({
   accessToken: 'at',
   tokenType: 'Bearer' as const,
@@ -124,10 +148,10 @@ describe('앱 셸', () => {
 
   it('refreshToken이 있으면 복원해 홈 탭을 띄우고, 세션이 끝나면 로그인으로 돌아간다', async () => {
     mockSecureStore.set('caquick.refreshToken', 'rt');
-    server.use(restOk('/seller/refresh', session()), sellerMe);
+    server.use(restOk('/seller/refresh', session()), sellerMe, ...home);
     const router = open('/');
     await router;
-    expect(await screen.findByText('오늘의 현황')).toBeTruthy();
+    expect(await screen.findByText('12개')).toBeTruthy();
     expect(router.getPathname()).toBe('/');
     expect(mockSecureStore.get('caquick.refreshToken')).toBe('rt2');
 
@@ -146,7 +170,7 @@ describe('앱 셸', () => {
 
   it('로그인된 상태로 로그인 화면에 오면 앱으로 보낸다', async () => {
     mockSecureStore.set('caquick.refreshToken', 'rt');
-    server.use(restOk('/seller/refresh', session()), sellerMe);
+    server.use(restOk('/seller/refresh', session()), sellerMe, ...home);
     const router = open('/login');
     await router;
     await waitFor(() => expect(router.getPathname()).toBe('/'));
