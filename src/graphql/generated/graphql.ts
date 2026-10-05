@@ -13,6 +13,50 @@ export type AccountStatus =
   /** 운영자가 정지한 상태. 모든 API 접근이 FORBIDDEN이고 refresh 세션도 폐기된다. */
   | 'SUSPENDED';
 
+/** 감사 로그에 기록된 행위 종류. */
+export type AuditActionType =
+  /** 생성. */
+  | 'CREATE'
+  /** 삭제(soft-delete 포함). */
+  | 'DELETE'
+  /** 상태 전이. */
+  | 'STATUS_CHANGE'
+  /** 수정. */
+  | 'UPDATE';
+
+/** 감사 로그가 가리키는 대상 종류. 판매자 화면(sellerAuditLogs)은 STORE·PRODUCT·ORDER·CONVERSATION·CHANGE_PASSWORD만 노출하고 필터 입력도 그 범위만 받는다. */
+export type AuditTargetType =
+  /** 계정(관리자·판매자 생성, 정지/복구, 비밀번호 초기화). */
+  | 'ACCOUNT'
+  /** 플랫폼 배너. */
+  | 'BANNER'
+  /** 카테고리 마스터. */
+  | 'CATEGORY'
+  /** 비밀번호 변경. targetId는 바꾼 계정 ID. */
+  | 'CHANGE_PASSWORD'
+  /** 구매자 문의 대화. */
+  | 'CONVERSATION'
+  /** 관리자 알림 발송. */
+  | 'NOTIFICATION'
+  /** 주문 상태 변경. */
+  | 'ORDER'
+  /** 상품과 그 하위. */
+  | 'PRODUCT'
+  /** 지역 마스터. */
+  | 'REGION'
+  /** 리뷰 강제 삭제. */
+  | 'REVIEW'
+  /** 리뷰 댓글 강제 삭제. */
+  | 'REVIEW_COMMENT'
+  /** 신고 처리. */
+  | 'REVIEW_REPORT'
+  /** 검색 진입 화면 키워드 바로가기 칩. 순서 변경은 순서가 바뀐 칩마다 1건씩 남는다. */
+  | 'SEARCH_KEYWORD_CHIP'
+  /** 매장 설정·콘텐츠. */
+  | 'STORE'
+  /** 태그 마스터. */
+  | 'TAG';
+
 /** 상품 카테고리 분류. */
 export type CategoryType =
   /** 상황·이벤트 기준 분류(생일, 기념일 등). 홈 화면 칩에는 이 분류만 노출된다. */
@@ -81,6 +125,22 @@ export type ProductReviewsInput = {
   sort?: ReviewSort | null | undefined;
 };
 
+/** 리뷰 댓글 목록 조회 조건. */
+export type ReviewCommentsInput = {
+  /** 이전 페이지 마지막 댓글 id(이후부터 조회). */
+  cursor?: string | null | undefined;
+  /** 한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
+  reviewId: string | number;
+};
+
+/** 리뷰 첨부 미디어 종류. */
+export type ReviewMediaType =
+  /** 이미지. */
+  | 'IMAGE'
+  /** 동영상. thumbnailUrl이 있으면 대표 프레임으로 쓰지만 필수가 아니라 없을 수 있다. */
+  | 'VIDEO';
+
 /** 리뷰 목록 정렬. 상품 리뷰·매장 리뷰가 공용으로 쓴다. */
 export type ReviewSort =
   /** 최신순. */
@@ -103,6 +163,28 @@ export type SellerAddProductImageInput = {
   productId: string | number;
   /** 노출 순서. 미지정 시 맨 뒤에 붙는다. */
   sortOrder?: number | null | undefined;
+};
+
+/** 감사 로그 조회 조건. */
+export type SellerAuditLogListInput = {
+  /** 이전 응답의 nextCursor. 첫 페이지는 생략한다. */
+  cursor?: string | null | undefined;
+  /** 한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
+  /** 대상 종류 필터. 미지정 시 전체. */
+  targetType?: AuditTargetType | null | undefined;
+};
+
+/** FAQ 항목 생성 입력. */
+export type SellerCreateFaqTopicInput = {
+  /** FAQ 답변 본문(HTML). */
+  answerHtml: string;
+  /** 노출 여부. 기본 true. */
+  isActive?: boolean | null | undefined;
+  /** 노출 순서. 오름차순이고 같으면 id 오름차순. 미지정 시 0이라 기존이 모두 0이면 맨 뒤에 온다. */
+  sortOrder?: number | null | undefined;
+  /** FAQ 질문 제목. */
+  title: string;
 };
 
 /** 옵션 그룹 생성 입력. */
@@ -277,6 +359,19 @@ export type SellerTagSearchInput = {
   limit?: number | null | undefined;
 };
 
+/** FAQ 항목 수정 입력. 전달한 필드만 변경된다(부분 수정). */
+export type SellerUpdateFaqTopicInput = {
+  /** FAQ 답변 본문(HTML). */
+  answerHtml?: string | null | undefined;
+  /** 노출 여부. */
+  isActive?: boolean | null | undefined;
+  /** 노출 순서. */
+  sortOrder?: number | null | undefined;
+  /** FAQ 질문 제목. */
+  title?: string | null | undefined;
+  topicId: string | number;
+};
+
 /**
  * 주문 상태 변경 입력. 전이 규칙은 OrderStatusType 설명을 따르며, 규칙에 어긋나면
  * BAD_USER_INPUT으로 거절된다.
@@ -378,6 +473,32 @@ export type StoreMapProvider =
   | 'NAVER'
   /** 지도 연결 없음. 지도 진입 동선을 노출하지 않는다. */
   | 'NONE';
+
+/** 매장 상품 목록 조회 조건. 필터는 AND로 결합된다. */
+export type StoreProductsInput = {
+  /** 특정 카테고리 섹션만. 비우면 전체. */
+  categoryId?: string | number | null | undefined;
+  /** 이전 페이지 마지막 항목 id(이후부터 조회). */
+  cursor?: string | null | undefined;
+  /** 한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
+  /** 매장 내 상품명·태그 검색어. */
+  search?: string | null | undefined;
+  storeId: string | number;
+};
+
+/** 매장 리뷰 목록 조회 조건. */
+export type StoreReviewsInput = {
+  /** 이전 페이지의 nextCursor 값(불투명 토큰). 동일 sort에서만 유효. */
+  cursor?: string | null | undefined;
+  /** 한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
+  /** true면 사진(미디어) 있는 리뷰만(사진후기 그리드). */
+  photoOnly?: boolean | null | undefined;
+  /** 정렬 기준. 기본 최신순. 정렬을 바꾸면 기존 cursor는 무효다. */
+  sort?: ReviewSort | null | undefined;
+  storeId: string | number;
+};
 
 /**
  * 업로드 용도. 용도마다 저장 경로가 다르고, 저장 입력은 같은 용도로 발급된 URL만 받는다.
@@ -589,6 +710,57 @@ export type SellerProductTagSearchQueryVariables = Exact<{
 
 export type SellerProductTagSearchQuery = { sellerSearchTags: Array<{ id: string, name: string, isExactMatch: boolean, productCount: number }> };
 
+export type SellerReviewMediaFieldsFragment = { mediaType: ReviewMediaType, mediaUrl: string, thumbnailUrl: string | null, sortOrder: number };
+
+export type SellerReviewsListQueryVariables = Exact<{
+  input: StoreReviewsInput;
+}>;
+
+
+export type SellerReviewsListQuery = { storeReviews: { totalCount: number, photoTotalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, rating: number, content: string | null, likeCount: number, authorNickname: string | null, productName: string, createdAt: string, media: Array<{ mediaType: ReviewMediaType, mediaUrl: string, thumbnailUrl: string | null, sortOrder: number }> }> } };
+
+export type SellerReviewsDetailQueryVariables = Exact<{
+  reviewId: string | number;
+}>;
+
+
+export type SellerReviewsDetailQuery = { reviewDetail: { review: { id: string, rating: number, content: string | null, likeCount: number, commentCount: number, authorNickname: string | null, createdAt: string, media: Array<{ mediaType: ReviewMediaType, mediaUrl: string, thumbnailUrl: string | null, sortOrder: number }>, customOptions: Array<{ groupName: string, optionTitle: string }> }, product: { productId: string, name: string, thumbnailUrl: string | null, regularPrice: number, salePrice: number | null } } };
+
+export type SellerReviewsCommentsQueryVariables = Exact<{
+  input: ReviewCommentsInput;
+}>;
+
+
+export type SellerReviewsCommentsQuery = { reviewComments: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, content: string, authorNickname: string | null, createdAt: string }> } };
+
+export type SellerStoreAuditLogsQueryVariables = Exact<{
+  input?: SellerAuditLogListInput | null | undefined;
+}>;
+
+
+export type SellerStoreAuditLogsQuery = { sellerAuditLogs: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, targetType: AuditTargetType, targetId: string, action: AuditActionType, beforeJson: string | null, afterJson: string | null, createdAt: string }> } };
+
+export type SellerStoreCreateFaqTopicMutationVariables = Exact<{
+  input: SellerCreateFaqTopicInput;
+}>;
+
+
+export type SellerStoreCreateFaqTopicMutation = { sellerCreateFaqTopic: { id: string } };
+
+export type SellerStoreUpdateFaqTopicMutationVariables = Exact<{
+  input: SellerUpdateFaqTopicInput;
+}>;
+
+
+export type SellerStoreUpdateFaqTopicMutation = { sellerUpdateFaqTopic: { id: string } };
+
+export type SellerStoreDeleteFaqTopicMutationVariables = Exact<{
+  topicId: string | number;
+}>;
+
+
+export type SellerStoreDeleteFaqTopicMutation = { sellerDeleteFaqTopic: boolean };
+
 export type SellerStoreFieldsFragment = { id: string, storeName: string, storePhone: string, addressFull: string, addressCity: string | null, addressDistrict: string | null, addressNeighborhood: string | null, mapProvider: StoreMapProvider, websiteUrl: string | null, businessHoursText: string | null, profileImageUrl: string | null, greetingMessage: string | null, pickupSlotIntervalMinutes: number, minLeadTimeMinutes: number, maxDaysAhead: number, isActive: boolean };
 
 export type SellerStoreMyStoreQueryVariables = Exact<{ [key: string]: never; }>;
@@ -628,6 +800,27 @@ export type SellerStoreFaqTopicsQueryVariables = Exact<{ [key: string]: never; }
 
 
 export type SellerStoreFaqTopicsQuery = { sellerFaqTopics: Array<{ id: string, storeId: string, title: string, answerHtml: string, sortOrder: number, isActive: boolean, createdAt: string, updatedAt: string }> };
+
+export type SellerStorePreviewDetailQueryVariables = Exact<{
+  storeId: string | number;
+}>;
+
+
+export type SellerStorePreviewDetailQuery = { storeDetail: { id: string, storeName: string, regionLabel: string | null, ratingAverage: number, reviewCount: number, images: Array<string> }, storeProductCategories: Array<{ id: string, name: string, sortOrder: number, productCount: number }> };
+
+export type SellerStorePreviewProductsQueryVariables = Exact<{
+  input: StoreProductsInput;
+}>;
+
+
+export type SellerStorePreviewProductsQuery = { storeProducts: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ product: { id: string, name: string, thumbnailUrl: string | null, regularPrice: number, salePrice: number | null, discountRate: number } }> } };
+
+export type SellerStorePreviewProductQueryVariables = Exact<{
+  productId: string | number;
+}>;
+
+
+export type SellerStorePreviewProductQuery = { productDetail: { id: string, name: string, description: string | null, purchaseNotice: string | null, images: Array<string>, regularPrice: number, salePrice: number | null, discountRate: number } };
 
 export type SellerStoreRegionGroupsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -748,6 +941,14 @@ export class TypedDocumentString<TResult, TVariables>
     return this.value;
   }
 }
+export const SellerReviewMediaFieldsFragmentDoc = new TypedDocumentString(`
+    fragment SellerReviewMediaFields on ReviewMedia {
+  mediaType
+  mediaUrl
+  thumbnailUrl
+  sortOrder
+}
+    `, {"fragmentName":"SellerReviewMediaFields"}) as unknown as TypedDocumentString<SellerReviewMediaFieldsFragment, unknown>;
 export const SellerStoreFieldsFragmentDoc = new TypedDocumentString(`
     fragment SellerStoreFields on SellerStore {
   id
@@ -1215,6 +1416,119 @@ export const SellerProductTagSearchDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerProductTagSearchQuery, SellerProductTagSearchQueryVariables>;
+export const SellerReviewsListDocument = new TypedDocumentString(`
+    query SellerReviewsList($input: StoreReviewsInput!) {
+  storeReviews(input: $input) {
+    items {
+      id
+      rating
+      content
+      media {
+        ...SellerReviewMediaFields
+      }
+      likeCount
+      authorNickname
+      productName
+      createdAt
+    }
+    totalCount
+    photoTotalCount
+    hasMore
+    nextCursor
+  }
+}
+    fragment SellerReviewMediaFields on ReviewMedia {
+  mediaType
+  mediaUrl
+  thumbnailUrl
+  sortOrder
+}`) as unknown as TypedDocumentString<SellerReviewsListQuery, SellerReviewsListQueryVariables>;
+export const SellerReviewsDetailDocument = new TypedDocumentString(`
+    query SellerReviewsDetail($reviewId: ID!) {
+  reviewDetail(reviewId: $reviewId) {
+    review {
+      id
+      rating
+      content
+      media {
+        ...SellerReviewMediaFields
+      }
+      likeCount
+      commentCount
+      authorNickname
+      customOptions {
+        groupName
+        optionTitle
+      }
+      createdAt
+    }
+    product {
+      productId
+      name
+      thumbnailUrl
+      regularPrice
+      salePrice
+    }
+  }
+}
+    fragment SellerReviewMediaFields on ReviewMedia {
+  mediaType
+  mediaUrl
+  thumbnailUrl
+  sortOrder
+}`) as unknown as TypedDocumentString<SellerReviewsDetailQuery, SellerReviewsDetailQueryVariables>;
+export const SellerReviewsCommentsDocument = new TypedDocumentString(`
+    query SellerReviewsComments($input: ReviewCommentsInput!) {
+  reviewComments(input: $input) {
+    items {
+      id
+      content
+      authorNickname
+      createdAt
+    }
+    totalCount
+    hasMore
+    nextCursor
+  }
+}
+    `) as unknown as TypedDocumentString<SellerReviewsCommentsQuery, SellerReviewsCommentsQueryVariables>;
+export const SellerStoreAuditLogsDocument = new TypedDocumentString(`
+    query SellerStoreAuditLogs($input: SellerAuditLogListInput) {
+  sellerAuditLogs(input: $input) {
+    items {
+      id
+      targetType
+      targetId
+      action
+      beforeJson
+      afterJson
+      createdAt
+    }
+    totalCount
+    hasMore
+    nextCursor
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreAuditLogsQuery, SellerStoreAuditLogsQueryVariables>;
+export const SellerStoreCreateFaqTopicDocument = new TypedDocumentString(`
+    mutation SellerStoreCreateFaqTopic($input: SellerCreateFaqTopicInput!) {
+  sellerCreateFaqTopic(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreCreateFaqTopicMutation, SellerStoreCreateFaqTopicMutationVariables>;
+export const SellerStoreUpdateFaqTopicDocument = new TypedDocumentString(`
+    mutation SellerStoreUpdateFaqTopic($input: SellerUpdateFaqTopicInput!) {
+  sellerUpdateFaqTopic(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreUpdateFaqTopicMutation, SellerStoreUpdateFaqTopicMutationVariables>;
+export const SellerStoreDeleteFaqTopicDocument = new TypedDocumentString(`
+    mutation SellerStoreDeleteFaqTopic($topicId: ID!) {
+  sellerDeleteFaqTopic(topicId: $topicId)
+}
+    `) as unknown as TypedDocumentString<SellerStoreDeleteFaqTopicMutation, SellerStoreDeleteFaqTopicMutationVariables>;
 export const SellerStoreMyStoreDocument = new TypedDocumentString(`
     query SellerStoreMyStore {
   sellerMyStore {
@@ -1318,6 +1632,57 @@ export const SellerStoreFaqTopicsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerStoreFaqTopicsQuery, SellerStoreFaqTopicsQueryVariables>;
+export const SellerStorePreviewDetailDocument = new TypedDocumentString(`
+    query SellerStorePreviewDetail($storeId: ID!) {
+  storeDetail(storeId: $storeId) {
+    id
+    storeName
+    regionLabel
+    ratingAverage
+    reviewCount
+    images
+  }
+  storeProductCategories(storeId: $storeId) {
+    id
+    name
+    sortOrder
+    productCount
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStorePreviewDetailQuery, SellerStorePreviewDetailQueryVariables>;
+export const SellerStorePreviewProductsDocument = new TypedDocumentString(`
+    query SellerStorePreviewProducts($input: StoreProductsInput!) {
+  storeProducts(input: $input) {
+    items {
+      product {
+        id
+        name
+        thumbnailUrl
+        regularPrice
+        salePrice
+        discountRate
+      }
+    }
+    totalCount
+    hasMore
+    nextCursor
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStorePreviewProductsQuery, SellerStorePreviewProductsQueryVariables>;
+export const SellerStorePreviewProductDocument = new TypedDocumentString(`
+    query SellerStorePreviewProduct($productId: ID!) {
+  productDetail(productId: $productId) {
+    id
+    name
+    description
+    purchaseNotice
+    images
+    regularPrice
+    salePrice
+    discountRate
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStorePreviewProductQuery, SellerStorePreviewProductQueryVariables>;
 export const SellerStoreRegionGroupsDocument = new TypedDocumentString(`
     query SellerStoreRegionGroups {
   regionGroups {

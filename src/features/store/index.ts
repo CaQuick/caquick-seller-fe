@@ -11,3 +11,4 @@ export {
   StorePreviewScreen,
   StoreSpecialClosuresScreen,
 } from './ui/screens';
+export { storeRatingQueryOptions } from './api/my-store';

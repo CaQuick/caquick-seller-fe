@@ -1,4 +1,5 @@
 export interface ReviewListFilter {
+  storeId?: string;
   photoOnly?: boolean;
   sort?: string;
 }
