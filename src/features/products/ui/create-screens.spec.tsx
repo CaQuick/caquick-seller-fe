@@ -209,7 +209,7 @@ describe('1/3 기본 정보', () => {
     const calls = presign((n) => n === 2);
     picked('file:///a.jpg', 'file:///b.jpg');
     await openCreate();
-    await fireEvent.press(await screen.findByRole('button', { name: '이미지 추가 (0/5)' }));
+    await fireEvent.press(await screen.findByRole('button', { name: '이미지 추가 (0/6)' }));
     expect(await screen.findByRole('button', { name: '상품 이미지 2 다시 올리기' })).toBeTruthy();
     expect(toast.error).toHaveBeenCalledWith('잠시 후 다시 시도해 주세요.');
     expect(calls.map((c) => (c.input as { purpose: string }).purpose)).toEqual([
@@ -226,7 +226,7 @@ describe('1/3 기본 정보', () => {
       'https://cdn/3.jpg',
     ]);
     await fireEvent.press(screen.getByRole('button', { name: '상품 이미지 1 삭제' }));
-    expect(screen.getByRole('button', { name: '이미지 추가 (1/5)' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '이미지 추가 (1/6)' })).toBeTruthy();
   });
 
   it('필수값을 채우면 2/3으로 넘어간다', async () => {
@@ -234,7 +234,7 @@ describe('1/3 기본 정보', () => {
     picked('file:///a.jpg');
     const router = openCreate();
     await router;
-    await fireEvent.press(await screen.findByRole('button', { name: '이미지 추가 (0/5)' }));
+    await fireEvent.press(await screen.findByRole('button', { name: '이미지 추가 (0/6)' }));
     await fireEvent.changeText(screen.getByLabelText('상품명'), '그림일기 케이크');
     await fireEvent.changeText(screen.getByLabelText('정가'), '35000');
     await waitFor(() => expect(useDraftStore.getState().draft.images[0]?.status).toBe('done'));

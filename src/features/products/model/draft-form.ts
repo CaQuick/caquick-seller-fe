@@ -3,8 +3,8 @@ import { formatNumber } from '@/shared/lib/format';
 
 import { type ProductDraft } from './draft-store';
 
-/** BE MAX_PRODUCT_IMAGES. 6장째는 sellerAddProductImage가 거절한다 */
-export const MAX_IMAGES = 5;
+/** BE MAX_PRODUCT_IMAGES와 같다 — 넘치면 sellerAddProductImage가 거절한다 */
+export const MAX_IMAGES = 6;
 export const MAX_TAGS = 20;
 const MAX_TAG_LENGTH = 80;
 const MAX_PRICE = 1_000_000_000;
