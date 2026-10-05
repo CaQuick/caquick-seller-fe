@@ -12,7 +12,7 @@ import { type LoginValues, loginSchema } from '../model/password-rules';
 import { login } from '../model/session';
 import { useSessionStore } from '../model/session-store';
 import { AuthField, SubmitButton } from './form-field';
-import logo from './caquick-logo.png';
+import logo from '../../../../assets/images/caquick-logo.png';
 
 interface Failure {
   code: string | null;
