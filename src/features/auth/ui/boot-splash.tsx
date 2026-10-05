@@ -6,7 +6,7 @@ import { Button } from '@/shared/ui';
 
 import { AUTH_COPY } from '../model/messages';
 import { useSessionBootstrap } from '../model/use-session-bootstrap';
-import logo from './caquick-logo.png';
+import logo from '../../../../assets/images/caquick-logo.png';
 
 /** 1초 안에 끝나는 부팅에는 점을 보여 주지 않는다 */
 const DOTS_DELAY_MS = 1_000;
