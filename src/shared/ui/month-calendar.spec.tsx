@@ -57,6 +57,25 @@ describe('MonthCalendar', () => {
     expect(onSelectDay).not.toHaveBeenCalled();
   });
 
+  it('isDisabled인 달 안 날짜도 앞뒤 달처럼 꺼진다', async () => {
+    const onSelectDay = jest.fn();
+    await render(
+      <MonthCalendar
+        month={OCT}
+        onMonthChange={jest.fn()}
+        days={{ '2026-10-05': { caption: '12' }, '2026-10-06': { caption: '12' } }}
+        isDisabled={(ymd) => ymd < '2026-10-06'}
+        onSelectDay={onSelectDay}
+      />,
+    );
+    const past = screen.getByRole('button', { name: '10월 5일' });
+    expect(past).toBeDisabled();
+    await fireEvent.press(past);
+    expect(onSelectDay).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole('button', { name: '10월 6일, 12' }));
+    expect(onSelectDay).toHaveBeenCalledWith('2026-10-06');
+  });
+
   it('이전·다음 달 버튼은 연 경계를 넘겨 넘긴다', async () => {
     const onMonthChange = jest.fn();
     await render(<MonthCalendar month={{ y: 2026, m: 12 }} onMonthChange={onMonthChange} />);

@@ -30,6 +30,8 @@ interface Props {
   onSelectDay?: (ymd: string) => void;
   /** 범례에 보일 항목 */
   legend?: readonly ('sel' | 'off' | 'full')[];
+  /** 달 안이어도 고를 수 없는 날(지난 날짜 등) — 앞뒤 달 날짜처럼 흐리게 둔다 */
+  isDisabled?: (ymd: string) => boolean;
 }
 
 const CELL: Record<
@@ -57,6 +59,7 @@ export function MonthCalendar({
   today,
   onSelectDay,
   legend,
+  isDisabled,
 }: Props) {
   const todayYmd = today ? formatYmd(today) : null;
   const cells = monthGrid(month);
@@ -101,8 +104,9 @@ export function MonthCalendar({
           <View key={week} className="flex-row">
             {cells.slice(week * 7, week * 7 + 7).map((cell) => {
               const ymd = formatYmd(cell);
-              const info = cell.inMonth ? days[ymd] : undefined;
-              const isSel = cell.inMonth && selected.includes(ymd);
+              const active = cell.inMonth && !isDisabled?.(ymd);
+              const info = active ? days[ymd] : undefined;
+              const isSel = active && selected.includes(ymd);
               const look = CELL[isSel ? 'sel' : (info?.state ?? 'none')];
               const stateLabel = info?.state && STATE_LABEL[info.state];
               const label = [
@@ -117,20 +121,17 @@ export function MonthCalendar({
                   key={ymd}
                   accessibilityRole="button"
                   accessibilityLabel={label}
-                  accessibilityState={{ selected: isSel, disabled: !cell.inMonth }}
-                  disabled={!cell.inMonth || !onSelectDay}
+                  accessibilityState={{ selected: isSel, disabled: !active }}
+                  disabled={!active || !onSelectDay}
                   onPress={() => onSelectDay?.(ymd)}
                   className={cn(
                     'h-11 flex-1 items-center justify-center gap-px rounded-md',
-                    cell.inMonth && look.box,
+                    active && look.box,
                     ymd === todayYmd && !isSel && 'border border-primary',
                   )}
                 >
                   <Text
-                    className={cn(
-                      'font-sans text-base',
-                      cell.inMonth ? look.text : 'text-placeholder2',
-                    )}
+                    className={cn('font-sans text-base', active ? look.text : 'text-placeholder2')}
                   >
                     {cell.d}
                   </Text>
