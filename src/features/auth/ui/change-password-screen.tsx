@@ -14,7 +14,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApiError, isForbiddenCode, messageFor } from '@/shared/api';
-import { showToast } from '@/shared/ui';
+import { colors } from '@/shared/config/tokens';
+import { Icon, showToast } from '@/shared/ui';
 
 import { AUTH_COPY } from '../model/messages';
 import { type ChangePasswordValues, changePasswordSchema } from '../model/password-rules';
@@ -85,7 +86,7 @@ export function ChangePasswordScreen() {
         <View style={{ paddingTop: insets.top + 8 }}>
           <Text
             accessibilityRole="header"
-            className="text-text-3 h-11 text-center font-sans text-2xl font-bold leading-[44px] tracking-tighter"
+            className="h-11 text-center font-sans text-2xl font-bold leading-[44px] tracking-tighter text-text3"
           >
             비밀번호 변경
           </Text>
@@ -93,10 +94,21 @@ export function ChangePasswordScreen() {
       ) : null}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerClassName="px-5 pb-6">
         {forced ? (
-          <View className="bg-tint-2 mt-6 rounded-lg p-3">
-            <Text className="text-text-3 font-sans text-sm leading-[19px] tracking-tight">
-              {AUTH_COPY.forcedChange}
-            </Text>
+          // 화면 바탕(bg)과 거의 같은 tint2(대비 1.03:1) 대신 tint로 — 첫 화면에서 바로 눈에 띄어야 한다
+          <View
+            testID="forced-notice"
+            accessible
+            className="mt-6 flex-row gap-2.5 rounded-lg bg-tint px-4 py-3.5"
+          >
+            <Icon name="alert" size={18} color={colors.primaryStrong} />
+            <View className="flex-1 gap-1">
+              <Text className="font-sans text-md font-semibold leading-[20px] tracking-tight text-text3">
+                {AUTH_COPY.forcedTitle}
+              </Text>
+              <Text className="font-sans text-sm leading-[19px] tracking-tight text-label">
+                {AUTH_COPY.forcedBody}
+              </Text>
+            </View>
           </View>
         ) : null}
         <View className={forced ? 'mt-[18px] gap-[18px]' : 'mt-[38px] gap-[18px]'}>

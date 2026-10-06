@@ -65,7 +65,7 @@ export function LoginScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 72 }}
       >
         {__DEV__ && DevLoginEntry ? <DevLoginEntry>{brand}</DevLoginEntry> : brand}
-        <Text className="text-text-2 mt-[18px] font-sans text-5xl font-bold leading-[32px] tracking-tighter">
+        <Text className="mt-[18px] font-sans text-5xl font-bold leading-[32px] tracking-tighter text-text2">
           판매자 로그인
         </Text>
         <Text className="mt-1.5 font-sans text-base tracking-tight text-muted">
