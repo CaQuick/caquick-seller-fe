@@ -23,6 +23,7 @@ describe('쿼리 키', () => {
       ['products', 'list', { isActive: true }],
     ],
     ['products.detail', productsKeys.detail('1'), ['products', 'detail', '1']],
+    ['products.manage', productsKeys.manage('1'), ['products', 'detail', '1', 'manage']],
     ['products.categories', productsKeys.categories(), ['products', 'categories']],
     ['products.tagSearch', productsKeys.tagSearch('케이크'), ['products', 'tags', '케이크']],
     ['push.permission', pushKeys.permission(), ['push', 'permission']],

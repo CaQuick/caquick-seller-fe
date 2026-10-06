@@ -336,6 +336,46 @@ export type SellerRegisterPushTokenInput = {
 };
 
 /**
+ * 옵션 그룹 순서 변경 입력. 배열 순서가 곧 새 노출 순서이고, 해당 상품의 그룹
+ * 전부를 빠짐없이 담아야 한다.
+ */
+export type SellerReorderOptionGroupsInput = {
+  /** 새 순서대로 나열한 옵션 그룹 ID 전체. */
+  optionGroupIds: Array<string | number>;
+  productId: string | number;
+};
+
+/**
+ * 옵션 선택지 순서 변경 입력. 배열 순서가 곧 새 노출 순서이고, 해당 그룹의 선택지
+ * 전부를 빠짐없이 담아야 한다.
+ */
+export type SellerReorderOptionItemsInput = {
+  optionGroupId: string | number;
+  /** 새 순서대로 나열한 선택지 ID 전체. */
+  optionItemIds: Array<string | number>;
+};
+
+/**
+ * 커스텀 문구 슬롯 순서 변경 입력. 배열 순서가 곧 새 노출 순서이고, 해당 템플릿의
+ * 슬롯 전부를 빠짐없이 담아야 한다.
+ */
+export type SellerReorderProductCustomTextTokensInput = {
+  templateId: string | number;
+  /** 새 순서대로 나열한 슬롯 ID 전체. */
+  tokenIds: Array<string | number>;
+};
+
+/**
+ * 상품 이미지 순서 변경 입력. 배열 순서가 곧 새 노출 순서다.
+ * 현재 이미지 전부를 빠짐없이 담아야 하며, 개수가 다르거나 남의 이미지 ID가 섞이면 BAD_USER_INPUT.
+ */
+export type SellerReorderProductImagesInput = {
+  /** 새 순서대로 나열한 이미지 ID 전체. */
+  imageIds: Array<string | number>;
+  productId: string | number;
+};
+
+/**
  * 판매자 메시지 발송 입력. bodyFormat에 맞는 본문 필드가 비어 있으면 BAD_USER_INPUT.
  * 내 매장의 대화방이 아니면 NOT_FOUND.
  */
@@ -364,6 +404,13 @@ export type SellerSetProductCategoriesInput = {
   /** 연결할 카테고리 ID 전체. */
   categoryIds: Array<string | number>;
   productId: string | number;
+};
+
+/** 커스텀 템플릿 활성 상태 변경 입력. */
+export type SellerSetProductCustomTemplateActiveInput = {
+  /** true면 구매자 화면에 커스텀 입력이 열린다. */
+  isActive: boolean;
+  templateId: string | number;
 };
 
 /** 이름 기반 태그 연결 설정 입력. 전달한 목록으로 통째로 교체한다. */
@@ -403,6 +450,46 @@ export type SellerUpdateFaqTopicInput = {
   topicId: string | number;
 };
 
+/** 옵션 그룹 수정 입력. 전달한 필드만 변경된다(부분 수정). */
+export type SellerUpdateOptionGroupInput = {
+  /** 그룹 안내 문구. */
+  description?: string | null | undefined;
+  /** 노출 여부. */
+  isActive?: boolean | null | undefined;
+  /** 필수 선택 여부. false면 0개 선택도 허용된다. */
+  isRequired?: boolean | null | undefined;
+  /** 최대 선택 개수. */
+  maxSelect?: number | null | undefined;
+  /** 최소 선택 개수. */
+  minSelect?: number | null | undefined;
+  /** 그룹명. */
+  name?: string | null | undefined;
+  optionGroupId: string | number;
+  /** 구매자 커스텀 입력(설명)이 필요한 그룹으로 표시한다. 현재는 켜면 해당 옵션 주문이 거절된다. */
+  optionRequiresDescription?: boolean | null | undefined;
+  /** 구매자 커스텀 입력(이미지)이 필요한 그룹으로 표시한다. 현재는 켜면 해당 옵션 주문이 거절된다. */
+  optionRequiresImage?: boolean | null | undefined;
+  /** 노출 순서. */
+  sortOrder?: number | null | undefined;
+};
+
+/** 옵션 선택지 수정 입력. 전달한 필드만 변경된다(부분 수정). */
+export type SellerUpdateOptionItemInput = {
+  /** 선택지 설명. */
+  description?: string | null | undefined;
+  /** 선택지 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT. */
+  imageUrl?: string | null | undefined;
+  /** 노출 여부. */
+  isActive?: boolean | null | undefined;
+  optionItemId: string | number;
+  /** 추가 금액(원). */
+  priceDelta?: number | null | undefined;
+  /** 노출 순서. */
+  sortOrder?: number | null | undefined;
+  /** 선택지 이름. */
+  title?: string | null | undefined;
+};
+
 /**
  * 주문 상태 변경 입력. 전이 규칙은 OrderStatusType 설명을 따르며, 규칙에 어긋나면
  * BAD_USER_INPUT으로 거절된다.
@@ -426,6 +513,27 @@ export type SellerUpdatePickupPolicyInput = {
   minLeadTimeMinutes: number;
   /** 픽업 예약 시간 슬롯 간격(분). */
   pickupSlotIntervalMinutes: number;
+};
+
+/** 상품 수정 입력. 전달한 필드만 변경된다(부분 수정). 노출 여부는 별도 mutation을 쓴다. */
+export type SellerUpdateProductInput = {
+  /** 커스텀 도안의 바탕 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT. */
+  baseDesignImageUrl?: string | null | undefined;
+  /** 통화 코드(ISO 4217, 대문자 3자). KRW 외에는 구매자 주문이 거절된다. */
+  currency?: string | null | undefined;
+  /** 상품 설명. */
+  description?: string | null | undefined;
+  /** 상품명. */
+  name?: string | null | undefined;
+  /** 제작 소요 시간(분). */
+  preparationTimeMinutes?: number | null | undefined;
+  productId: string | number;
+  /** 구매 전 안내 문구. */
+  purchaseNotice?: string | null | undefined;
+  /** 정가(원). */
+  regularPrice?: number | null | undefined;
+  /** 할인가(원). */
+  salePrice?: number | null | undefined;
 };
 
 /**
@@ -459,6 +567,40 @@ export type SellerUpdateStoreBasicInfoInput = {
   storePhone?: string | null | undefined;
   /** 매장 홈페이지·SNS URL. */
   websiteUrl?: string | null | undefined;
+};
+
+/** 커스텀 템플릿 등록·수정 입력. 상품당 1개라 같은 상품에 다시 보내면 덮어쓴다. */
+export type SellerUpsertProductCustomTemplateInput = {
+  /** 문구를 올릴 바탕 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT. */
+  baseImageUrl: string;
+  /** 활성 여부. 기본 true. */
+  isActive?: boolean | null | undefined;
+  productId: string | number;
+};
+
+/** 커스텀 문구 슬롯 등록·수정 입력. */
+export type SellerUpsertProductCustomTextTokenInput = {
+  /** 구매자가 입력하지 않았을 때 쓸 기본 문구. */
+  defaultText: string;
+  /** 문구 영역 높이. */
+  height?: number | null | undefined;
+  /** 필수 입력 여부. 기본 true. */
+  isRequired?: boolean | null | undefined;
+  /** 입력 가능한 최대 글자 수. 기본 30. */
+  maxLength?: number | null | undefined;
+  /** 베이스 이미지 위 가로 위치. 생략 시 배치를 클라이언트가 정한다. */
+  posX?: number | null | undefined;
+  /** 베이스 이미지 위 세로 위치. */
+  posY?: number | null | undefined;
+  /** 입력 화면 노출 순서. 오름차순이고 동률의 순서는 보장하지 않는다. 미지정 시 0. */
+  sortOrder?: number | null | undefined;
+  templateId: string | number;
+  /** 수정할 슬롯 ID. 생략하면 새로 등록한다. */
+  tokenId?: string | number | null | undefined;
+  /** 슬롯 식별 키. 주문 스냅샷에 그대로 남는다. */
+  tokenKey: string;
+  /** 문구 영역 너비. */
+  width?: number | null | undefined;
 };
 
 /**
@@ -740,6 +882,111 @@ export type SellerProductTagSearchQueryVariables = Exact<{
 
 
 export type SellerProductTagSearchQuery = { sellerSearchTags: Array<{ id: string, name: string, isExactMatch: boolean, productCount: number }> };
+
+export type SellerProductManageQueryVariables = Exact<{
+  productId: string | number;
+}>;
+
+
+export type SellerProductManageQuery = { sellerProduct: { id: string, optionGroups: Array<{ id: string, name: string, description: string | null, isRequired: boolean, minSelect: number, maxSelect: number, optionItems: Array<{ id: string, title: string, description: string | null, imageUrl: string | null, priceDelta: number, isActive: boolean }> }>, customTemplate: { id: string, baseImageUrl: string, isActive: boolean, textTokens: Array<{ id: string, tokenKey: string, defaultText: string, maxLength: number, isRequired: boolean, posX: number | null, posY: number | null, width: number | null, height: number | null }> } | null } };
+
+export type SellerProductUpdateMutationVariables = Exact<{
+  input: SellerUpdateProductInput;
+}>;
+
+
+export type SellerProductUpdateMutation = { sellerUpdateProduct: { id: string } };
+
+export type SellerProductDeleteImageMutationVariables = Exact<{
+  imageId: string | number;
+}>;
+
+
+export type SellerProductDeleteImageMutation = { sellerDeleteProductImage: boolean };
+
+export type SellerProductReorderImagesMutationVariables = Exact<{
+  input: SellerReorderProductImagesInput;
+}>;
+
+
+export type SellerProductReorderImagesMutation = { sellerReorderProductImages: Array<{ id: string }> };
+
+export type SellerProductUpdateOptionGroupMutationVariables = Exact<{
+  input: SellerUpdateOptionGroupInput;
+}>;
+
+
+export type SellerProductUpdateOptionGroupMutation = { sellerUpdateOptionGroup: { id: string } };
+
+export type SellerProductDeleteOptionGroupMutationVariables = Exact<{
+  optionGroupId: string | number;
+}>;
+
+
+export type SellerProductDeleteOptionGroupMutation = { sellerDeleteOptionGroup: boolean };
+
+export type SellerProductReorderOptionGroupsMutationVariables = Exact<{
+  input: SellerReorderOptionGroupsInput;
+}>;
+
+
+export type SellerProductReorderOptionGroupsMutation = { sellerReorderOptionGroups: Array<{ id: string }> };
+
+export type SellerProductUpdateOptionItemMutationVariables = Exact<{
+  input: SellerUpdateOptionItemInput;
+}>;
+
+
+export type SellerProductUpdateOptionItemMutation = { sellerUpdateOptionItem: { id: string } };
+
+export type SellerProductDeleteOptionItemMutationVariables = Exact<{
+  optionItemId: string | number;
+}>;
+
+
+export type SellerProductDeleteOptionItemMutation = { sellerDeleteOptionItem: boolean };
+
+export type SellerProductReorderOptionItemsMutationVariables = Exact<{
+  input: SellerReorderOptionItemsInput;
+}>;
+
+
+export type SellerProductReorderOptionItemsMutation = { sellerReorderOptionItems: Array<{ id: string }> };
+
+export type SellerProductUpsertTemplateMutationVariables = Exact<{
+  input: SellerUpsertProductCustomTemplateInput;
+}>;
+
+
+export type SellerProductUpsertTemplateMutation = { sellerUpsertProductCustomTemplate: { id: string } };
+
+export type SellerProductSetTemplateActiveMutationVariables = Exact<{
+  input: SellerSetProductCustomTemplateActiveInput;
+}>;
+
+
+export type SellerProductSetTemplateActiveMutation = { sellerSetProductCustomTemplateActive: { id: string } };
+
+export type SellerProductUpsertTextTokenMutationVariables = Exact<{
+  input: SellerUpsertProductCustomTextTokenInput;
+}>;
+
+
+export type SellerProductUpsertTextTokenMutation = { sellerUpsertProductCustomTextToken: { id: string } };
+
+export type SellerProductDeleteTextTokenMutationVariables = Exact<{
+  tokenId: string | number;
+}>;
+
+
+export type SellerProductDeleteTextTokenMutation = { sellerDeleteProductCustomTextToken: boolean };
+
+export type SellerProductReorderTextTokensMutationVariables = Exact<{
+  input: SellerReorderProductCustomTextTokensInput;
+}>;
+
+
+export type SellerProductReorderTextTokensMutation = { sellerReorderProductCustomTextTokens: Array<{ id: string }> };
 
 export type SellerPushRegisterTokenMutationVariables = Exact<{
   input: SellerRegisterPushTokenInput;
@@ -1473,6 +1720,135 @@ export const SellerProductTagSearchDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerProductTagSearchQuery, SellerProductTagSearchQueryVariables>;
+export const SellerProductManageDocument = new TypedDocumentString(`
+    query SellerProductManage($productId: ID!) {
+  sellerProduct(productId: $productId) {
+    id
+    optionGroups {
+      id
+      name
+      description
+      isRequired
+      minSelect
+      maxSelect
+      optionItems {
+        id
+        title
+        description
+        imageUrl
+        priceDelta
+        isActive
+      }
+    }
+    customTemplate {
+      id
+      baseImageUrl
+      isActive
+      textTokens {
+        id
+        tokenKey
+        defaultText
+        maxLength
+        isRequired
+        posX
+        posY
+        width
+        height
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductManageQuery, SellerProductManageQueryVariables>;
+export const SellerProductUpdateDocument = new TypedDocumentString(`
+    mutation SellerProductUpdate($input: SellerUpdateProductInput!) {
+  sellerUpdateProduct(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductUpdateMutation, SellerProductUpdateMutationVariables>;
+export const SellerProductDeleteImageDocument = new TypedDocumentString(`
+    mutation SellerProductDeleteImage($imageId: ID!) {
+  sellerDeleteProductImage(imageId: $imageId)
+}
+    `) as unknown as TypedDocumentString<SellerProductDeleteImageMutation, SellerProductDeleteImageMutationVariables>;
+export const SellerProductReorderImagesDocument = new TypedDocumentString(`
+    mutation SellerProductReorderImages($input: SellerReorderProductImagesInput!) {
+  sellerReorderProductImages(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductReorderImagesMutation, SellerProductReorderImagesMutationVariables>;
+export const SellerProductUpdateOptionGroupDocument = new TypedDocumentString(`
+    mutation SellerProductUpdateOptionGroup($input: SellerUpdateOptionGroupInput!) {
+  sellerUpdateOptionGroup(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductUpdateOptionGroupMutation, SellerProductUpdateOptionGroupMutationVariables>;
+export const SellerProductDeleteOptionGroupDocument = new TypedDocumentString(`
+    mutation SellerProductDeleteOptionGroup($optionGroupId: ID!) {
+  sellerDeleteOptionGroup(optionGroupId: $optionGroupId)
+}
+    `) as unknown as TypedDocumentString<SellerProductDeleteOptionGroupMutation, SellerProductDeleteOptionGroupMutationVariables>;
+export const SellerProductReorderOptionGroupsDocument = new TypedDocumentString(`
+    mutation SellerProductReorderOptionGroups($input: SellerReorderOptionGroupsInput!) {
+  sellerReorderOptionGroups(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductReorderOptionGroupsMutation, SellerProductReorderOptionGroupsMutationVariables>;
+export const SellerProductUpdateOptionItemDocument = new TypedDocumentString(`
+    mutation SellerProductUpdateOptionItem($input: SellerUpdateOptionItemInput!) {
+  sellerUpdateOptionItem(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductUpdateOptionItemMutation, SellerProductUpdateOptionItemMutationVariables>;
+export const SellerProductDeleteOptionItemDocument = new TypedDocumentString(`
+    mutation SellerProductDeleteOptionItem($optionItemId: ID!) {
+  sellerDeleteOptionItem(optionItemId: $optionItemId)
+}
+    `) as unknown as TypedDocumentString<SellerProductDeleteOptionItemMutation, SellerProductDeleteOptionItemMutationVariables>;
+export const SellerProductReorderOptionItemsDocument = new TypedDocumentString(`
+    mutation SellerProductReorderOptionItems($input: SellerReorderOptionItemsInput!) {
+  sellerReorderOptionItems(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductReorderOptionItemsMutation, SellerProductReorderOptionItemsMutationVariables>;
+export const SellerProductUpsertTemplateDocument = new TypedDocumentString(`
+    mutation SellerProductUpsertTemplate($input: SellerUpsertProductCustomTemplateInput!) {
+  sellerUpsertProductCustomTemplate(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductUpsertTemplateMutation, SellerProductUpsertTemplateMutationVariables>;
+export const SellerProductSetTemplateActiveDocument = new TypedDocumentString(`
+    mutation SellerProductSetTemplateActive($input: SellerSetProductCustomTemplateActiveInput!) {
+  sellerSetProductCustomTemplateActive(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductSetTemplateActiveMutation, SellerProductSetTemplateActiveMutationVariables>;
+export const SellerProductUpsertTextTokenDocument = new TypedDocumentString(`
+    mutation SellerProductUpsertTextToken($input: SellerUpsertProductCustomTextTokenInput!) {
+  sellerUpsertProductCustomTextToken(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductUpsertTextTokenMutation, SellerProductUpsertTextTokenMutationVariables>;
+export const SellerProductDeleteTextTokenDocument = new TypedDocumentString(`
+    mutation SellerProductDeleteTextToken($tokenId: ID!) {
+  sellerDeleteProductCustomTextToken(tokenId: $tokenId)
+}
+    `) as unknown as TypedDocumentString<SellerProductDeleteTextTokenMutation, SellerProductDeleteTextTokenMutationVariables>;
+export const SellerProductReorderTextTokensDocument = new TypedDocumentString(`
+    mutation SellerProductReorderTextTokens($input: SellerReorderProductCustomTextTokensInput!) {
+  sellerReorderProductCustomTextTokens(input: $input) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductReorderTextTokensMutation, SellerProductReorderTextTokensMutationVariables>;
 export const SellerPushRegisterTokenDocument = new TypedDocumentString(`
     mutation SellerPushRegisterToken($input: SellerRegisterPushTokenInput!) {
   sellerRegisterPushToken(input: $input)

@@ -12,4 +12,5 @@ export const productsKeys = {
   categories: () => [...productsKeys.all, 'categories'] as const,
   tagSearch: (keyword: string) => [...productsKeys.all, 'tags', keyword] as const,
   buyerPreview: (id: string) => [...productsKeys.detail(id), 'buyer'] as const,
+  manage: (id: string) => [...productsKeys.detail(id), 'manage'] as const,
 };

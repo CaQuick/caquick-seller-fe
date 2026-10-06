@@ -45,6 +45,21 @@ type Documents = {
     "\n  mutation SellerProductCreateOptionGroup($input: SellerCreateOptionGroupInput!) {\n    sellerCreateOptionGroup(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductCreateOptionGroupDocument,
     "\n  mutation SellerProductCreateOptionItem($input: SellerCreateOptionItemInput!) {\n    sellerCreateOptionItem(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductCreateOptionItemDocument,
     "\n  query SellerProductTagSearch($input: SellerTagSearchInput!) {\n    sellerSearchTags(input: $input) {\n      id\n      name\n      isExactMatch\n      productCount\n    }\n  }\n": typeof types.SellerProductTagSearchDocument,
+    "\n  query SellerProductManage($productId: ID!) {\n    sellerProduct(productId: $productId) {\n      id\n      optionGroups {\n        id\n        name\n        description\n        isRequired\n        minSelect\n        maxSelect\n        optionItems {\n          id\n          title\n          description\n          imageUrl\n          priceDelta\n          isActive\n        }\n      }\n      customTemplate {\n        id\n        baseImageUrl\n        isActive\n        textTokens {\n          id\n          tokenKey\n          defaultText\n          maxLength\n          isRequired\n          posX\n          posY\n          width\n          height\n        }\n      }\n    }\n  }\n": typeof types.SellerProductManageDocument,
+    "\n  mutation SellerProductUpdate($input: SellerUpdateProductInput!) {\n    sellerUpdateProduct(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductUpdateDocument,
+    "\n  mutation SellerProductDeleteImage($imageId: ID!) {\n    sellerDeleteProductImage(imageId: $imageId)\n  }\n": typeof types.SellerProductDeleteImageDocument,
+    "\n  mutation SellerProductReorderImages($input: SellerReorderProductImagesInput!) {\n    sellerReorderProductImages(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductReorderImagesDocument,
+    "\n  mutation SellerProductUpdateOptionGroup($input: SellerUpdateOptionGroupInput!) {\n    sellerUpdateOptionGroup(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductUpdateOptionGroupDocument,
+    "\n  mutation SellerProductDeleteOptionGroup($optionGroupId: ID!) {\n    sellerDeleteOptionGroup(optionGroupId: $optionGroupId)\n  }\n": typeof types.SellerProductDeleteOptionGroupDocument,
+    "\n  mutation SellerProductReorderOptionGroups($input: SellerReorderOptionGroupsInput!) {\n    sellerReorderOptionGroups(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductReorderOptionGroupsDocument,
+    "\n  mutation SellerProductUpdateOptionItem($input: SellerUpdateOptionItemInput!) {\n    sellerUpdateOptionItem(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductUpdateOptionItemDocument,
+    "\n  mutation SellerProductDeleteOptionItem($optionItemId: ID!) {\n    sellerDeleteOptionItem(optionItemId: $optionItemId)\n  }\n": typeof types.SellerProductDeleteOptionItemDocument,
+    "\n  mutation SellerProductReorderOptionItems($input: SellerReorderOptionItemsInput!) {\n    sellerReorderOptionItems(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductReorderOptionItemsDocument,
+    "\n  mutation SellerProductUpsertTemplate($input: SellerUpsertProductCustomTemplateInput!) {\n    sellerUpsertProductCustomTemplate(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductUpsertTemplateDocument,
+    "\n  mutation SellerProductSetTemplateActive($input: SellerSetProductCustomTemplateActiveInput!) {\n    sellerSetProductCustomTemplateActive(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductSetTemplateActiveDocument,
+    "\n  mutation SellerProductUpsertTextToken($input: SellerUpsertProductCustomTextTokenInput!) {\n    sellerUpsertProductCustomTextToken(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductUpsertTextTokenDocument,
+    "\n  mutation SellerProductDeleteTextToken($tokenId: ID!) {\n    sellerDeleteProductCustomTextToken(tokenId: $tokenId)\n  }\n": typeof types.SellerProductDeleteTextTokenDocument,
+    "\n  mutation SellerProductReorderTextTokens($input: SellerReorderProductCustomTextTokensInput!) {\n    sellerReorderProductCustomTextTokens(input: $input) {\n      id\n    }\n  }\n": typeof types.SellerProductReorderTextTokensDocument,
     "\n  mutation SellerPushRegisterToken($input: SellerRegisterPushTokenInput!) {\n    sellerRegisterPushToken(input: $input)\n  }\n": typeof types.SellerPushRegisterTokenDocument,
     "\n  mutation SellerPushUnregisterToken($input: SellerUnregisterPushTokenInput!) {\n    sellerUnregisterPushToken(input: $input)\n  }\n": typeof types.SellerPushUnregisterTokenDocument,
     "\n  fragment SellerReviewMediaFields on ReviewMedia {\n    mediaType\n    mediaUrl\n    thumbnailUrl\n    sortOrder\n  }\n": typeof types.SellerReviewMediaFieldsFragmentDoc,
@@ -114,6 +129,21 @@ const documents: Documents = {
     "\n  mutation SellerProductCreateOptionGroup($input: SellerCreateOptionGroupInput!) {\n    sellerCreateOptionGroup(input: $input) {\n      id\n    }\n  }\n": types.SellerProductCreateOptionGroupDocument,
     "\n  mutation SellerProductCreateOptionItem($input: SellerCreateOptionItemInput!) {\n    sellerCreateOptionItem(input: $input) {\n      id\n    }\n  }\n": types.SellerProductCreateOptionItemDocument,
     "\n  query SellerProductTagSearch($input: SellerTagSearchInput!) {\n    sellerSearchTags(input: $input) {\n      id\n      name\n      isExactMatch\n      productCount\n    }\n  }\n": types.SellerProductTagSearchDocument,
+    "\n  query SellerProductManage($productId: ID!) {\n    sellerProduct(productId: $productId) {\n      id\n      optionGroups {\n        id\n        name\n        description\n        isRequired\n        minSelect\n        maxSelect\n        optionItems {\n          id\n          title\n          description\n          imageUrl\n          priceDelta\n          isActive\n        }\n      }\n      customTemplate {\n        id\n        baseImageUrl\n        isActive\n        textTokens {\n          id\n          tokenKey\n          defaultText\n          maxLength\n          isRequired\n          posX\n          posY\n          width\n          height\n        }\n      }\n    }\n  }\n": types.SellerProductManageDocument,
+    "\n  mutation SellerProductUpdate($input: SellerUpdateProductInput!) {\n    sellerUpdateProduct(input: $input) {\n      id\n    }\n  }\n": types.SellerProductUpdateDocument,
+    "\n  mutation SellerProductDeleteImage($imageId: ID!) {\n    sellerDeleteProductImage(imageId: $imageId)\n  }\n": types.SellerProductDeleteImageDocument,
+    "\n  mutation SellerProductReorderImages($input: SellerReorderProductImagesInput!) {\n    sellerReorderProductImages(input: $input) {\n      id\n    }\n  }\n": types.SellerProductReorderImagesDocument,
+    "\n  mutation SellerProductUpdateOptionGroup($input: SellerUpdateOptionGroupInput!) {\n    sellerUpdateOptionGroup(input: $input) {\n      id\n    }\n  }\n": types.SellerProductUpdateOptionGroupDocument,
+    "\n  mutation SellerProductDeleteOptionGroup($optionGroupId: ID!) {\n    sellerDeleteOptionGroup(optionGroupId: $optionGroupId)\n  }\n": types.SellerProductDeleteOptionGroupDocument,
+    "\n  mutation SellerProductReorderOptionGroups($input: SellerReorderOptionGroupsInput!) {\n    sellerReorderOptionGroups(input: $input) {\n      id\n    }\n  }\n": types.SellerProductReorderOptionGroupsDocument,
+    "\n  mutation SellerProductUpdateOptionItem($input: SellerUpdateOptionItemInput!) {\n    sellerUpdateOptionItem(input: $input) {\n      id\n    }\n  }\n": types.SellerProductUpdateOptionItemDocument,
+    "\n  mutation SellerProductDeleteOptionItem($optionItemId: ID!) {\n    sellerDeleteOptionItem(optionItemId: $optionItemId)\n  }\n": types.SellerProductDeleteOptionItemDocument,
+    "\n  mutation SellerProductReorderOptionItems($input: SellerReorderOptionItemsInput!) {\n    sellerReorderOptionItems(input: $input) {\n      id\n    }\n  }\n": types.SellerProductReorderOptionItemsDocument,
+    "\n  mutation SellerProductUpsertTemplate($input: SellerUpsertProductCustomTemplateInput!) {\n    sellerUpsertProductCustomTemplate(input: $input) {\n      id\n    }\n  }\n": types.SellerProductUpsertTemplateDocument,
+    "\n  mutation SellerProductSetTemplateActive($input: SellerSetProductCustomTemplateActiveInput!) {\n    sellerSetProductCustomTemplateActive(input: $input) {\n      id\n    }\n  }\n": types.SellerProductSetTemplateActiveDocument,
+    "\n  mutation SellerProductUpsertTextToken($input: SellerUpsertProductCustomTextTokenInput!) {\n    sellerUpsertProductCustomTextToken(input: $input) {\n      id\n    }\n  }\n": types.SellerProductUpsertTextTokenDocument,
+    "\n  mutation SellerProductDeleteTextToken($tokenId: ID!) {\n    sellerDeleteProductCustomTextToken(tokenId: $tokenId)\n  }\n": types.SellerProductDeleteTextTokenDocument,
+    "\n  mutation SellerProductReorderTextTokens($input: SellerReorderProductCustomTextTokensInput!) {\n    sellerReorderProductCustomTextTokens(input: $input) {\n      id\n    }\n  }\n": types.SellerProductReorderTextTokensDocument,
     "\n  mutation SellerPushRegisterToken($input: SellerRegisterPushTokenInput!) {\n    sellerRegisterPushToken(input: $input)\n  }\n": types.SellerPushRegisterTokenDocument,
     "\n  mutation SellerPushUnregisterToken($input: SellerUnregisterPushTokenInput!) {\n    sellerUnregisterPushToken(input: $input)\n  }\n": types.SellerPushUnregisterTokenDocument,
     "\n  fragment SellerReviewMediaFields on ReviewMedia {\n    mediaType\n    mediaUrl\n    thumbnailUrl\n    sortOrder\n  }\n": types.SellerReviewMediaFieldsFragmentDoc,
@@ -273,6 +303,66 @@ export function graphql(source: "\n  mutation SellerProductCreateOptionItem($inp
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query SellerProductTagSearch($input: SellerTagSearchInput!) {\n    sellerSearchTags(input: $input) {\n      id\n      name\n      isExactMatch\n      productCount\n    }\n  }\n"): typeof import('./graphql').SellerProductTagSearchDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query SellerProductManage($productId: ID!) {\n    sellerProduct(productId: $productId) {\n      id\n      optionGroups {\n        id\n        name\n        description\n        isRequired\n        minSelect\n        maxSelect\n        optionItems {\n          id\n          title\n          description\n          imageUrl\n          priceDelta\n          isActive\n        }\n      }\n      customTemplate {\n        id\n        baseImageUrl\n        isActive\n        textTokens {\n          id\n          tokenKey\n          defaultText\n          maxLength\n          isRequired\n          posX\n          posY\n          width\n          height\n        }\n      }\n    }\n  }\n"): typeof import('./graphql').SellerProductManageDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductUpdate($input: SellerUpdateProductInput!) {\n    sellerUpdateProduct(input: $input) {\n      id\n    }\n  }\n"): typeof import('./graphql').SellerProductUpdateDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductDeleteImage($imageId: ID!) {\n    sellerDeleteProductImage(imageId: $imageId)\n  }\n"): typeof import('./graphql').SellerProductDeleteImageDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductReorderImages($input: SellerReorderProductImagesInput!) {\n    sellerReorderProductImages(input: $input) {\n      id\n    }\n  }\n"): typeof import('./graphql').SellerProductReorderImagesDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductUpdateOptionGroup($input: SellerUpdateOptionGroupInput!) {\n    sellerUpdateOptionGroup(input: $input) {\n      id\n    }\n  }\n"): typeof import('./graphql').SellerProductUpdateOptionGroupDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductDeleteOptionGroup($optionGroupId: ID!) {\n    sellerDeleteOptionGroup(optionGroupId: $optionGroupId)\n  }\n"): typeof import('./graphql').SellerProductDeleteOptionGroupDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductReorderOptionGroups($input: SellerReorderOptionGroupsInput!) {\n    sellerReorderOptionGroups(input: $input) {\n      id\n    }\n  }\n"): typeof import('./graphql').SellerProductReorderOptionGroupsDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductUpdateOptionItem($input: SellerUpdateOptionItemInput!) {\n    sellerUpdateOptionItem(input: $input) {\n      id\n    }\n  }\n"): typeof import('./graphql').SellerProductUpdateOptionItemDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductDeleteOptionItem($optionItemId: ID!) {\n    sellerDeleteOptionItem(optionItemId: $optionItemId)\n  }\n"): typeof import('./graphql').SellerProductDeleteOptionItemDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductReorderOptionItems($input: SellerReorderOptionItemsInput!) {\n    sellerReorderOptionItems(input: $input) {\n      id\n    }\n  }\n"): typeof import('./graphql').SellerProductReorderOptionItemsDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductUpsertTemplate($input: SellerUpsertProductCustomTemplateInput!) {\n    sellerUpsertProductCustomTemplate(input: $input) {\n      id\n    }\n  }\n"): typeof import('./graphql').SellerProductUpsertTemplateDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductSetTemplateActive($input: SellerSetProductCustomTemplateActiveInput!) {\n    sellerSetProductCustomTemplateActive(input: $input) {\n      id\n    }\n  }\n"): typeof import('./graphql').SellerProductSetTemplateActiveDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductUpsertTextToken($input: SellerUpsertProductCustomTextTokenInput!) {\n    sellerUpsertProductCustomTextToken(input: $input) {\n      id\n    }\n  }\n"): typeof import('./graphql').SellerProductUpsertTextTokenDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductDeleteTextToken($tokenId: ID!) {\n    sellerDeleteProductCustomTextToken(tokenId: $tokenId)\n  }\n"): typeof import('./graphql').SellerProductDeleteTextTokenDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SellerProductReorderTextTokens($input: SellerReorderProductCustomTextTokensInput!) {\n    sellerReorderProductCustomTextTokens(input: $input) {\n      id\n    }\n  }\n"): typeof import('./graphql').SellerProductReorderTextTokensDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
