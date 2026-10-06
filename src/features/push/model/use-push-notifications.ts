@@ -5,11 +5,12 @@ import { useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { onBeforeLogout, useSessionStore } from '@/features/auth';
+import { notifyNewOrder } from '@/features/orders';
 import { showToast } from '@/shared/ui';
 
 import { PUSH_COPY } from './copy';
 import { ensurePushToken, hasPushToken, releasePushToken } from './registration';
-import { hrefFor, parsePushData, shouldToast, staleKeysFor } from './routing';
+import { hrefFor, parsePushData, shouldToastMessage, staleKeysFor } from './routing';
 
 type Session = ReturnType<typeof useSessionStore.getState>;
 const isReady = (s: Session) => s.status === 'authenticated' && !s.mustChangePassword;
@@ -77,10 +78,11 @@ export function usePushNotifications(queryClient: QueryClient) {
       const target = parsePushData(request.content.data);
       if (!target) return;
       for (const queryKey of staleKeysFor(target)) void queryClient.invalidateQueries({ queryKey });
-      if (shouldToast(target, pathRef.current))
-        showToast.info(
-          PUSH_COPY.foreground(request.content.title ?? '', request.content.body ?? ''),
-        );
+      const { title, body } = request.content;
+      // 새 주문은 구독이 먼저 알렸으면 건너뛴다(구독이 끊겼을 때 푸시가 대신 알림)
+      if (target.kind === 'ORDER_SUBMITTED') notifyNewOrder(target.orderId, body ?? '');
+      else if (shouldToastMessage(target.conversationId, pathRef.current))
+        showToast.info(PUSH_COPY.foreground(title ?? '', body ?? ''));
     });
     const response = Notifications.addNotificationResponseReceivedListener((r) => open(r));
     return () => {

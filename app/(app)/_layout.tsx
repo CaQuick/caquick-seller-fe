@@ -1,12 +1,14 @@
 import { Redirect, Stack } from 'expo-router';
 
 import { useSessionStore } from '@/features/auth';
+import { useNewOrderNotices } from '@/features/orders';
 import { colors, fontFamily, fontWeight } from '@/shared/config/tokens';
 
 /** 세션 가드 + 루트 Stack. 상세 화면은 전부 여기(탭 안 중첩 Stack 금지) */
 export default function AppLayout() {
   const status = useSessionStore((s) => s.status);
   const mustChangePassword = useSessionStore((s) => s.mustChangePassword);
+  useNewOrderNotices(status === 'authenticated' && !mustChangePassword);
   if (status === 'unknown') return null;
   if (status === 'anonymous') return <Redirect href="/login" />;
   if (mustChangePassword) return <Redirect href="/change-password" />;

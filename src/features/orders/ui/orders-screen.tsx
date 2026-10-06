@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 
 import { colors } from '@/shared/config/tokens';
-import { formatPickupKst, todayKst } from '@/shared/lib/kst';
+import { todayKst } from '@/shared/lib/kst';
 import {
   Button,
   Chip,
@@ -21,7 +21,6 @@ import {
   SearchBar,
   SectionHeader,
   Segmented,
-  showToast,
   SkeletonRows,
 } from '@/shared/ui';
 
@@ -35,7 +34,6 @@ import {
   type OrderFilters,
   toListVars,
 } from '../model/filters';
-import { type OrderUpdate } from '../model/order-updates';
 import { groupByPickupDay } from '../model/sections';
 import { STATUS_LABEL, STATUS_SEGMENTS } from '../model/status';
 import { useDebouncedValue } from '../model/use-debounced-value';
@@ -50,9 +48,6 @@ const SEGMENTS = [
   ...STATUS_SEGMENTS.map((s) => ({ value: s, label: STATUS_LABEL[s] })),
 ] as const;
 
-const notifyNewOrder = (u: OrderUpdate) =>
-  showToast.info(`새 주문: ${u.productName} · 픽업 ${formatPickupKst(u.pickupAt)}`);
-
 const rangeKey = (r: DateRange | null) => (r ? `${r.from}~${r.to}` : 'none');
 
 export function OrdersScreen() {
@@ -66,7 +61,7 @@ export function OrdersScreen() {
   const pickupSheet = useRef<BottomSheetModal>(null);
   const createdSheet = useRef<BottomSheetModal>(null);
 
-  useOrderUpdates(notifyNewOrder);
+  useOrderUpdates();
   const { refetch } = query;
   const focused = useRef(false);
   useFocusEffect(

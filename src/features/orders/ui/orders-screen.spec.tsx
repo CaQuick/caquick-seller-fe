@@ -248,7 +248,7 @@ describe('OrdersScreen', () => {
     expect(calls).toHaveLength(2);
   });
 
-  it('구독 이벤트로 목록의 주문을 고치고, 오래된 이벤트는 버리며, 새 주문은 토스트와 함께 다시 받는다', async () => {
+  it('구독 이벤트로 목록의 주문을 고치고, 오래된 이벤트는 버리며, 새 주문은 목록을 다시 받는다(토스트는 전역 리스너 몫)', async () => {
     const calls = listHandler(() => page([summary('1')]));
     await open();
     await screen.findByText('케이크 1');
@@ -275,7 +275,7 @@ describe('OrdersScreen', () => {
       pickupAt: '2026-10-12T02:00:00.000Z',
       updatedAt: '2026-10-06T02:00:00.000Z',
     });
-    expect(toast).toHaveBeenCalledWith('새 주문: 딸기 타르트 · 픽업 10/12 11:00');
     await waitFor(() => expect(calls).toHaveLength(2));
+    expect(toast).not.toHaveBeenCalled();
   });
 });

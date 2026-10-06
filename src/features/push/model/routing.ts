@@ -32,11 +32,7 @@ export function staleKeysFor(target: PushTarget): QueryKey[] {
     : [chatsKeys.conversations(), chatsKeys.messages(target.conversationId), homeKeys.all];
 }
 
-/**
- * 포그라운드 수신 때 인앱 토스트를 띄울지. 새 주문은 주문 구독이 이미 알린다.
- * 문의는 채팅 탭(목록 구독이 알림)과 그 대화방에 있을 때를 뺀다
- */
-export function shouldToast(target: PushTarget, pathname: string): boolean {
-  if (target.kind === 'ORDER_SUBMITTED') return false;
-  return pathname !== '/chats' && pathname !== `/chats/${target.conversationId}`;
+/** 포그라운드 문의 토스트를 띄울지. 채팅 탭(목록 구독이 알림)과 그 대화방에 있을 때를 뺀다 */
+export function shouldToastMessage(conversationId: string, pathname: string): boolean {
+  return pathname !== '/chats' && pathname !== `/chats/${conversationId}`;
 }

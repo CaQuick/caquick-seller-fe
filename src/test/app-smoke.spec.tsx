@@ -4,6 +4,8 @@ import { AppState } from 'react-native';
 
 import { useSessionStore } from '@/features/auth';
 import { resetSessionHooks } from '@/shared/api';
+import { subscribe } from '@/shared/api/ws-client';
+import { showToast } from '@/shared/ui';
 import { mockSecureStore } from '@/test/mocks';
 import { gqlOk, restOk } from '@/test/msw/graphql';
 import { server } from '@/test/msw/server';
@@ -157,6 +159,38 @@ describe('앱 셸', () => {
 
     await act(() => Promise.resolve(useSessionStore.getState().clear()));
     await waitFor(() => expect(router.getPathname()).toBe('/login'));
+  });
+
+  it('새 주문은 주문 탭이 아니어도(홈) 앱 전역 리스너가 토스트로 알린다', async () => {
+    mockSecureStore.set('caquick.refreshToken', 'rt');
+    server.use(restOk('/seller/refresh', session()), sellerMe, ...home);
+    // 실제 Toaster는 jest의 reanimated 목에서 그려지지 않는다
+    const info = jest.spyOn(showToast, 'info').mockImplementation(() => 0);
+    await open('/');
+    expect(await screen.findByText('12개')).toBeTruthy();
+    const [, , sink] = jest
+      .mocked(subscribe)
+      .mock.calls.find(([doc]) => doc.toString().includes('subscription SellerOrdersUpdated'))!;
+    await act(() =>
+      Promise.resolve(
+        sink.next({
+          sellerOrderUpdated: {
+            orderId: '77',
+            status: 'SUBMITTED',
+            pickupAt: '2026-10-12T02:00:00.000Z',
+            buyerName: '김다은',
+            totalPrice: 38000,
+            productName: '딸기 타르트',
+            updatedAt: '2026-10-06T02:00:00.000Z',
+          },
+        }),
+      ),
+    );
+    expect(info).toHaveBeenCalledWith(
+      '새 주문: 딸기 타르트 · 픽업 10/12 11:00',
+      expect.any(Function),
+    );
+    info.mockRestore();
   });
 
   it('비밀번호 변경이 강제된 세션은 앱 대신 변경 화면으로 보낸다', async () => {
