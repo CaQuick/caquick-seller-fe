@@ -44,8 +44,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   experiments: { typedRoutes: true },
   plugins: [
     'expo-router',
-    // 64비트 ARM만 — x86류는 에뮬레이터용, 32비트 전용 OS 기기(Android Go 저가폰)는 지원하지 않는다
-    ['expo-build-properties', { android: { buildArchs: ['arm64-v8a'] } }],
+    [
+      'expo-build-properties',
+      {
+        // 64비트 ARM만 — x86류는 에뮬레이터용, 32비트 전용 OS 기기(Android Go 저가폰)는 지원하지 않는다
+        android: { buildArchs: ['arm64-v8a'] },
+        // iOS 27 SDK는 UIScene 생명주기가 없으면 실행을 거부하는데 SDK 57 템플릿은 아직 채택하지 않았다.
+        // Expo의 ExpoAppSceneDelegate로 옮긴다(SDK 58부터는 템플릿 기본이라 경고 후 무시 — 그때 지운다)
+        ios: { enableSceneSupport: true },
+      },
+    ],
     [
       'expo-font',
       {
