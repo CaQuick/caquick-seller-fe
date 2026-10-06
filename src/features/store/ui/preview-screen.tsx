@@ -2,7 +2,6 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
   FlatList,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -19,6 +18,7 @@ import {
   Empty,
   ErrorState,
   Icon,
+  RemoteImage,
   Screen,
   Segmented,
   SkeletonRows,
@@ -56,9 +56,9 @@ function Photo({
   return (
     <View className={cn('items-center justify-center overflow-hidden bg-gray2', className)}>
       {uri ? (
-        <Image
+        <RemoteImage
           accessibilityLabel={label}
-          source={{ uri }}
+          uri={uri}
           style={{ width: '100%', height: '100%' }}
         />
       ) : (

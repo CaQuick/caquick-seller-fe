@@ -1,7 +1,7 @@
-import { Image, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { colors, shadow } from '@/shared/config/tokens';
-import { Icon, Stars } from '@/shared/ui';
+import { Icon, RemoteImage, Stars } from '@/shared/ui';
 
 import { formatReviewDate, mediaThumbs, nicknameOf, type ReviewMediaLike } from '../model/reviews';
 
@@ -70,9 +70,9 @@ export function ReviewCard({ review, productName, options, clamp = false }: Prop
               className="h-16 w-16 items-center justify-center overflow-hidden rounded-md bg-gray2"
             >
               {uri ? (
-                <Image
+                <RemoteImage
                   accessibilityLabel={`리뷰 사진 ${i + 1}`}
-                  source={{ uri }}
+                  uri={uri}
                   style={{ width: 64, height: 64 }}
                 />
               ) : (

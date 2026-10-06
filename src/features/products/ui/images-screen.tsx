@@ -1,12 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import Sortable from 'react-native-sortables';
 
 import { type SellerProductDetailQuery } from '@/graphql/generated/graphql';
 import { messageFor } from '@/shared/api';
 import { colors, radius } from '@/shared/config/tokens';
-import { Icon, showToast } from '@/shared/ui';
+import { Icon, RemoteImage, showToast } from '@/shared/ui';
 
 import { productDetailQueryOptions } from '../api/browse';
 import { addProductImage } from '../api/create';
@@ -150,11 +150,7 @@ function ImagesBody({ product }: { product: Product }) {
           const label = `상품 이미지 ${index + 1}`;
           return (
             <View className="aspect-square overflow-hidden rounded-lg bg-gray2">
-              <Image
-                accessibilityLabel={label}
-                source={{ uri: item.url }}
-                className="h-full w-full"
-              />
+              <RemoteImage accessibilityLabel={label} uri={item.url} className="h-full w-full" />
               {item.kind === 'uploading' || busy === item.key ? (
                 <View
                   accessibilityLabel={`${label} 처리 중`}

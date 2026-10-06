@@ -1,10 +1,10 @@
-import { Image, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { type SellerOrdersListQuery } from '@/graphql/generated/graphql';
 import { colors, shadow } from '@/shared/config/tokens';
 import { formatKrw } from '@/shared/lib/format';
 import { type YmdDate } from '@/shared/lib/kst';
-import { Icon, StatusChip } from '@/shared/ui';
+import { Icon, RemoteImage, StatusChip } from '@/shared/ui';
 
 import { formatPickup } from '../model/format';
 import { STATUS_LABEL, STATUS_TONE } from '../model/status';
@@ -34,8 +34,8 @@ export function OrderRow({
       className="flex-row items-center gap-3.5 rounded-xl bg-surface py-[17px] pl-4 pr-[19px]"
     >
       {order.firstItemImageUrl ? (
-        <Image
-          source={{ uri: order.firstItemImageUrl }}
+        <RemoteImage
+          uri={order.firstItemImageUrl}
           style={{ width: 50, height: 50 }}
           className="rounded-full bg-gray-bg"
         />

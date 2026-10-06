@@ -1,13 +1,13 @@
 import { type BottomSheetModal } from '@gorhom/bottom-sheet';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import Sortable from 'react-native-sortables';
 
 import { messageFor } from '@/shared/api';
 import { colors, shadow } from '@/shared/config/tokens';
 import { cn } from '@/shared/lib/cn';
 import { formatNumber } from '@/shared/lib/format';
-import { ConfirmSheet, Icon, showToast, Switch } from '@/shared/ui';
+import { ConfirmSheet, Icon, RemoteImage, showToast, Switch } from '@/shared/ui';
 
 import { priceText, toDigits } from '../model/draft-form';
 import { pickImages, uploadProductImage } from '../model/draft-images';
@@ -303,7 +303,7 @@ function ItemThumb({
       className={cn('items-center justify-center overflow-hidden rounded-sm bg-gray-bg', className)}
     >
       {item.imageUrl ? (
-        <Image source={{ uri: item.imageUrl }} className="h-full w-full" />
+        <RemoteImage uri={item.imageUrl} className="h-full w-full" />
       ) : (
         <Icon name="add" size={14} color={colors.placeholder} />
       )}

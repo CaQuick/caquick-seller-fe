@@ -33,4 +33,9 @@ describe('ImageThumb', () => {
     await view.rerender(<ImageThumb uri="https://img/1.jpg" label="상품 이미지 1" />);
     expect(screen.queryByRole('button')).toBeNull();
   });
+
+  it('반증: 썸네일은 메모리·디스크 캐시로 그린다(S3 직접 URL, CDN 없음)', async () => {
+    await render(<ImageThumb uri="https://img/1.jpg" label="상품 이미지 1" />);
+    expect(screen.getByLabelText('상품 이미지 1')).toHaveProp('cachePolicy', 'memory-disk');
+  });
 });

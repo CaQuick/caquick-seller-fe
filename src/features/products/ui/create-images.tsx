@@ -1,8 +1,8 @@
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { messageFor } from '@/shared/api';
 import { colors } from '@/shared/config/tokens';
-import { Icon, ImageDropzone, showToast } from '@/shared/ui';
+import { Icon, ImageDropzone, RemoteImage, showToast } from '@/shared/ui';
 
 import { MAX_IMAGES } from '../model/draft-form';
 import { pickImages, uploadDraftImage } from '../model/draft-images';
@@ -67,7 +67,7 @@ function Thumb({
 }) {
   return (
     <View className="h-[82px] w-[82px] overflow-hidden rounded-thumb bg-gray2">
-      <Image accessibilityLabel={label} source={{ uri: image.uri }} className="h-full w-full" />
+      <RemoteImage accessibilityLabel={label} uri={image.uri} className="h-full w-full" />
       {image.status === 'uploading' ? (
         <View
           accessibilityLabel={`${label} 올리는 중`}

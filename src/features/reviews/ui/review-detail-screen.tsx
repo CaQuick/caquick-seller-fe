@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ApiError, messageFor } from '@/shared/api';
 import { colors, shadow } from '@/shared/config/tokens';
@@ -11,6 +11,7 @@ import {
   Empty,
   ErrorState,
   Icon,
+  RemoteImage,
   Screen,
   SectionHeader,
   SkeletonRows,
@@ -43,7 +44,7 @@ function ProductRow({ product, options }: { product: Product; options: string })
     >
       <View className="h-[50px] w-[50px] items-center justify-center overflow-hidden rounded-full bg-gray2">
         {product.thumbnailUrl ? (
-          <Image source={{ uri: product.thumbnailUrl }} style={{ width: 50, height: 50 }} />
+          <RemoteImage uri={product.thumbnailUrl} style={{ width: 50, height: 50 }} />
         ) : (
           <Icon name="products" size={20} color={colors.placeholder} />
         )}

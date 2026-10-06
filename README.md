@@ -36,18 +36,37 @@ pnpm start           # Metro(localhost:8081). 끝나면 종료합니다
 
 코드와 Metro는 맥미니에서 돌리고, 앱은 맥북의 iOS 시뮬레이터에서 띄웁니다.
 
-1. 맥미니에서 백엔드를 `PORT=4100 yarn start:dev`로 띄우고(필요하면 worker도), 이 레포에서 `pnpm start`를 실행합니다.
-2. 맥북에서 포트를 포워딩합니다: `ssh -N -L 8081:127.0.0.1:8081 -L 4100:127.0.0.1:4100 mini`
-3. EAS 클라우드로 받은 dev client `.app`을 시뮬레이터에 설치합니다(`development` 프로필, iOS 시뮬레이터 빌드).
-4. dev client에서 `http://localhost:8081`을 입력하면 `.env.development`의 주소로 로컬 백엔드에 붙습니다.
-5. 세션이 끝나면 Metro와 nest watch를 종료합니다. 맥미니는 운영 호스트입니다.
+1. 맥미니에서 백엔드를 `PORT=4100 yarn start:dev`로 띄우고, 이 레포에서 `pnpm start`를 실행합니다. 구독 이벤트·푸시까지 보려면 백엔드 worker(`APP_ROLE=worker PORT=4101 yarn start:dev`)도 띄웁니다.
+2. 로그인 계정이 없으면 백엔드에서 `SELLER_SEED_PASSWORD=<비밀번호> yarn prisma:seed`를 돌립니다. `seed-seller-a`·`seed-seller-b` 판매자가 생깁니다.
+3. 맥북에서 포트를 포워딩합니다: `ssh -N -L 8081:127.0.0.1:8081 -L 4100:127.0.0.1:4100 mini`
+4. dev client `.app`을 시뮬레이터에 설치합니다. EAS 클라우드의 `development` 프로필(iOS 시뮬레이터 빌드)로 한 번 받으며, Expo 조직 생성과 `eas init`이 먼저입니다.
+5. dev client에서 `http://localhost:8081`을 입력하면 `.env.development`의 주소로 로컬 백엔드에 붙습니다.
+6. 세션이 끝나면 Metro와 nest watch를 종료합니다. 맥미니는 운영 호스트입니다.
+
+`app.config.ts`에 EAS `projectId`가 없는 동안은 푸시 토큰 등록(경고 로그)과 OTA 확인을 건너뜁니다.
+
+## 화면
+
+탭은 홈·주문·상품·채팅·매장 5개이고, 상세 화면은 탭 밖 루트 Stack에 둡니다.
+
+| 영역 | 화면(라우트)                                                                                                                                                                     |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 인증 | 로그인 `/login` · 비밀번호 변경 `/change-password`(강제)·`/settings/change-password`                                                                                             |
+| 홈   | 판매자 홈 `/` — 오늘 현황·최근 주문·상품 등록 FAB                                                                                                                                |
+| 주문 | 목록 `/orders` · 상세 `/orders/[id]`(상태 변경·취소) · 새 주문 토스트(전역)                                                                                                      |
+| 상품 | 목록 `/products` · 상세 `/products/[id]` · 등록 3단계 `/products/new/{basic,options,preview}` · 수정 `edit` · 이미지 `images` · 옵션 `options` · 커스텀 템플릿 `custom-template` |
+| 채팅 | 목록 `/chats` · 채팅방 `/chats/[conversationId]`                                                                                                                                 |
+| 매장 | 매장 탭 `/store` · 기본 정보 · 영업시간 · 특별휴무 · 픽업 정책 · 일별 생산 수량 · 자동응답(FAQ) · 리뷰 · 구매자 화면 미리보기 · 조작 이력(`/store/*`)                            |
+| 설정 | `/settings` — 계정·알림 권한·업데이트 확인·로그아웃                                                                                                                              |
 
 ## 명령어
 
 | 명령                          | 내용                                                                                                         |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `pnpm validate`               | lint → typecheck → codegen:check → knip → test:cov → expo-doctor → expo export. pre-push 훅과 동일합니다     |
-| `pnpm test` / `pnpm test:cov` | Jest(jest-expo). 네트워크는 MSW가 흉내 냅니다                                                                |
+| `pnpm test` / `pnpm test:cov` | Jest(jest-expo). 네트워크는 MSW가 흉내 냅니다. 맥미니에서는 `~/caquick-wt/run-locked.sh`로 돌립니다          |
+| `pnpm knip:check`             | 안 쓰는 파일·export·의존성 검사                                                                              |
+| `pnpm run doctor`             | expo-doctor. `pnpm doctor`는 pnpm 내장 명령으로 해석돼 `run`을 붙입니다                                      |
 | `pnpm lint` / `pnpm format`   | typed routes 선언을 만든 뒤 ESLint(경계 규칙 포함) / Prettier                                                |
 | `pnpm typecheck`              | typed routes 선언을 만든 뒤 `tsc --noEmit`                                                                   |
 | `pnpm schema:pull [ref]`      | 백엔드 SDL 스냅샷(`schema/schema.graphql`) 갱신. 기본 `develop`, `BE_DIR=../caquick-be`로 로컬 체크아웃 사용 |

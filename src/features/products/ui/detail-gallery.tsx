@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import {
-  Image,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
@@ -10,6 +9,7 @@ import {
 } from 'react-native';
 
 import { cn } from '@/shared/lib/cn';
+import { RemoteImage } from '@/shared/ui';
 
 interface Props {
   urls: readonly string[];
@@ -53,10 +53,10 @@ export function DetailGallery({ urls }: Props) {
           onMomentumScrollEnd={onScrollEnd}
         >
           {urls.map((uri, i) => (
-            <Image
+            <RemoteImage
               key={`${i}-${uri}`}
               accessibilityLabel={`상품 이미지 ${i + 1}/${urls.length}`}
-              source={{ uri }}
+              uri={uri}
               style={{ width, height: width }}
             />
           ))}
@@ -80,7 +80,7 @@ export function DetailGallery({ urls }: Props) {
               i === index && 'border-2 border-primary',
             )}
           >
-            <Image source={{ uri }} className="h-full w-full" />
+            <RemoteImage uri={uri} className="h-full w-full" />
           </Pressable>
         ))}
       </ScrollView>

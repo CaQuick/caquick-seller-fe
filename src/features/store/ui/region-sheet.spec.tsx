@@ -24,11 +24,6 @@ const lookup = (regionByLocation: object | null) =>
 const FOUND = { group: { id: 'g2', name: '인천' }, region: { id: 'r9', name: '서구' } };
 
 async function openSheet(queryClient = createTestQueryClient()) {
-  // 뮤테이션 gc 타이머(기본 5분)가 jest 종료를 붙잡지 않게
-  queryClient.setDefaultOptions({
-    ...queryClient.getDefaultOptions(),
-    mutations: { retry: false, gcTime: 0 },
-  });
   server.use(
     graphql.query('SellerStoreRegionGroups', () =>
       HttpResponse.json({ data: { regionGroups: [] } }),

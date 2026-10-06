@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { type SellerHomeRecentOrdersQuery } from '@/graphql/generated/graphql';
 import { colors, shadow } from '@/shared/config/tokens';
-import { Icon, StatusChip } from '@/shared/ui';
+import { Icon, RemoteImage, StatusChip } from '@/shared/ui';
 
 import { HOME_COPY, ORDER_STATUS_VIEW, pickupLabel } from '../model/home';
 
@@ -25,7 +25,7 @@ export function RecentOrderRow({ order }: { order: Order }) {
     >
       <View className="h-[50px] w-[50px] overflow-hidden rounded-full bg-gray-bg">
         {order.firstItemImageUrl ? (
-          <Image source={{ uri: order.firstItemImageUrl }} style={{ width: 50, height: 50 }} />
+          <RemoteImage uri={order.firstItemImageUrl} style={{ width: 50, height: 50 }} />
         ) : null}
       </View>
       <View className="flex-1">
