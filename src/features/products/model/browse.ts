@@ -83,5 +83,15 @@ export const setActiveInList = (
   isActive: boolean,
 ) => mapItems(data, (items) => items.map((p) => (p.id === productId ? { ...p, isActive } : p)));
 
+/** 스냅샷에 있던 이 상품의 노출 값만 현재 목록에 되돌린다(다른 상품의 변경은 그대로) */
+export function restoreActiveInList(
+  current: ProductListData | undefined,
+  snapshot: ProductListData | undefined,
+  productId: string,
+) {
+  const before = snapshot?.pages.flatMap((page) => page.items).find((p) => p.id === productId);
+  return before ? setActiveInList(current, productId, before.isActive) : current;
+}
+
 export const removeFromList = (data: ProductListData | undefined, productId: string) =>
   mapItems(data, (items) => items.filter((p) => p.id !== productId));

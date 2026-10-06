@@ -6,7 +6,12 @@ import { showToast } from '@/shared/ui';
 
 import { deleteProduct, setProductActive } from '../api/browse';
 import { productsKeys } from '../api/queryKeys';
-import { type ProductListData, removeFromList, setActiveInList } from './browse';
+import {
+  type ProductListData,
+  removeFromList,
+  restoreActiveInList,
+  setActiveInList,
+} from './browse';
 
 export function useDebouncedValue<T>(value: T, delayMs = 300): T {
   const [debounced, setDebounced] = useState(value);
@@ -23,7 +28,7 @@ interface ActiveVars {
 }
 
 /**
- * 노출 스위치는 낙관적으로 반영한다: 목록·상세 캐시를 먼저 바꾸고 실패하면 스냅샷으로 되돌린다.
+ * 노출 스위치는 낙관적으로 반영한다: 목록·상세 캐시를 먼저 바꾸고 실패하면 이 상품만 스냅샷 값으로 되돌린다.
  * 성공 뒤 목록은 stale 표시만 한다 — 보고 있는 탭에서 행이 바로 사라지지 않아 되돌려 켤 수 있다
  */
 export function useSetProductActive() {
@@ -46,7 +51,12 @@ export function useSetProductActive() {
       return { lists, detail };
     },
     onError: (error, { productId }, context) => {
-      context?.lists.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      // 이 상품만 되돌린다 — 목록 통째 복원은 응답 전에 바꾼 다른 상품의 스위치까지 덮는다
+      context?.lists.forEach(([key, snapshot]) =>
+        queryClient.setQueryData<ProductListData>(key, (current) =>
+          restoreActiveInList(current, snapshot, productId),
+        ),
+      );
       if (context?.detail) queryClient.setQueryData(productsKeys.detail(productId), context.detail);
       showToast.error(messageFor(error));
     },
