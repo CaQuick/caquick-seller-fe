@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 
-import { gradient } from '@/shared/config/tokens';
+import { gradient, tracking } from '@/shared/config/tokens';
 
 import { cssGradientLine } from '../model/gradient';
 import { HeroCard } from './hero-card';
@@ -44,5 +44,17 @@ describe('HeroCard', () => {
     const resized = await layout(338, 240);
     expect(resized).toMatchObject(cssGradientLine(45, 338, 240));
     expect(resized?.y1).not.toBeCloseTo(first?.y1 as number);
+  });
+
+  // 강조 글자는 중첩 Text라 줄바꿈·자간은 바깥 문장 것을 그대로 쓴다
+  it.each([
+    [null, '오늘 생산 수량을\n설정해 주세요', '생산 수량'],
+    [12, '오늘 제작 가능한\n수량은 12개 예요', '오늘 제작 가능'],
+  ])('남은 수량 %s: 문장 속 강조 글자만 굵게 쓴다', async (remaining, text, strong) => {
+    await render(<HeroCard remainingCapacity={remaining} />);
+    const sentence = screen.getByText(text);
+    expect(sentence).toHaveStyle({ letterSpacing: tracking(22, -0.02) });
+    expect(sentence.props.className).not.toMatch(/font-bold/);
+    expect(within(sentence).getByText(strong)).toHaveProp('className', 'font-bold');
   });
 });
