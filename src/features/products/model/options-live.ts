@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { type SellerProductManageQuery } from '@/graphql/generated/graphql';
 import { messageFor } from '@/shared/api';
@@ -66,7 +66,8 @@ const sameOrder = (a: readonly string[], b: readonly string[]) =>
 
 /**
  * 옵션 편집기를 조작마다 바로 저장하는 어댑터. 화면은 먼저 바꾸고, 요청이 실패하면 캐시의 서버 값으로
- * 되돌린다. 요청이 도는 동안에는 서버 값으로 덮지 않는다 — 끝난 뒤 다시 받은 값이 진실이다
+ * 되돌린다. 요청은 조작 순서대로 하나씩 보내고, 줄이 빌 때까지 서버 값으로 덮지 않는다 — 끝난 뒤 다시
+ * 받은 값이 진실이다
  */
 export function useLiveOptions(product: ManageProduct) {
   const queryClient = useQueryClient();
@@ -78,25 +79,29 @@ export function useLiveOptions(product: ManageProduct) {
     setGroups(toOptionGroups(product));
   }
 
-  const run = async (next: ((g: Groups) => Groups) | null, request: () => Promise<unknown>) => {
+  // 동시에 보내면 늦게 반영된 앞 편집이 뒤 편집을 덮을 수 있다
+  const queue = useRef(Promise.resolve());
+  const run = (next: ((g: Groups) => Groups) | null, request: () => Promise<unknown>) => {
     if (next) setGroups(next);
     setInFlight((n) => n + 1);
-    try {
-      await request();
-    } catch (e) {
-      setSynced(null);
-      showToast.error(messageFor(e));
-    } finally {
-      setInFlight((n) => n - 1);
-      void queryClient.invalidateQueries({ queryKey: productsKeys.detail(product.id) });
-    }
+    queue.current = queue.current.then(async () => {
+      try {
+        await request();
+      } catch (e) {
+        setSynced(null);
+        showToast.error(messageFor(e));
+      } finally {
+        setInFlight((n) => n - 1);
+        void queryClient.invalidateQueries({ queryKey: productsKeys.detail(product.id) });
+      }
+    });
   };
   const group = (key: string) => groups.find((g) => g.key === key);
 
   return {
     groups,
     onAddGroup: (fields: GroupFields) =>
-      void run(null, () =>
+      run(null, () =>
         createOptionGroup({
           productId: product.id,
           ...fields,
@@ -108,13 +113,13 @@ export function useLiveOptions(product: ManageProduct) {
       const current = group(key);
       const changed = current ? changedFields<GroupFields>(current, patch) : {};
       if (Object.keys(changed).length === 0) return;
-      void run(
+      run(
         (g) => changeGroup(g, key, changed),
         () => updateOptionGroup({ optionGroupId: key, ...changed }),
       );
     },
     onRemoveGroup: (key: string) =>
-      void run(
+      run(
         (g) => g.filter((x) => x.key !== key),
         () => deleteOptionGroup(key),
       ),
@@ -126,13 +131,13 @@ export function useLiveOptions(product: ManageProduct) {
         )
       )
         return;
-      void run(
+      run(
         (g) => reorderGroups(g, keys),
         () => reorderOptionGroups(product.id, keys),
       );
     },
     onAddItem: (groupKey: string, fields: ItemFields) =>
-      void run(null, () =>
+      run(null, () =>
         createOptionItem({
           optionGroupId: groupKey,
           title: fields.title,
@@ -146,13 +151,13 @@ export function useLiveOptions(product: ManageProduct) {
       const current = group(groupKey)?.items.find((i) => i.key === itemKey);
       const changed = current ? changedFields<ItemFields>(current, patch) : {};
       if (Object.keys(changed).length === 0) return;
-      void run(
+      run(
         (g) => changeItem(g, groupKey, itemKey, changed),
         () => updateOptionItem({ optionItemId: itemKey, ...changed }),
       );
     },
     onRemoveItem: (groupKey: string, itemKey: string) =>
-      void run(
+      run(
         (g) =>
           g.map((x) =>
             x.key === groupKey ? { ...x, items: x.items.filter((i) => i.key !== itemKey) } : x,
@@ -160,7 +165,7 @@ export function useLiveOptions(product: ManageProduct) {
         () => deleteOptionItem(itemKey),
       ),
     onReorderItems: (groupKey: string, keys: string[]) =>
-      void run(
+      run(
         (g) =>
           g.map((x) =>
             x.key === groupKey
