@@ -25,6 +25,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'com.caquick.seller',
+    // FCM(Android 푸시 토큰). 파일은 커밋하지 않고 빌드 환경이 경로를 준다 — 없으면 푸시 등록만 실패한다
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON,
     adaptiveIcon: {
       backgroundColor: '#FBFBFF',
       foregroundImage: './assets/android-icon-foreground.png',

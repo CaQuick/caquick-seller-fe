@@ -111,6 +111,18 @@ unset ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD
 
 조직 `caquick`의 robot user 토큰을 `EXPO_TOKEN`으로 등록한다(`gh secret set EXPO_TOKEN -R CaQuick/caquick-seller-fe -e production`). 토큰이 생기면 `eas init`(app.config.ts의 `extra.eas.projectId`·`updates.url` TODO 채움) → `eas update:configure` → `eas channel:create production`·`preview`·`development`. 로컬 빌드는 EAS Secret 가시성 환경변수를 못 읽으므로 비밀값은 전부 GitHub Environment에 둔다.
 
+### 7. Firebase(Android 푸시)
+
+Firebase 프로젝트에 Android 앱 `com.caquick.seller`를 등록하고 두 파일을 `~/caquick-secrets/seller/`(600)에 둔다. SHA 인증서 지문은 FCM에 필요 없다(Google 로그인·App Check용).
+
+- `google-services.json` → Environment 시크릿 `GOOGLE_SERVICES_JSON_BASE64`. 잡이 `$RUNNER_TEMP`에 복원해 `GOOGLE_SERVICES_JSON` 경로로 app.config에 넘긴다. 레포 밖에 두는 건 `--local` 빌드가 git 기준으로 프로젝트를 복사해 무시된 `.secrets/`를 빠뜨리기 때문이다. fingerprint가 파일 내용을 해시하므로 파일을 바꾸면 Android 새 빌드가 돈다.
+- FCM V1 서비스 계정 키(JSON) → EAS credentials(Android → FCM V1). Expo Push Service가 이 키로 FCM에 보낸다.
+
+```bash
+base64 < ~/caquick-secrets/seller/google-services.json | tr -d '\n' \
+  | gh secret set GOOGLE_SERVICES_JSON_BASE64 -R CaQuick/caquick-seller-fe -e production
+```
+
 ## 시크릿·변수(Environment `production`)
 
 | 이름                                                             | 종류        | 필수         | 없을 때                                        |
@@ -121,6 +133,7 @@ unset ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD
 | `ASC_API_KEY_P8_BASE64` · `ASC_API_KEY_ID` · `ASC_API_ISSUER_ID` | secret      | 선택         | iOS submit 건너뜀, 원장은 `built/`             |
 | `ASC_APP_ID`                                                     | variable    | 선택         | iOS submit 건너뜀                              |
 | `IOS_STORE_READY`                                                | variable    | 선택         | `true`가 아니면 `production-simulator`(tar.gz) |
+| `GOOGLE_SERVICES_JSON_BASE64`                                    | secret      | Android 푸시 | 경고 후 진행, Android 푸시 토큰 등록 실패      |
 | `PLAY_SERVICE_ACCOUNT_JSON_BASE64`                               | secret      | 선택         | Android submit 건너뜀, 원장은 `built/`         |
 | `DISCORD_WEBHOOK_URL`                                            | secret      | 선택         | 알림 생략                                      |
 | `CODECOV_TOKEN`                                                  | repo secret | 선택         | CI 업로드 생략                                 |

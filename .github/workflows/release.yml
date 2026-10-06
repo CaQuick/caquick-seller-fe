@@ -121,6 +121,25 @@ jobs:
             --message "republish $REPUBLISH_GROUP"
           echo "SKIP=1" >> "$GITHUB_ENV"
 
+      # fingerprint가 이 파일 내용을 해시하므로 fingerprint·빌드·OTA 전에 같은 내용으로 둔다.
+      # 레포 밖 절대경로에 둔다 — --local 빌드는 git 기준으로 프로젝트를 복사해 무시된 .secrets/를 빠뜨린다
+      - name: Restore google-services.json
+        if: env.SKIP != '1'
+        env:
+          GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GS_B64" ]; then
+            echo "::warning::GOOGLE_SERVICES_JSON_BASE64 없음 — Android 빌드가 푸시 토큰을 받지 못한다"
+            exit 0
+          fi
+          umask 077
+          f="$RUNNER_TEMP/google-services.json"
+          printf '%s' "$GS_B64" | base64 -d > "$f"
+          jq -e '.client[].client_info.android_client_info | select(.package_name == "com.caquick.seller")' "$f" > /dev/null \
+            || { echo "google-services.json에 com.caquick.seller 클라이언트가 없음"; exit 1; }
+          echo "GOOGLE_SERVICES_JSON=$f" >> "$GITHUB_ENV"
+
       # Environment 시크릿은 잡 if:에서 직접 못 읽는다 — 단계에서 outputs로 바꾼다
       - name: Resolve submit capability
         if: env.SKIP != '1'
@@ -300,7 +319,7 @@ jobs:
 
       - name: Cleanup secrets
         if: always()
-        run: rm -rf .secrets credentials.json
+        run: rm -rf .secrets credentials.json "$RUNNER_TEMP/google-services.json"
 
       - name: Release host lock
         if: always()
