@@ -124,7 +124,7 @@ jobs:
       # fingerprint가 이 파일 내용을 해시하므로 fingerprint·빌드·OTA 전에 같은 내용으로 둔다.
       # 레포 밖 절대경로에 둔다 — --local 빌드는 git 기준으로 프로젝트를 복사해 무시된 .secrets/를 빠뜨린다
       - name: Restore google-services.json
-        if: env.SKIP != '1'
+        if: env.SKIP != '1' && env.PLATFORM != 'ios'
         env:
           GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
