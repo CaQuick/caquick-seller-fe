@@ -1,14 +1,18 @@
+import { useQuery } from '@tanstack/react-query';
+import { Slot } from 'expo-router';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import { launchImageLibraryAsync } from 'expo-image-picker';
 import { HttpResponse, graphql } from 'msw';
 import { toast } from 'sonner-native';
 
+import { homeKeys } from '@/features/home';
 import { type SellerStoreMyStoreQuery } from '@/graphql/generated/graphql';
 import { mockFileSizes } from '@/test/mocks';
 import { graphqlError } from '@/test/msw/graphql';
 import { server } from '@/test/msw/server';
-import { Providers } from '@/test/render';
+import { createTestQueryClient, Providers } from '@/test/render';
 
+import { storeKeys } from '../api/queryKeys';
 import { StoreBasicInfoScreen } from './basic-info-screen';
 import { StorePickupPolicyScreen } from './pickup-policy-screen';
 import { StoreMenuScreen } from './store-menu-screen';
@@ -542,5 +546,65 @@ describe('픽업 정책', () => {
       expect(calendarCalls.at(-1)).toEqual({ storeId: '3', yearMonth: '2026-11' }),
     );
     await act(() => Promise.resolve());
+  });
+});
+
+describe('저장 뒤 홈·매장 허브 갱신', () => {
+  /** 홈 매장 카드와 허브 평점 카드처럼 다른 화면의 키를 지켜보며 조회 횟수를 센다 */
+  const fetches = { home: 0, hub: 0 };
+  function WatchLayout() {
+    useQuery({ queryKey: homeKeys.store(), queryFn: () => ++fetches.home });
+    useQuery({ queryKey: storeKeys.rating('3'), queryFn: () => ++fetches.hub });
+    return <Slot />;
+  }
+  const openWatched = (initialUrl: string) => {
+    const queryClient = createTestQueryClient();
+    return renderRouter(
+      { ...routes, _layout: WatchLayout },
+      {
+        initialUrl,
+        wrapper: ({ children }) => <Providers queryClient={queryClient}>{children}</Providers>,
+      },
+    );
+  };
+  beforeEach(() => {
+    fetches.home = 0;
+    fetches.hub = 0;
+  });
+
+  it('기본 정보를 저장하면 홈의 매장명·운영 상태와 매장 허브를 다시 부른다', async () => {
+    server.use(myStore());
+    record('SellerStoreUpdateBasicInfo', (vars) => ({
+      sellerUpdateStoreBasicInfo: { ...STORE, ...(vars.input as object) },
+    }));
+    await openWatched('/store/basic-info');
+    await fireEvent.changeText(await screen.findByLabelText('매장명'), '해즈 케이크 청라점');
+    expect(fetches).toEqual({ home: 1, hub: 1 });
+    await fireEvent.press(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(fetches).toEqual({ home: 2, hub: 2 }));
+  });
+
+  it('픽업 정책을 저장하면 홈과 매장 허브를 다시 부른다', async () => {
+    server.use(myStore({ isActive: false }));
+    record('SellerStoreUpdatePickupPolicy', (vars) => ({
+      sellerUpdatePickupPolicy: { ...STORE, isActive: false, ...(vars.input as object) },
+    }));
+    await openWatched('/store/pickup-policy');
+    await fireEvent.press(await screen.findByRole('button', { name: '예약 가능 일수 늘리기' }));
+    expect(fetches).toEqual({ home: 1, hub: 1 });
+    await fireEvent.press(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(fetches).toEqual({ home: 2, hub: 2 }));
+  });
+
+  it('반증: 저장이 실패하면 홈을 다시 부르지 않는다', async () => {
+    server.use(
+      myStore(),
+      fail('SellerStoreUpdateBasicInfo', 'TEXT_TOO_LONG', '텍스트는 30자 이하여야 합니다.'),
+    );
+    await openWatched('/store/basic-info');
+    await fireEvent.changeText(await screen.findByLabelText('전화번호'), '010-0000-0000');
+    await fireEvent.press(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(fetches).toEqual({ home: 1, hub: 1 });
   });
 });

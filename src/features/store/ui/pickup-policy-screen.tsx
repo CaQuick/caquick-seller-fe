@@ -5,8 +5,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-na
 import { ApiError } from '@/shared/api';
 import { ActionBar, MenuGroup, MenuRow, showToast, Stepper, TextField } from '@/shared/ui';
 
-import { myStoreQueryOptions, updatePickupPolicy } from '../api/my-store';
-import { storeKeys } from '../api/queryKeys';
+import { myStoreQueryOptions, syncSavedStore, updatePickupPolicy } from '../api/my-store';
 import { SLOT_INTERVALS, stepSlotInterval } from '../model/calendar';
 import { STORE_COPY, storeErrorMessage } from '../model/messages';
 import { FieldLabel, InfoBox, QueryGate, SubScreen } from './parts';
@@ -52,9 +51,8 @@ function PolicyForm({
     mutationFn: updatePickupPolicy,
     onSuccess: async (store) => {
       setFormError(null);
-      queryClient.setQueryData(storeKeys.myStore(), store);
       showToast.success(STORE_COPY.saved);
-      await queryClient.invalidateQueries({ queryKey: storeKeys.all });
+      await syncSavedStore(queryClient, store);
     },
     onError: (e) => {
       if (e instanceof ApiError && e.classification === 'BAD_USER_INPUT') {

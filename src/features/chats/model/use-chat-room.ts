@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { homeKeys } from '@/features/home';
 import { messageFor, subscribe } from '@/shared/api';
 import { showToast } from '@/shared/ui';
 
@@ -72,6 +73,7 @@ export function useChatRoom(conversationId: string, onBuyerMessage: () => void) 
       queryClient.setQueryData<MessagePages>(key, (old) => old && upsertMessage(old, message));
       setPending((list) => list.filter((p) => p.localId !== localId));
       void queryClient.invalidateQueries({ queryKey: chatsKeys.conversations() });
+      void queryClient.invalidateQueries({ queryKey: homeKeys.dashboard() });
     },
     onError: (error, { localId }) => {
       setPending((list) =>

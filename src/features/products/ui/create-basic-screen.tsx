@@ -18,7 +18,13 @@ import {
   priceText,
   toDigits,
 } from '../model/draft-form';
-import { isPristine, loadDraft, type SavedDraft, useDraftStore } from '../model/draft-store';
+import {
+  isPristine,
+  loadDraft,
+  type SavedDraft,
+  useDraftOwner,
+  useDraftStore,
+} from '../model/draft-store';
 import { type CategoryPick, CategorySheet, type CategoryTab } from './create-category-sheet';
 import { CreateFrame, saveDraftWithToast } from './create-frame';
 import { CreateImages } from './create-images';
@@ -39,16 +45,17 @@ export function ProductNewBasicScreen() {
   const restoreSheet = useRef<BottomSheetModal>(null);
   const leaveSheet = useRef<BottomSheetModal>(null);
   const categories = useQuery(categoriesQueryOptions());
+  const accountId = useDraftOwner();
 
   // 새로 들어왔을 때만 묻는다 — 2/3에서 돌아온 경우는 이미 작성 중이다
   useEffect(() => {
-    if (!isPristine(useDraftStore.getState().draft)) return;
-    void loadDraft().then((found) => {
+    if (accountId === undefined || !isPristine(useDraftStore.getState().draft)) return;
+    void loadDraft(accountId).then((found) => {
       if (!found) return;
       setSaved(found);
       restoreSheet.current?.present();
     });
-  }, []);
+  }, [accountId]);
 
   const back = useCallback(() => {
     if (isPristine(useDraftStore.getState().draft)) leaveFlow();
@@ -89,7 +96,10 @@ export function ProductNewBasicScreen() {
         label={CREATE_COPY.step1}
         onBack={back}
         actions={{
-          secondary: { title: CREATE_COPY.saveDraft, onPress: () => void saveDraftWithToast() },
+          secondary: {
+            title: CREATE_COPY.saveDraft,
+            onPress: () => void saveDraftWithToast(accountId),
+          },
           primary: {
             title: CREATE_COPY.next,
             variant: complete ? 'primary' : 'soft',

@@ -157,6 +157,13 @@ describe('푸시 토큰 해제', () => {
     expect(calls.map((c) => c.op)).toEqual(['register', 'unregister']);
   });
 
+  it('notify 없이 해제하면 서버를 부르지 않고 토큰만 잊는다', async () => {
+    await ensurePushToken({ prompt: false });
+    await releasePushToken({ notify: false });
+    expect(calls.map((c) => c.op)).toEqual(['register']);
+    expect(hasPushToken()).toBe(false);
+  });
+
   it('등록한 적이 없으면 아무것도 보내지 않는다', async () => {
     await releasePushToken();
     expect(calls).toEqual([]);

@@ -9,8 +9,9 @@ import type * as MockRN from 'react-native';
 import { Text } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { authKeys, useSessionStore } from '@/features/auth';
 import { mockFileSizes } from '@/test/mocks';
-import { gqlOk, graphqlError } from '@/test/msw/graphql';
+import { gqlError, gqlOk, graphqlError } from '@/test/msw/graphql';
 import { server } from '@/test/msw/server';
 import { createTestQueryClient, Providers } from '@/test/render';
 
@@ -61,9 +62,28 @@ jest.mock('expo-image-manipulator', () => ({
   },
 }));
 
-/** renderRouter는 결과 Promise에 헬퍼(getPathname)를 얹는다 — async로 감싸지 않고 그대로 돌려준다 */
-function openCreate(initialUrl = '/products/new/basic') {
+const ACCOUNT = '7';
+const DRAFT_KEY = `caquick.productDraft.${ACCOUNT}`;
+const me = (accountId: string) => ({
+  accountId,
+  username: 'seller',
+  displayName: null,
+  storeId: '3',
+  mustChangePassword: false,
+  accountStatus: 'ACTIVE',
+});
+const sellerMe = (accountId: string) => gqlOk('SellerAuthMe', { sellerMe: me(accountId) });
+
+/**
+ * 앱처럼 부팅이 채운 내 계정을 깔고 연다(null이면 화면이 직접 조회).
+ * renderRouter는 결과 Promise에 헬퍼(getPathname)를 얹는다 — async로 감싸지 않고 그대로 돌려준다
+ */
+function openCreate(initialUrl = '/products/new/basic', accountId: string | null = ACCOUNT) {
   const queryClient = createTestQueryClient();
+  if (accountId !== null) {
+    queryClient.setQueryDefaults(authKeys.me(), { gcTime: Infinity });
+    queryClient.setQueryData(authKeys.me(), me(accountId));
+  }
   return renderRouter(
     {
       _layout: () => <Stack />,
@@ -176,10 +196,18 @@ const sheet = (id: string) => within(screen.getByTestId(id));
 const nextButton = () => screen.getByRole('button', { name: '다음' });
 
 beforeEach(async () => {
+  useSessionStore.setState({
+    status: 'authenticated',
+    accessToken: 'at',
+    mustChangePassword: false,
+  });
   useDraftStore.getState().reset();
   await AsyncStorage.clear();
   mockFileSizes.set('file:///cache/p.jpg', 2048);
-  server.use(gqlOk('SellerProductsFilterCategories', { categories: CATEGORIES }));
+  server.use(
+    gqlOk('SellerProductsFilterCategories', { categories: CATEGORIES }),
+    sellerMe(ACCOUNT),
+  );
 });
 afterEach(() => jest.clearAllMocks());
 
@@ -343,6 +371,28 @@ describe('1/3 기본 정보', () => {
     expect(screen.getByLabelText('상품명')).toHaveDisplayValue('그림일기 케이크');
   });
 
+  it('다른 계정으로 들어오면 이전 계정의 임시저장을 묻지 않는다', async () => {
+    await saveDraft(ACCOUNT, FILLED);
+    const read = jest.spyOn(AsyncStorage, 'getItem');
+    server.use(sellerMe('8'));
+    await openCreate(undefined, '8');
+    await waitFor(() => expect(read).toHaveBeenCalledWith('caquick.productDraft.8'));
+    await waitFor(() => expect(screen.getByLabelText('상품명')).toBeTruthy());
+    expect(screen.queryByText(/이어서 작성할까요/)).toBeNull();
+    expect(presentSpy).not.toHaveBeenCalled();
+  });
+
+  it('내 계정을 받지 못했으면 임시저장하지 않고 알린다', async () => {
+    server.use(gqlError('SellerAuthMe', { message: 'x', classification: 'INTERNAL_SERVER_ERROR' }));
+    const write = jest.spyOn(AsyncStorage, 'setItem');
+    await openCreate(undefined, null);
+    await fireEvent.press(await screen.findByRole('button', { name: '임시저장' }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('임시저장하지 못했어요. 잠시 후 다시 시도해 주세요'),
+    );
+    expect(write).not.toHaveBeenCalled();
+  });
+
   it('임시저장이 실패하면 알린다', async () => {
     jest.spyOn(AsyncStorage, 'setItem').mockRejectedValueOnce(new Error('full'));
     await openCreate();
@@ -495,7 +545,7 @@ describe('2/3 옵션', () => {
     await openCreate('/products/new/options');
     await fireEvent.press(await screen.findByRole('button', { name: '임시저장' }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('임시저장했어요'));
-    const raw = JSON.parse((await AsyncStorage.getItem('caquick.productDraft'))!) as {
+    const raw = JSON.parse((await AsyncStorage.getItem(DRAFT_KEY))!) as {
       draft: ProductDraft;
     };
     expect(raw.draft.optionGroups).toEqual(FILLED.optionGroups);
@@ -573,7 +623,7 @@ describe('3/3 미리보기·등록', () => {
 
   it('등록하기는 숨김 생성부터 노출까지 부른 뒤 상품 상세로 가고 토스트를 띄우며 초안을 지운다', async () => {
     const calls = chain();
-    await saveDraft(FILLED);
+    await saveDraft(ACCOUNT, FILLED);
     const router = openCreate('/products/new/preview');
     await router;
     await fireEvent.press(await screen.findByRole('button', { name: '등록하기' }));
@@ -603,7 +653,7 @@ describe('3/3 미리보기·등록', () => {
     ]);
     expect(calls.active).toEqual([{ input: { productId: '100', isActive: true } }]);
     expect(calls.remove).toEqual([]);
-    expect(await AsyncStorage.getItem('caquick.productDraft')).toBeNull();
+    expect(await AsyncStorage.getItem(DRAFT_KEY)).toBeNull();
   });
 
   it('중간에 실패하면 단계와 문구를 보이고, 다시 시도는 만든 상품을 이어서 등록한다', async () => {

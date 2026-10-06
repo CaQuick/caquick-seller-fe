@@ -49,8 +49,9 @@ export function CreateFrame({ step, label, onBack, actions, children }: FramePro
   );
 }
 
-export async function saveDraftWithToast() {
-  const ok = await saveDraft(useDraftStore.getState().draft);
+export async function saveDraftWithToast(accountId: string | undefined) {
+  const ok =
+    accountId !== undefined && (await saveDraft(accountId, useDraftStore.getState().draft));
   if (ok) showToast.success(CREATE_COPY.draftSaved);
   else showToast.error(CREATE_COPY.draftSaveFailed);
 }
