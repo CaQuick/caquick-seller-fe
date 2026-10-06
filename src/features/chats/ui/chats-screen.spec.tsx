@@ -207,4 +207,49 @@ describe('ChatsScreen', () => {
     expect(toast).toHaveBeenCalledTimes(1);
     toast.mockRestore();
   });
+
+  it('첫 조회 응답 전에 도착한 이벤트는 목록을 다시 불러와 반영한다', async () => {
+    const toast = jest.spyOn(showToast, 'info').mockImplementation(() => 'id');
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let arrived = false;
+    let requests = 0;
+    const before = [conv('1'), conv('2', { lastMessageAt: ago(60) })];
+    const after = [
+      conv('2', { lastMessagePreview: '조회 중 도착', lastMessageAt: ago(0), unreadCount: 1 }),
+      conv('1'),
+    ];
+    server.use(
+      graphql.query('SellerChatsConversations', async () => {
+        requests += 1;
+        // 요청 시점 스냅샷 — 이벤트 전 요청은 붙잡아 뒀다가 이벤트 뒤에 돌려준다
+        const items = arrived ? after : before;
+        if (!arrived) await gate;
+        return HttpResponse.json({
+          data: {
+            sellerConversations: { items, totalCount: 2, hasMore: false, nextCursor: null },
+          },
+        });
+      }),
+    );
+    await open();
+    await waitFor(() => expect(requests).toBe(1));
+    arrived = true;
+    await emit({
+      conversationId: '2',
+      accountId: 'a2',
+      buyerNickname: '구매자2',
+      lastMessagePreview: '조회 중 도착',
+      lastMessageAt: ago(0),
+      sellerLastReadAt: null,
+      unreadCount: 1,
+    });
+    await act(() => Promise.resolve().then(release));
+    expect(await screen.findByText('조회 중 도착')).toBeTruthy();
+    expect(within(rows()[0]!).getByText('구매자2')).toBeTruthy();
+    expect(screen.getByLabelText('1건')).toBeTruthy();
+    // 다시 불러온 목록이 보여 주므로 새 문의 토스트는 띄우지 않는다
+    expect(toast).not.toHaveBeenCalled();
+    toast.mockRestore();
+  });
 });
