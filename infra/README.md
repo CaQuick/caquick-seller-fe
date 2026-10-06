@@ -109,7 +109,16 @@ unset ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD
 
 ### 6. Expo
 
-조직 `caquick`의 robot user 토큰을 `EXPO_TOKEN`으로 등록한다(`gh secret set EXPO_TOKEN -R CaQuick/caquick-seller-fe -e production`). 토큰이 생기면 `eas init`(app.config.ts의 `extra.eas.projectId`·`updates.url` TODO 채움) → `eas update:configure` → `eas channel:create production`·`preview`·`development`. 로컬 빌드는 EAS Secret 가시성 환경변수를 못 읽으므로 비밀값은 전부 GitHub Environment에 둔다.
+조직 `caquick`, 프로젝트 `@caquick/caquick-seller`(ID `491006a8-4cc4-40df-bdd6-bde68ddb5195`). robot user `caquick-seller-ci`(Developer)의 토큰을 `EXPO_TOKEN`으로 등록한다.
+
+```bash
+tr -d ' \r\n' < ~/caquick-secrets/seller-expo-token.txt | gh secret set EXPO_TOKEN -R CaQuick/caquick-seller-fe -e production
+```
+
+- `app.config.ts`가 동적 설정이라 `eas init`이 projectId를 쓰지 못한다 — `EAS_PROJECT_ID` 상수로 `extra.eas.projectId`·`updates.url`을 둔다(`owner: 'caquick'`).
+- 업데이트 채널 `production`·`preview`·`development`(같은 이름 브랜치)는 `eas channel:create <이름>`으로 만들었다.
+- FCM V1 서비스 계정 키는 `eas credentials -p android` → Google Service Account → FCM V1에서 올린다(대화형 전용).
+- 로컬 빌드는 EAS Secret 가시성 환경변수를 못 읽으므로 비밀값은 전부 GitHub Environment에 둔다. EAS 환경변수가 하나도 없으면 `--environment`를 준 명령이 JSON 앞 stdout에 안내 줄을 붙이므로, 워크플로는 JSON 시작 줄부터 읽는다.
 
 ### 7. Firebase(Android 푸시)
 

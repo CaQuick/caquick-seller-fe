@@ -9,10 +9,14 @@ const PRETENDARD = [
   { path: './assets/fonts/Pretendard-Bold.otf', weight: 700 },
 ];
 
+/** EAS 프로젝트 @caquick/caquick-seller. 동적 설정이라 `eas init`이 쓰지 못해 직접 둔다 */
+const EAS_PROJECT_ID = '491006a8-4cc4-40df-bdd6-bde68ddb5195';
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: '케이퀵 판매자',
   slug: 'caquick-seller',
+  owner: 'caquick',
   version: '1.0.0',
   scheme: 'caquickseller',
   orientation: 'portrait',
@@ -35,8 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     predictiveBackGestureEnabled: false,
   },
-  // TODO(EAS): Expo 조직 caquick 생성 뒤 `eas init`이 넣는 projectId로 채운다 — https://u.expo.dev/<projectId>
-  // updates: { url: 'https://u.expo.dev/<projectId>' },
+  updates: { url: `https://u.expo.dev/${EAS_PROJECT_ID}` },
   runtimeVersion: { policy: 'fingerprint' },
   experiments: { typedRoutes: true },
   plugins: [
@@ -67,6 +70,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
   ],
   extra: {
-    // TODO(EAS): eas: { projectId: '<projectId>' }
+    eas: { projectId: EAS_PROJECT_ID },
   },
 });
