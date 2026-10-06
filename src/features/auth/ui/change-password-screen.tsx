@@ -85,7 +85,7 @@ export function ChangePasswordScreen() {
         <View style={{ paddingTop: insets.top + 8 }}>
           <Text
             accessibilityRole="header"
-            className="text-text-3 h-11 text-center font-sans text-2xl font-bold leading-[44px] tracking-tighter"
+            className="h-11 text-center font-sans text-2xl font-bold leading-[44px] tracking-tighter text-text3"
           >
             비밀번호 변경
           </Text>
@@ -93,8 +93,8 @@ export function ChangePasswordScreen() {
       ) : null}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerClassName="px-5 pb-6">
         {forced ? (
-          <View className="bg-tint-2 mt-6 rounded-lg p-3">
-            <Text className="text-text-3 font-sans text-sm leading-[19px] tracking-tight">
+          <View className="mt-6 rounded-lg bg-tint2 p-3">
+            <Text className="font-sans text-sm leading-[19px] tracking-tight text-text3">
               {AUTH_COPY.forcedChange}
             </Text>
           </View>

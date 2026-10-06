@@ -36,7 +36,7 @@ export function AuthField({ label, error, invalid, hint, secret, ...input }: Fie
   const [hidden, setHidden] = useState(true);
   return (
     <View>
-      <Text className="text-text-2 mb-3 font-sans text-lg font-semibold tracking-tight">
+      <Text className="mb-3 font-sans text-lg font-semibold tracking-tight text-text2">
         {label}
       </Text>
       <View

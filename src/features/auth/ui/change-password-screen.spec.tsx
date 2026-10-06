@@ -5,9 +5,11 @@ import { toast } from 'sonner-native';
 
 import { resetSessionHooks } from '@/shared/api';
 import { AUTH_URL } from '@/shared/config/env';
+import { colors } from '@/shared/config/tokens';
 import { mockSecureStore } from '@/test/mocks';
 import { restError, restOk } from '@/test/msw/graphql';
 import { server } from '@/test/msw/server';
+import { themeColor } from '@/test/tailwind';
 
 import { AUTH_COPY, SESSION_ENDED } from '../model/messages';
 import { installSessionHooks } from '../model/session';
@@ -67,6 +69,19 @@ describe('ChangePasswordScreen', () => {
     expect(screen.getByRole('button', { name: '다른 계정으로 로그인' })).toBeTruthy();
     expect(consumesBack(back)).toBe(true);
     back.mockRestore();
+  });
+
+  // theme에 없는 색 클래스는 NativeWind가 조용히 버려 상자 없이 글자만 남는다
+  it('강제 안내는 tint2 바탕·text3 글자 상자로, 제목·입력 라벨은 시안 글자색으로 그린다', async () => {
+    await open();
+    const notice = screen.getByText(AUTH_COPY.forcedChange);
+    expect(themeColor(notice.parent?.props.className, 'bg')).toBe(colors.tint2);
+    expect(themeColor(notice.props.className, 'text')).toBe(colors.text3);
+    const title = screen.getByRole('header', { name: '비밀번호 변경' });
+    expect(themeColor(title.props.className, 'text')).toBe(colors.text3);
+    expect(themeColor(screen.getByText('현재 비밀번호').props.className, 'text')).toBe(
+      colors.text2,
+    );
   });
 
   it('설정에서 들어오면 배너·다른 계정 로그인 없이 뒤로가기를 막지 않는다', async () => {
