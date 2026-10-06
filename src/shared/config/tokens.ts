@@ -51,6 +51,10 @@ export const colors = {
   dangerBg: '#FFF1F1',
   star: '#FFC43D',
   homeTabFill: '#E8E4FF', // 홈 활성 탭 집 채움(점은 stepLast)
+  toastBg: '#2A2A31', // 하단 다크 토스트(.toast)
+  toastText: '#FFFFFF',
+  toastSuccess: '#9CF0C6', // 성공 ✓
+  toastError: '#FF9EA1', // 실패 ! — 어두운 바탕에서 읽히는 연한 빨강
 } as const;
 
 /** CSS linear-gradient(angle, 색 위치…) 그대로. RN 스타일에는 그라디언트가 없어 SVG로 그린다 */
@@ -158,6 +162,7 @@ export const shadow = {
     fab: '0 8px 16px rgba(109,91,255,0.3)',
     segment: '0 1px 3px rgba(0,0,0,0.08)',
     hero: '0 4px 14px rgba(0,0,0,0.06)',
+    toast: '0 8px 20px rgba(0,0,0,0.2)',
   },
   /** RN style 객체 */
   native: {
@@ -195,6 +200,13 @@ export const shadow = {
       shadowRadius: 14,
       shadowOffset: { width: 0, height: 4 },
       elevation: 3,
+    },
+    toast: {
+      shadowColor: '#000000',
+      shadowOpacity: 0.2,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 8,
     },
   },
 } as const;
