@@ -157,7 +157,7 @@ pnpm codegen           # 스냅샷 + 문서 → src/graphql/generated (커밋 �
   - `static`: typecheck → `codegen:check` → `knip` → `expo-doctor` → `expo export`(Metro 번들이 두 플랫폼에서 만들어지는지)
   - `test (1~3/3)`: jest `--shard`, `--json` 보고서를 아티팩트로 넘깁니다
   - `coverage-report`: 샤드가 전부 success인지 확인 → 보고서 병합·임계 판정 → Codecov(토큰 있을 때) → PR 댓글
-- 필수 status check(Terraform ruleset): `check` · `pr-title` · `coverage-report` · `Analyze (javascript-typescript)`. 사람 승인은 없고 봇 리뷰(Codex·CodeRabbit)가 실질 게이트이며 절차는 BE와 같습니다.
+- 필수 status check(Terraform ruleset): `check` · `pr-title` · `coverage-report` · `Analyze (javascript-typescript)`. 사람 승인은 없고 봇 리뷰(Codex)가 실질 게이트이며 절차는 BE와 같습니다(CodeRabbit은 BE 전용, D56).
 - `release.yml`(맥미니 `macmini-seller`, 단일 잡)은 `main`의 CI 성공 뒤에 돕니다.
   1. main 끝 커밋인지 확인하고 호스트 락을 잡습니다.
   2. 도구 점검 → `pnpm install` → (롤백 입력이면 `eas update:republish` 후 종료).
