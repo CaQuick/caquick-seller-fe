@@ -58,6 +58,7 @@
 | D52 | 2026-10-06 | 디자인 수치(색·폰트·간격·반경·자간)는 시안 PNG 실측값으로 확정. 토큰 표(`spec/tokens.md`)는 받지 않는다(D26 수치 부분 대체)                                                                                                                             | 디자이너 토큰 표 없음(사용자 결정)                                                                                      |
 | D53 | 2026-10-06 | Android `google-services.json`은 커밋하지 않고 시크릿 `GOOGLE_SERVICES_JSON_BASE64` → 잡이 `$RUNNER_TEMP`에 복원해 `GOOGLE_SERVICES_JSON`으로 넘김. FCM V1 키는 EAS credentials                                                                         | 공개 레포. fingerprint는 내용만 해시, `--local`은 git 기준 복사라 무시된 경로가 빠짐                                    |
 | D54 | 2026-10-06 | Expo 조직 `caquick`·프로젝트 `@caquick/caquick-seller`, robot `caquick-seller-ci`(Developer) 토큰을 `EXPO_TOKEN`으로. projectId는 `app.config.ts` 상수(동적 설정이라 `eas init`이 못 씀). 채널 production·preview·development                           | 개인 계정이 아닌 조직 소유(플랜 §8). robot은 빌드·OTA·credentials에 필요한 최소 역할                                    |
+| D55 | 2026-10-06 | Android 네이티브는 ARM만 빌드한다(`expo-build-properties` `android.buildArchs`: arm64-v8a·armeabi-v7a). x86·x86_64 제외                                                                                                                                 | x86 폰은 사실상 없음, 에뮬레이터·일부 크롬북용(사용자 결정). 릴리즈 C++ 컴파일 4벌 → 2벌                                |
 
 ## 시안 대비 남은 차이
 
