@@ -64,7 +64,7 @@ describe('ChangePasswordScreen', () => {
   it('강제 변경이면 안내 배너·다른 계정 로그인을 보여주고 하드웨어 뒤로가기를 막는다', async () => {
     const back = jest.spyOn(BackHandler, 'addEventListener');
     await open();
-    expect(screen.getByText(AUTH_COPY.forcedChange)).toBeTruthy();
+    expect(screen.getByText(AUTH_COPY.forcedTitle)).toBeTruthy();
     expect(screen.getByRole('header', { name: '비밀번호 변경' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '다른 계정으로 로그인' })).toBeTruthy();
     expect(consumesBack(back)).toBe(true);
@@ -72,11 +72,15 @@ describe('ChangePasswordScreen', () => {
   });
 
   // theme에 없는 색 클래스는 NativeWind가 조용히 버려 상자 없이 글자만 남는다
-  it('강제 안내는 tint2 바탕·text3 글자 상자로, 제목·입력 라벨은 시안 글자색으로 그린다', async () => {
+  it('강제 안내는 tint 바탕 공지 상자(아이콘·굵은 제목·본문)로, 화면 제목·입력 라벨은 시안 글자색으로 그린다', async () => {
     await open();
-    const notice = screen.getByText(AUTH_COPY.forcedChange);
-    expect(themeColor(notice.parent?.props.className, 'bg')).toBe(colors.tint2);
-    expect(themeColor(notice.props.className, 'text')).toBe(colors.text3);
+    expect(themeColor(screen.getByTestId('forced-notice').props.className, 'bg')).toBe(colors.tint);
+    const noticeTitle = screen.getByText(AUTH_COPY.forcedTitle);
+    expect(themeColor(noticeTitle.props.className, 'text')).toBe(colors.text3);
+    expect(noticeTitle.props.className).toContain('font-semibold');
+    expect(themeColor(screen.getByText(AUTH_COPY.forcedBody).props.className, 'text')).toBe(
+      colors.label,
+    );
     const title = screen.getByRole('header', { name: '비밀번호 변경' });
     expect(themeColor(title.props.className, 'text')).toBe(colors.text3);
     expect(themeColor(screen.getByText('현재 비밀번호').props.className, 'text')).toBe(
@@ -88,7 +92,7 @@ describe('ChangePasswordScreen', () => {
     signedIn(false);
     const back = jest.spyOn(BackHandler, 'addEventListener');
     await open();
-    expect(screen.queryByText(AUTH_COPY.forcedChange)).toBeNull();
+    expect(screen.queryByText(AUTH_COPY.forcedTitle)).toBeNull();
     expect(screen.queryByRole('header')).toBeNull();
     expect(screen.queryByRole('button', { name: '다른 계정으로 로그인' })).toBeNull();
     expect(consumesBack(back)).toBe(false);
