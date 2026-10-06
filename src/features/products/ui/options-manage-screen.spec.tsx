@@ -4,7 +4,11 @@ import type * as MockReact from 'react';
 import type * as MockRN from 'react-native';
 import { toast } from 'sonner-native';
 
-import { type SellerProductManageQuery } from '@/graphql/generated/graphql';
+import {
+  type SellerProductManageQuery,
+  type SellerProductUpdateOptionItemMutation,
+  type SellerProductUpdateOptionItemMutationVariables,
+} from '@/graphql/generated/graphql';
 import { graphqlError } from '@/test/msw/graphql';
 import { server } from '@/test/msw/server';
 import { createTestQueryClient, Providers } from '@/test/render';
@@ -167,6 +171,55 @@ describe('ProductOptionsScreen', () => {
     await fireEvent.press(toggle);
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('잠시 후 다시 시도해 주세요.'));
     await waitFor(() => expect(screen.getByRole('switch', { name: '0호 판매' })).toBeChecked());
+  });
+
+  it('같은 옵션을 연달아 바꾸면 앞 저장이 끝난 뒤 다음을 보내 서버에도 마지막 편집이 남는다', async () => {
+    let isActive = true;
+    const log: string[] = [];
+    const releases: (() => void)[] = [];
+    server.use(
+      graphql.query<SellerProductManageQuery>('SellerProductManage', () => {
+        log.push(`조회 ${isActive}`);
+        const [size, ...rest] = GROUPS;
+        const items = size!.optionItems.map((i) => (i.id === 'o1' ? { ...i, isActive } : i));
+        return HttpResponse.json({
+          data: {
+            sellerProduct: {
+              id: '7',
+              optionGroups: [{ ...size!, optionItems: items }, ...rest],
+              customTemplate: null,
+            },
+          },
+        });
+      }),
+      graphql.mutation<
+        SellerProductUpdateOptionItemMutation,
+        SellerProductUpdateOptionItemMutationVariables
+      >('SellerProductUpdateOptionItem', async ({ variables: { input } }) => {
+        log.push(`보냄 ${input.isActive}`);
+        // 첫 요청은 풀어 줄 때 반영된다 — 그사이 뒤 요청이 먼저 반영되면 순서가 뒤집힌다
+        if (releases.length === 0) await new Promise<void>((resolve) => releases.push(resolve));
+        isActive = input.isActive!;
+        log.push(`반영 ${input.isActive}`);
+        return HttpResponse.json({ data: { sellerUpdateOptionItem: { id: 'o1' } } });
+      }),
+    );
+    const toggle = () => screen.getByRole('switch', { name: '0호 판매' });
+    const edits = () => log.filter((e) => !e.startsWith('조회'));
+    await open();
+    await fireEvent.press(await screen.findByRole('switch', { name: '0호 판매' }));
+    await waitFor(() => expect(edits()).toEqual(['보냄 false']));
+    await fireEvent.press(toggle());
+    expect(toggle()).toBeChecked();
+    expect(edits()).toEqual(['보냄 false']);
+
+    releases[0]!();
+    await waitFor(() => expect(edits()).toHaveLength(4));
+    expect(edits()).toEqual(['보냄 false', '반영 false', '보냄 true', '반영 true']);
+    expect(isActive).toBe(true);
+    // 줄이 빈 뒤 다시 받은 서버 값으로도 켜져 있다
+    await waitFor(() => expect(log.at(-1)).toBe('조회 true'));
+    await waitFor(() => expect(toggle()).toBeChecked());
   });
 
   it('추가 금액은 입력을 마칠 때 바뀐 경우만 저장하고, 실패하면 입력도 되돌린다', async () => {
