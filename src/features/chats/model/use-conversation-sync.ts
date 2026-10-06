@@ -25,8 +25,12 @@ export function useConversationSync(onNewInquiry: (conversation: Conversation) =
         next: ({ sellerConversationUpdated: event }) => {
           const key = chatsKeys.conversations();
           const data = queryClient.getQueryData<ConversationPages>(key);
-          // 아직 목록이 없으면 첫 조회가 최신 상태를 가져온다
-          if (!data) return;
+          // 첫 조회 중이면 응답이 이 이벤트 전 스냅샷일 수 있다. 데이터 없는 조회는 무효화로
+          // 취소되지 않아(진행 중 요청을 재사용) 초기화해 다시 부르고, 새 목록이 보여 주니 알리지 않는다
+          if (!data) {
+            void queryClient.resetQueries({ queryKey: key });
+            return;
+          }
           const { data: merged, applied, previous } = mergeConversationUpdate(data, event);
           if (!applied) return;
           queryClient.setQueryData(key, merged);
