@@ -1,4 +1,4 @@
-import { notifyManager } from '@tanstack/react-query';
+import { notifyManager, QueryClient } from '@tanstack/react-query';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import { router as navigation } from 'expo-router';
 import { type Sink } from 'graphql-ws';
@@ -73,8 +73,7 @@ function listHandler(respond: (input: SellerOrderListInput) => Page) {
   return calls;
 }
 
-function open() {
-  const queryClient = createTestQueryClient();
+function open(queryClient = createTestQueryClient()) {
   return renderRouter(
     { orders: OrdersScreen, 'orders/[id]': () => <Text>상세</Text> },
     {
@@ -277,5 +276,49 @@ describe('OrdersScreen', () => {
     });
     await waitFor(() => expect(calls).toHaveLength(2));
     expect(toast).not.toHaveBeenCalled();
+  });
+
+  it('상태가 바뀌면 그 주문이 있던 목록은 그 자리에서 고치고, 없던 목록은 새 상태가 들어갈 수 있는 것만 다시 받는다', async () => {
+    // 앱처럼 staleTime이 있어야 탭을 오갈 때 받아 둔 목록을 다시 받지 않는다
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: 30_000 } },
+    });
+    let made = false;
+    const calls = listHandler(({ status }) => {
+      if (status === 'MADE') return page(made ? [summary('1', { status: 'MADE' })] : []);
+      if (status === 'CANCELED') return page([]);
+      return page([summary('1', { status: 'CONFIRMED' })]);
+    });
+    const fetched = (status?: string) => calls.filter((c) => c.status === status).length;
+    const tab = (name: string) => fireEvent.press(screen.getByRole('tab', { name }));
+    await open(queryClient);
+    await screen.findByText('케이크 1');
+    await tab('제작 완료');
+    await waitFor(() => expect(fetched('MADE')).toBe(1));
+    await tab('취소');
+    await waitFor(() => expect(fetched('CANCELED')).toBe(1));
+    await tab('전체');
+    await screen.findByText('케이크 1');
+    expect(calls).toHaveLength(3);
+
+    made = true;
+    await emit({
+      orderId: '1',
+      status: 'MADE',
+      pickupAt: TODAY_NOON,
+      buyerName: '김다은',
+      totalPrice: 38000,
+      productName: '케이크 1',
+      updatedAt: '2026-10-06T01:00:00.000Z',
+    });
+    expect(row('케이크 1')).toHaveTextContent(/제작 완료/);
+    expect(fetched()).toBe(1);
+
+    await tab('제작 완료');
+    expect(await screen.findByText('케이크 1')).toBeTruthy();
+    expect(fetched('MADE')).toBe(2);
+    await tab('취소');
+    expect(await screen.findByText('조건에 맞는 주문이 없어요')).toBeTruthy();
+    expect(fetched('CANCELED')).toBe(1);
   });
 });

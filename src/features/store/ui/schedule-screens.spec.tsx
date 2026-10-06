@@ -4,6 +4,10 @@ import type React from 'react';
 import type * as ReactNative from 'react-native';
 import { toast } from 'sonner-native';
 
+import {
+  type SellerStoreUpsertBusinessHourMutation,
+  type SellerUpsertStoreBusinessHourInput,
+} from '@/graphql/generated/graphql';
 import { hmToDate } from '@/shared/ui/time-row';
 import { graphqlError } from '@/test/msw/graphql';
 import { server } from '@/test/msw/server';
@@ -192,6 +196,65 @@ describe('영업시간', () => {
     await fireEvent.press(await screen.findByRole('switch', { name: '수 영업' }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('x'));
     expect(screen.getByRole('switch', { name: '수 영업' })).toBeChecked();
+  });
+
+  it('같은 요일을 연달아 바꾸면 앞 저장이 끝난 뒤 마지막 편집만 이어 보내 서버에도 마지막 편집이 남는다', async () => {
+    let saved = HOURS;
+    const calls: SellerUpsertStoreBusinessHourInput[] = [];
+    const releases: (() => void)[] = [];
+    server.use(
+      graphql.query('SellerStoreBusinessHours', () =>
+        HttpResponse.json({ data: { sellerStoreBusinessHours: saved } }),
+      ),
+      graphql.mutation<
+        SellerStoreUpsertBusinessHourMutation,
+        { input: SellerUpsertStoreBusinessHourInput }
+      >('SellerStoreUpsertBusinessHour', async ({ variables: { input } }) => {
+        calls.push(input);
+        // 앞 두 요청은 풀어 줄 때 반영된다 — 그사이 뒤 요청이 먼저 반영되면 순서가 뒤집힌다
+        if (calls.length <= 2) await new Promise<void>((resolve) => releases.push(resolve));
+        saved = saved.map((h) =>
+          h.dayOfWeek === input.dayOfWeek
+            ? {
+                ...h,
+                isClosed: input.isClosed,
+                openTime: input.openTime ?? null,
+                closeTime: input.closeTime ?? null,
+              }
+            : h,
+        );
+        return HttpResponse.json({
+          data: { sellerUpsertStoreBusinessHour: { id: `h${input.dayOfWeek}` } },
+        });
+      }),
+    );
+    const day = () => screen.getByRole('switch', { name: '월 영업' });
+    const end = () => screen.getByRole('button', { name: '월 종료 시각' });
+    await open('/store/business-hours');
+    await fireEvent.press(await screen.findByRole('switch', { name: '월 영업' }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    await fireEvent.press(day());
+    await fireEvent.press(end());
+    await fireEvent(screen.getByTestId('time-picker'), 'valueChange', {}, hmToDate('18:00'));
+    await fireEvent.press(screen.getByRole('button', { name: '완료' }));
+
+    // 첫 저장이 끝나야 다음을 보내고, 그사이 낀 편집(다시 영업 10–19)은 건너뛴다
+    releases[0]!();
+    await waitFor(() => expect(calls).toHaveLength(2));
+    expect(calls).toEqual([
+      { dayOfWeek: 1, isClosed: true, openTime: null, closeTime: null },
+      { dayOfWeek: 1, isClosed: false, openTime: T('10:00'), closeTime: T('18:00') },
+    ]);
+    // 앞 저장이 끝나도 아직 저장 중인 마지막 편집을 지우지 않는다
+    expect(day()).toBeChecked();
+    expect(end()).toHaveAccessibilityValue({ text: '18:00' });
+
+    releases[1]!();
+    await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(2));
+    expect(toast.success).toHaveBeenCalledWith('월요일 영업시간이 저장되었습니다');
+    expect(saved.find((h) => h.dayOfWeek === 1)).toEqual(hour(1, '10:00', '18:00'));
+    expect(day()).toBeChecked();
+    expect(end()).toHaveAccessibilityValue({ text: '18:00' });
   });
 });
 
