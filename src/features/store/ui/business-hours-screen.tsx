@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import { showToast, TimeRow } from '@/shared/ui';
@@ -36,26 +36,39 @@ export function StoreBusinessHoursScreen() {
     return h ? { open: true, ...h } : { open: false, ...DEFAULT_RANGE };
   };
 
-  const save = async (day: number, { open, start, end }: RowValue) => {
+  // 같은 요일 저장을 줄 세운다 — 동시에 보내면 늦게 반영된 앞 편집이 마지막 편집을 덮을 수 있다
+  const queues = useRef(new Map<number, Promise<void>>());
+  const latest = useRef(new Map<number, number>());
+
+  const save = (day: number, { open, start, end }: RowValue) => {
     const next = { open, start, end };
+    const seq = (latest.current.get(day) ?? 0) + 1;
+    latest.current.set(day, seq);
     if (open && start >= end) {
       setDraft(day, { ...next, error: STORE_COPY.hoursOrder });
       return;
     }
     setDraft(day, next);
-    try {
-      await upsertBusinessHour({
-        dayOfWeek: day,
-        isClosed: !next.open,
-        openTime: next.open ? hmToTimeIso(next.start) : null,
-        closeTime: next.open ? hmToTimeIso(next.end) : null,
-      });
-      showToast.success(STORE_COPY.hoursSaved(dayLabel(day)));
-      await queryClient.invalidateQueries({ queryKey: storeKeys.businessHours() });
-    } catch (e) {
-      showToast.error(storeErrorMessage(e));
-    }
-    setDraft(day, undefined);
+    const isLatest = () => latest.current.get(day) === seq;
+    const send = async () => {
+      // 기다리는 사이 더 새 편집이 왔으면 그것만 보낸다
+      if (!isLatest()) return;
+      try {
+        await upsertBusinessHour({
+          dayOfWeek: day,
+          isClosed: !next.open,
+          openTime: next.open ? hmToTimeIso(next.start) : null,
+          closeTime: next.open ? hmToTimeIso(next.end) : null,
+        });
+        showToast.success(STORE_COPY.hoursSaved(dayLabel(day)));
+        await queryClient.invalidateQueries({ queryKey: storeKeys.businessHours() });
+      } catch (e) {
+        showToast.error(storeErrorMessage(e));
+      }
+      if (isLatest()) setDraft(day, undefined);
+    };
+    const queued = (queues.current.get(day) ?? Promise.resolve()).then(send);
+    queues.current.set(day, queued);
   };
 
   return (
@@ -75,8 +88,8 @@ export function StoreBusinessHoursScreen() {
                     start={row.start}
                     end={row.end}
                     minuteInterval={10}
-                    onOpenChange={(open) => void save(day, { ...row, open })}
-                    onChange={(range) => void save(day, { ...row, ...range })}
+                    onOpenChange={(open) => save(day, { ...row, open })}
+                    onChange={(range) => save(day, { ...row, ...range })}
                   />
                   {row.error ? (
                     <Text
