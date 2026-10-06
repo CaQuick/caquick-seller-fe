@@ -6,6 +6,7 @@ import {
   optionGroupSummary,
   priceView,
   removeFromList,
+  restoreActiveInList,
   setActiveInList,
 } from './browse';
 
@@ -94,5 +95,21 @@ describe('목록 캐시 갱신', () => {
 
   it('캐시가 없으면 그대로 둔다', () => {
     expect(setActiveInList(undefined, '1', false)).toBeUndefined();
+  });
+
+  it('실패한 상품만 스냅샷 값으로 되돌리고 그사이 바뀐 다른 상품은 둔다', () => {
+    const snapshot = pages(['1', '2']);
+    const current = setActiveInList(setActiveInList(snapshot, '1', false), '2', false);
+    const next = restoreActiveInList(current, snapshot, '1');
+    expect(next?.pages[0]?.items.map((i) => [i.id, i.isActive])).toEqual([
+      ['1', true],
+      ['2', false],
+    ]);
+  });
+
+  it('스냅샷에 없는 상품이면 현재 목록을 그대로 둔다', () => {
+    const current = pages(['3']);
+    expect(restoreActiveInList(current, pages(['1']), '3')).toBe(current);
+    expect(restoreActiveInList(current, undefined, '3')).toBe(current);
   });
 });

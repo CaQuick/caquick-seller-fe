@@ -87,8 +87,7 @@ function listHandler(products: Item[] = PRODUCTS, calls: SellerProductListInput[
 
 const categoriesOk = gqlOk('SellerProductsFilterCategories', { categories: CATEGORIES });
 
-function open() {
-  const queryClient = createTestQueryClient();
+function open(queryClient = createTestQueryClient()) {
   return renderRouter(
     {
       products: ProductsScreen,
@@ -230,6 +229,40 @@ describe('ProductsScreen', () => {
     release();
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('상품을 찾을 수 없습니다.'));
     await waitFor(() => expect(toggle()).toBeChecked());
+  });
+
+  it('반증: 먼저 누른 스위치가 늦게 실패해도 그사이 바꾼 다른 상품은 되돌리지 않는다', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    server.use(
+      listHandler(),
+      categoriesOk,
+      graphql.mutation<object, { input: { productId: string; isActive: boolean } }>(
+        'SellerProductSetActive',
+        async ({ variables: { input } }) => {
+          if (input.productId === '2')
+            return HttpResponse.json({
+              data: { sellerSetProductActive: { id: '2', isActive: input.isActive } },
+            });
+          await gate;
+          return HttpResponse.error();
+        },
+      ),
+    );
+    const queryClient = createTestQueryClient();
+    await open(queryClient);
+    await row('그림일기 케이크');
+    const toggle = (name: string) => screen.getByRole('switch', { name: `${name} 노출` });
+    await fireEvent.press(toggle('그림일기 케이크'));
+    await waitFor(() => expect(toggle('그림일기 케이크')).not.toBeChecked());
+    await fireEvent.press(toggle('레터링 생일 케이크'));
+    // 두 번째 요청이 성공으로 끝나고 첫 요청만 남은 뒤에 첫 요청을 실패시킨다
+    await waitFor(() => expect(queryClient.isMutating()).toBe(1));
+    await waitFor(() => expect(toggle('레터링 생일 케이크')).not.toBeChecked());
+    release();
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('서버에 연결할 수 없습니다.'));
+    await waitFor(() => expect(toggle('그림일기 케이크')).toBeChecked());
+    expect(toggle('레터링 생일 케이크')).not.toBeChecked();
   });
 
   it('상품이 하나도 없으면 빈 상태의 등록 버튼으로 1/3에 간다', async () => {
