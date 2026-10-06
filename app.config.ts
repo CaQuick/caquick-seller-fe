@@ -44,8 +44,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   experiments: { typedRoutes: true },
   plugins: [
     'expo-router',
-    // x86·x86_64는 에뮬레이터·일부 크롬북용 — 릴리즈 네이티브 컴파일을 줄이려고 ARM만 빌드한다
-    ['expo-build-properties', { android: { buildArchs: ['arm64-v8a', 'armeabi-v7a'] } }],
+    // 64비트 ARM만 — x86류는 에뮬레이터용, 32비트 전용 OS 기기(Android Go 저가폰)는 지원하지 않는다
+    ['expo-build-properties', { android: { buildArchs: ['arm64-v8a'] } }],
     [
       'expo-font',
       {
