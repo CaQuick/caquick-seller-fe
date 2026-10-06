@@ -6,7 +6,9 @@ import { colors, fontFamily, radius } from '@/shared/config/tokens';
 export const showToast = {
   success: (message: string) => toast.success(message),
   error: (message: string) => toast.error(message),
-  info: (message: string) => toast(message),
+  /** onPress가 있으면 토스트를 눌러 그 화면으로 간다 */
+  info: (message: string, onPress?: () => void) =>
+    onPress ? toast(message, { onPress }) : toast(message),
   dismiss: () => toast.dismiss(),
 };
 

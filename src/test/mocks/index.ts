@@ -34,8 +34,14 @@ jest.mock('expo-notifications', () => ({
   setNotificationHandler: jest.fn(),
   addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
-  getLastNotificationResponseAsync: jest.fn(() => Promise.resolve(null)),
+  getLastNotificationResponse: jest.fn(() => null),
+  clearLastNotificationResponse: jest.fn(),
   AndroidImportance: { DEFAULT: 3, HIGH: 4, MAX: 5 },
+}));
+
+/** expo-network: jest-expo 자동 mock은 구독 객체를 돌려주지 않는다 — onlineManager 해제가 remove를 부른다 */
+jest.mock('expo-network', () => ({
+  addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
 }));
 
 jest.mock('expo-updates', () => ({
@@ -78,3 +84,22 @@ jest.mock('expo-file-system', () => {
     Paths: { cache: { uri: 'file:///cache/' } },
   };
 });
+
+/** @native-html/render가 끌어오는 ESM 전용 패키지(jest 변환 대상 밖). 디버그 직렬화에만 쓰여 그대로 돌려준다 */
+jest.mock('stringify-entities', () => ({ stringifyEntities: (value: string) => value }));
+
+/** AsyncStorage(상품 등록 임시저장): 패키지가 주는 메모리 구현. 네이티브 모듈이 없으면 import 시점에 던진다 */
+jest.mock('@react-native-async-storage/async-storage', () =>
+  jest.requireActual<object>('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
+
+/** expo-location: 기본은 권한 허용 + 고정 좌표. spec이 mockResolvedValueOnce 등으로 바꾼다 */
+jest.mock('expo-location', () => ({
+  Accuracy: { Balanced: 3 },
+  requestForegroundPermissionsAsync: jest.fn(() =>
+    Promise.resolve({ status: 'granted', granted: true, canAskAgain: true }),
+  ),
+  getCurrentPositionAsync: jest.fn(() =>
+    Promise.resolve({ coords: { latitude: 37.5326, longitude: 126.6406 }, timestamp: 0 }),
+  ),
+}));

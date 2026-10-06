@@ -228,6 +228,71 @@ describe('authRequest', () => {
     });
   });
 
+  describe('auth 요청의 403 분기', () => {
+    it.each([
+      [true, 'ACCOUNT_NOT_ACTIVE', 1],
+      [true, 'ACCOUNT_TYPE_NOT_ALLOWED', 1],
+      [true, 'PASSWORD_CHANGE_REQUIRED', 1],
+      [true, 'ROLE_MISMATCH', 0],
+      [false, 'ACCOUNT_NOT_ACTIVE', 0],
+    ] as const)('auth=%s·%s면 onForbidden %d회 뒤 던진다', async (auth, code, calls) => {
+      const onForbidden = jest.fn();
+      registerSessionHooks({ onForbidden });
+      server.use(restError('/seller/change-password', 403, 'x', code));
+      await expect(
+        authRequest('/seller/change-password', { auth, body: {} }),
+      ).rejects.toMatchObject({ classification: 'FORBIDDEN', code });
+      expect(onForbidden).toHaveBeenCalledTimes(calls);
+      if (calls) expect(onForbidden).toHaveBeenCalledWith(code);
+    });
+  });
+
+  describe('devIssueToken', () => {
+    const g = globalThis as unknown as { __DEV__: boolean };
+
+    it('accountId를 바디로 보내고 Authorization은 붙이지 않는다', async () => {
+      registerSessionHooks({ getAccessToken: () => 'tok' });
+      let seen: { body: unknown; auth: string | null; xClient: string | null } | null = null;
+      server.use(
+        http.post(`${AUTH_URL}/dev/issue-token`, async ({ request }) => {
+          seen = {
+            body: await request.json(),
+            auth: request.headers.get('authorization'),
+            xClient: request.headers.get('x-client'),
+          };
+          return HttpResponse.json({
+            accessToken: 'a',
+            tokenType: 'Bearer',
+            expiresInSeconds: 900,
+          });
+        }),
+      );
+      await expect(sellerAuthApi.devIssueToken('12')).resolves.toMatchObject({ accessToken: 'a' });
+      expect(seen).toEqual({ body: { accountId: '12' }, auth: null, xClient: 'mobile' });
+    });
+
+    it('반증: __DEV__가 false면 요청 없이 DEV_ONLY_ENDPOINT로 거절한다', async () => {
+      let called = 0;
+      server.use(
+        http.post(`${AUTH_URL}/dev/issue-token`, () => {
+          called += 1;
+          return HttpResponse.json({});
+        }),
+      );
+      const dev = g.__DEV__;
+      g.__DEV__ = false;
+      try {
+        await expect(sellerAuthApi.devIssueToken('12')).rejects.toMatchObject({
+          code: 'DEV_ONLY_ENDPOINT',
+          classification: 'FORBIDDEN',
+        });
+      } finally {
+        g.__DEV__ = dev;
+      }
+      expect(called).toBe(0);
+    });
+  });
+
   it('네트워크 실패는 NETWORK', async () => {
     server.use(http.post(`${AUTH_URL}/seller/login`, () => HttpResponse.error()));
     await expect(authRequest('/seller/login', { body: {} })).rejects.toMatchObject({

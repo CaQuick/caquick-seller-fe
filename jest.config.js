@@ -31,8 +31,8 @@ module.exports = {
     '!src/shared/ui/**',
     '!**/*.spec.*',
   ],
-  // 초기값. 화면이 쌓여 안정되면 관리자 FE 수준(96/95/88/94)으로 올린다
-  coverageThreshold: { global: { statements: 90, branches: 80, functions: 90, lines: 90 } },
+  // 실측(2026-10-06: 97.57/92.93/95.84/97.94)의 정수 내림(D45). CI는 3샤드 병합 결과로 같은 값을 검사한다
+  coverageThreshold: { global: { statements: 97, branches: 92, functions: 95, lines: 97 } },
   coverageReporters: ['text-summary', 'lcov', 'json'],
   // 로컬(운영 맥미니)은 4개. CI는 러너 기본값
   ...(process.env.CI ? {} : { maxWorkers: 4 }),

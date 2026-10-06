@@ -1,8 +1,8 @@
 import { AUTH_URL } from '@/shared/config/env';
 
-import { ApiError, type FieldErrors, classifyStatus } from './errors';
+import { ApiError, type FieldErrors, classifyStatus, isForbiddenCode } from './errors';
 import { requestHeaders } from './headers';
-import { refreshOnce } from './session';
+import { getSessionHooks, refreshOnce } from './session';
 
 /** BE REST 에러 envelope(ApiResponseTemplate.ERROR). 로그인 성공 응답은 envelope 없이 본문 그대로다. */
 interface RestErrorBody {
@@ -56,7 +56,8 @@ async function send(
 
 /**
  * `/auth/*` REST 호출. 쿠키 없음, 모든 요청에 X-Client: mobile.
- * `auth: true` 요청이 입력 오류가 아닌 401이면 refresh 1회 뒤 재시도한다. 로그인·refresh 자체는 결과를 auth feature가 해석한다.
+ * `auth: true` 요청이 입력 오류가 아닌 401이면 refresh 1회 뒤 재시도하고, 세션 상태를 바꾸는 403 코드는 onForbidden에 넘긴다.
+ * 로그인·refresh 자체는 결과를 auth feature가 해석한다.
  */
 export async function authRequest<T>(path: string, options: RestOptions = {}): Promise<T> {
   let { status, body } = await send(path, options);
@@ -70,10 +71,13 @@ export async function authRequest<T>(path: string, options: RestOptions = {}): P
   }
   if (status === 204) return undefined as T;
   if (status < 200 || status >= 300) {
+    const code = body?.errorCode ?? null;
+    if (options.auth && status === 403 && isForbiddenCode(code))
+      getSessionHooks().onForbidden(code);
     throw new ApiError(
       body?.message ?? `요청 실패 (${status})`,
       classifyStatus(status),
-      body?.errorCode ?? null,
+      code,
       status,
       status === 400 ? toFieldErrors(body) : null,
     );
@@ -92,6 +96,9 @@ export interface CredentialSession {
   refreshExpiresAt: string;
 }
 
+/** 개발 빌드 전용 테스트 토큰. refresh 토큰이 없다 */
+type DevTokenSession = Pick<CredentialSession, 'accessToken' | 'tokenType' | 'expiresInSeconds'>;
+
 export const sellerAuthApi = {
   login: (body: { username: string; password: string }) =>
     authRequest<CredentialSession>('/seller/login', { body }),
@@ -100,4 +107,9 @@ export const sellerAuthApi = {
   logout: (refreshToken: string) => authRequest<void>('/seller/logout', { body: { refreshToken } }),
   changePassword: (body: { currentPassword: string; newPassword: string }) =>
     authRequest<{ ok: boolean }>('/seller/change-password', { auth: true, body }),
+  /** 운영 번들에서는 __DEV__ 상수 접기로 요청 경로째 빠진다 */
+  devIssueToken: (accountId: string) =>
+    __DEV__
+      ? authRequest<DevTokenSession>('/dev/issue-token', { body: { accountId } })
+      : Promise.reject(new ApiError('개발 빌드 전용', 'FORBIDDEN', 'DEV_ONLY_ENDPOINT', 403)),
 };

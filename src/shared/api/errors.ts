@@ -73,15 +73,22 @@ export const MESSAGES: Record<string, string> = {
   MISSING_REFRESH_TOKEN: '세션이 만료되었습니다. 다시 로그인해 주세요.',
   INVALID_REFRESH_TOKEN: '세션이 만료되었습니다. 다시 로그인해 주세요.',
   PASSWORD_CHANGE_REQUIRED: '비밀번호를 변경한 뒤 이용할 수 있습니다.',
-  ACCOUNT_NOT_ACTIVE: '이용이 정지된 계정입니다.',
+  ACCOUNT_NOT_ACTIVE: '이용이 정지된 계정입니다. 관리자에게 문의해 주세요.',
   ACCOUNT_TYPE_NOT_ALLOWED: '판매자 계정만 이용할 수 있습니다.',
-  LOGIN_RATE_LIMITED: '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.',
+  // BE 정책(같은 아이디·IP 15분 5회)과 같은 창. 앱은 해제 시각을 모른다
+  LOGIN_RATE_LIMITED: '로그인 시도가 너무 많습니다. 15분 뒤 다시 시도해 주세요.',
+  CURRENT_PASSWORD_INVALID: '현재 비밀번호가 일치하지 않습니다.',
   STORE_NOT_FOUND: '매장 정보를 찾을 수 없습니다.',
   INVALID_PUSH_TOKEN: '알림 등록에 실패했습니다. 앱을 다시 실행해 주세요.',
   PRODUCT_TAG_LIMIT_EXCEEDED: '태그는 상품당 20개까지 등록할 수 있습니다.',
   TEXT_TOO_LONG: '입력한 내용이 너무 깁니다.',
   INVALID_DATE: '날짜 형식이 올바르지 않습니다.',
 };
+
+/** 네트워크·서버 장애 — 세션이 끝났다는 뜻이 아니라 토큰을 지우지 않는다 */
+export function isTransientError(error: unknown): boolean {
+  return error instanceof ApiError && (error.classification === 'NETWORK' || error.status >= 500);
+}
 
 export function messageFor(error: unknown): string {
   if (error instanceof ApiError) {

@@ -106,7 +106,11 @@ jobs:
           fi
           if [ "$PLATFORM" != ios ]; then
             java -version 2>&1 | head -1
-            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list_installed | grep -E 'ndk;|build-tools;36|platforms;android-36'
+            # cmdline-tools 23부터 목록이 `ndk/…`처럼 `/`로 나온다 — 두 구분자를 다 받고, 패키지마다 따로 확인한다
+            installed=$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list_installed)
+            for pkg in 'ndk[;/]' 'build-tools[;/]36' 'platforms[;/]android-36'; do
+              grep -Eq "$pkg" <<< "$installed" || { echo "::error::Android SDK 패키지 없음: $pkg"; exit 1; }
+            done
           fi
 
       - name: Republish (rollback) and exit
@@ -116,6 +120,25 @@ jobs:
           eas update:republish --group "$REPUBLISH_GROUP" --non-interactive --json \
             --message "republish $REPUBLISH_GROUP"
           echo "SKIP=1" >> "$GITHUB_ENV"
+
+      # fingerprint가 이 파일 내용을 해시하므로 fingerprint·빌드·OTA 전에 같은 내용으로 둔다.
+      # 레포 밖 절대경로에 둔다 — --local 빌드는 git 기준으로 프로젝트를 복사해 무시된 .secrets/를 빠뜨린다
+      - name: Restore google-services.json
+        if: env.SKIP != '1' && env.PLATFORM != 'ios'
+        env:
+          GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GS_B64" ]; then
+            echo "::warning::GOOGLE_SERVICES_JSON_BASE64 없음 — Android 빌드가 푸시 토큰을 받지 못한다"
+            exit 0
+          fi
+          umask 077
+          f="$RUNNER_TEMP/google-services.json"
+          printf '%s' "$GS_B64" | base64 -d > "$f"
+          jq -e '.client[].client_info.android_client_info | select(.package_name == "com.caquick.seller")' "$f" > /dev/null \
+            || { echo "google-services.json에 com.caquick.seller 클라이언트가 없음"; exit 1; }
+          echo "GOOGLE_SERVICES_JSON=$f" >> "$GITHUB_ENV"
 
       # Environment 시크릿은 잡 if:에서 직접 못 읽는다 — 단계에서 outputs로 바꾼다
       - name: Resolve submit capability
@@ -155,7 +178,9 @@ jobs:
               { echo "${p}_build=false"; echo "${p}_update=false"; } >> "$GITHUB_OUTPUT"
               continue
             fi
-            hash=$(eas fingerprint:generate --platform "$p" --environment production --non-interactive --json | jq -r .hash)
+            # --environment를 주면 EAS 환경변수 안내가 JSON 앞 stdout에 붙는다 — JSON 시작 줄부터 읽는다
+            hash=$(eas fingerprint:generate --platform "$p" --environment production --non-interactive --json \
+              | sed -n '/^[[{]/,$p' | jq -r .hash)
             [ -n "$hash" ] && [ "$hash" != null ] || { echo "$p fingerprint 계산 실패"; exit 1; }
             if [ "$p" = ios ]; then submit=$SUBMIT_IOS; else submit=$SUBMIT_ANDROID; fi
             ledger=$([ "$submit" = true ] && echo shipped || echo built)
@@ -265,7 +290,7 @@ jobs:
         run: |
           set -euo pipefail
           out=$(eas update --channel production --environment production --platform ios \
-            --message "$MESSAGE" --non-interactive --json)
+            --message "$MESSAGE" --non-interactive --json | sed -n '/^[[{]/,$p')
           echo "$out" | jq .
           rv=$(echo "$out" | jq -r '.[0].runtimeVersion')
           [ "$rv" = "$HASH" ] || { echo "runtimeVersion($rv) ≠ fingerprint($HASH) — 계산 환경 불일치"; exit 1; }
@@ -280,7 +305,7 @@ jobs:
         run: |
           set -euo pipefail
           out=$(eas update --channel production --environment production --platform android \
-            --message "$MESSAGE" --non-interactive --json)
+            --message "$MESSAGE" --non-interactive --json | sed -n '/^[[{]/,$p')
           echo "$out" | jq .
           rv=$(echo "$out" | jq -r '.[0].runtimeVersion')
           [ "$rv" = "$HASH" ] || { echo "runtimeVersion($rv) ≠ fingerprint($HASH) — 계산 환경 불일치"; exit 1; }
@@ -296,7 +321,7 @@ jobs:
 
       - name: Cleanup secrets
         if: always()
-        run: rm -rf .secrets credentials.json
+        run: rm -rf .secrets credentials.json "$RUNNER_TEMP/google-services.json"
 
       - name: Release host lock
         if: always()

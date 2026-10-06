@@ -1,6 +1,7 @@
 import {
   WEEKDAYS_KO,
   addDays,
+  addMonths,
   formatKst,
   formatPickupKst,
   formatRelativeKst,
@@ -10,6 +11,7 @@ import {
   kstDayStartIso,
   kstParts,
   kstToIso,
+  monthGrid,
   parseYmd,
   todayKst,
 } from './kst';
@@ -85,5 +87,28 @@ describe('kst', () => {
       expect(formatRelativeKst('2026-12-31T13:30:00.000Z', jan1)).toBe('어제 22:30');
       expect(formatRelativeKst('2026-12-20T00:00:00.000Z', jan1)).toBe('2026-12-20');
     });
+  });
+});
+
+describe('monthGrid·addMonths', () => {
+  it('일요일 시작 42칸으로 앞뒤 달을 채운다(2026년 10월은 목요일 시작)', () => {
+    const grid = monthGrid({ y: 2026, m: 10 });
+    expect(grid).toHaveLength(42);
+    expect(formatYmd(grid[0]!)).toBe('2026-09-27');
+    expect(grid.slice(0, 4).every((c) => !c.inMonth)).toBe(true);
+    expect(grid[4]).toEqual({ y: 2026, m: 10, d: 1, inMonth: true });
+    expect(grid.filter((c) => c.inMonth)).toHaveLength(31);
+    expect(formatYmd(grid[41]!)).toBe('2026-11-07');
+  });
+
+  it('반증: 1일이 일요일인 달은 앞 달 칸이 없다', () => {
+    const grid = monthGrid({ y: 2026, m: 2 });
+    expect(grid[0]).toEqual({ y: 2026, m: 2, d: 1, inMonth: true });
+    expect(grid.filter((c) => c.inMonth)).toHaveLength(28);
+  });
+
+  it('addMonths는 연 경계를 넘는다', () => {
+    expect(addMonths({ y: 2026, m: 12 }, 1)).toEqual({ y: 2027, m: 1 });
+    expect(addMonths({ y: 2026, m: 1 }, -1)).toEqual({ y: 2025, m: 12 });
   });
 });

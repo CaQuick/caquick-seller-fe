@@ -9,10 +9,14 @@ const PRETENDARD = [
   { path: './assets/fonts/Pretendard-Bold.otf', weight: 700 },
 ];
 
+/** EAS 프로젝트 @caquick/caquick-seller. 동적 설정이라 `eas init`이 쓰지 못해 직접 둔다 */
+const EAS_PROJECT_ID = '491006a8-4cc4-40df-bdd6-bde68ddb5195';
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: '케이퀵 판매자',
   slug: 'caquick-seller',
+  owner: 'caquick',
   version: '1.0.0',
   scheme: 'caquickseller',
   orientation: 'portrait',
@@ -25,6 +29,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'com.caquick.seller',
+    // FCM(Android 푸시 토큰). 파일은 커밋하지 않고 빌드 환경이 경로를 준다 — 없으면 푸시 등록만 실패한다
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON,
     adaptiveIcon: {
       backgroundColor: '#FBFBFF',
       foregroundImage: './assets/android-icon-foreground.png',
@@ -33,12 +39,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     predictiveBackGestureEnabled: false,
   },
-  // TODO(EAS): Expo 조직 caquick 생성 뒤 `eas init`이 넣는 projectId로 채운다 — https://u.expo.dev/<projectId>
-  // updates: { url: 'https://u.expo.dev/<projectId>' },
+  updates: { url: `https://u.expo.dev/${EAS_PROJECT_ID}` },
   runtimeVersion: { policy: 'fingerprint' },
   experiments: { typedRoutes: true },
   plugins: [
     'expo-router',
+    [
+      'expo-build-properties',
+      {
+        // 64비트 ARM만 — x86류는 에뮬레이터용, 32비트 전용 OS 기기(Android Go 저가폰)는 지원하지 않는다
+        android: { buildArchs: ['arm64-v8a'] },
+        // iOS 27 SDK는 UIScene 생명주기가 없으면 실행을 거부하는데 SDK 57 템플릿은 아직 채택하지 않았다.
+        // Expo의 ExpoAppSceneDelegate로 옮긴다(SDK 58부터는 템플릿 기본이라 경고 후 무시 — 그때 지운다)
+        ios: { enableSceneSupport: true },
+      },
+    ],
     [
       'expo-font',
       {
@@ -53,8 +68,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-image-picker',
       { photosPermission: '상품·매장 사진을 올리기 위해 사진 보관함에 접근합니다.' },
     ],
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission: '매장 주소의 지역을 찾기 위해 현재 위치를 사용합니다.',
+        // 포그라운드만 쓴다 — 플러그인 기본값인 영문 '항상 허용'·동작 인식 문구를 넣지 않는다
+        locationAlwaysAndWhenInUsePermission: false,
+        locationAlwaysPermission: false,
+        motionUsagePermission: false,
+      },
+    ],
   ],
   extra: {
-    // TODO(EAS): eas: { projectId: '<projectId>' }
+    eas: { projectId: EAS_PROJECT_ID },
   },
 });

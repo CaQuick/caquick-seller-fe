@@ -8,9 +8,10 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { useSessionBootstrap, useSessionStore } from '@/features/auth';
+import { BootSplash, useProactiveRefresh, useSessionStore } from '@/features/auth';
+import { usePushNotifications } from '@/features/push';
 import { useOtaUpdate } from '@/features/settings';
-import { disposeWsClient } from '@/shared/api';
+import { bindOnlineManager, disposeWsClient } from '@/shared/api';
 import { colors } from '@/shared/config/tokens';
 import { AppToaster } from '@/shared/ui';
 
@@ -20,8 +21,8 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
 });
 
-// 포그라운드 복귀를 TanStack의 focus로 — RN에는 window focus가 없다
-// TODO(통합): onlineManager는 expo-network 또는 @react-native-community/netinfo가 붙은 뒤 배선
+// 포그라운드 복귀를 TanStack의 focus로, 기기 네트워크를 online으로 — RN에는 window 이벤트가 없다
+bindOnlineManager();
 AppState.addEventListener('change', (state) => focusManager.setFocused(state === 'active'));
 
 // 세션이 끝나면(로그아웃·강제 해제) 구독 소켓을 끊고 판매자 데이터 캐시를 비운다
@@ -32,8 +33,9 @@ useSessionStore.subscribe((s, prev) => {
 });
 
 export default function RootLayout() {
-  useSessionBootstrap();
+  useProactiveRefresh();
   useOtaUpdate();
+  usePushNotifications(queryClient);
   useEffect(() => () => focusManager.setFocused(undefined), []);
   return (
     <GestureHandlerRootView className="flex-1">
@@ -43,6 +45,7 @@ export default function RootLayout() {
           <Stack
             screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
           />
+          <BootSplash />
           <AppToaster />
         </BottomSheetModalProvider>
       </QueryClientProvider>

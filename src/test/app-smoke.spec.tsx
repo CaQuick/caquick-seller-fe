@@ -4,8 +4,10 @@ import { AppState } from 'react-native';
 
 import { useSessionStore } from '@/features/auth';
 import { resetSessionHooks } from '@/shared/api';
+import { subscribe } from '@/shared/api/ws-client';
+import { showToast } from '@/shared/ui';
 import { mockSecureStore } from '@/test/mocks';
-import { restOk } from '@/test/msw/graphql';
+import { gqlOk, restOk } from '@/test/msw/graphql';
 import { server } from '@/test/msw/server';
 
 import R_layout from '../../app/_layout';
@@ -43,6 +45,12 @@ import R_app_store_special_closures from '../../app/(app)/store/special-closures
 import R_auth_layout from '../../app/(auth)/_layout';
 import R_auth_change_password from '../../app/(auth)/change-password';
 import R_auth_login from '../../app/(auth)/login';
+
+// 홈의 주문 구독이 실제 소켓을 열지 않게 한다
+jest.mock('@/shared/api/ws-client', () => ({
+  ...jest.requireActual<object>('@/shared/api/ws-client'),
+  subscribe: jest.fn(() => () => undefined),
+}));
 
 /**
  * 라우터·세션 부팅·NativeWind·RNTL 14가 jest에서 함께 도는지 — app/ 안에는 spec을 못 두므로 여기서.
@@ -86,6 +94,35 @@ const routes = {
   '(auth)/login': R_auth_login,
 };
 
+const sellerMe = gqlOk('SellerAuthMe', {
+  sellerMe: {
+    accountId: '7',
+    username: 'seller01',
+    displayName: null,
+    storeId: '3',
+    mustChangePassword: false,
+    accountStatus: 'ACTIVE',
+  },
+});
+
+const home = [
+  gqlOk('SellerHomeStore', {
+    sellerMyStore: { id: '3', storeName: '해즈 케이크', isActive: true },
+  }),
+  gqlOk('SellerHomeDashboard', {
+    sellerDashboard: {
+      date: '2026-10-06',
+      newOrderCount: 0,
+      pickupDay: { salesAmount: 0 },
+      createdDay: { orderCount: 0 },
+      remainingCapacity: 12,
+      activeProductCount: 0,
+      unansweredConversationCount: 0,
+    },
+  }),
+  gqlOk('SellerHomeRecentOrders', { sellerOrderList: { items: [] } }),
+];
+
 const session = (mustChangePassword = false) => ({
   accessToken: 'at',
   tokenType: 'Bearer' as const,
@@ -107,21 +144,53 @@ describe('앱 셸', () => {
   it('저장된 세션이 없으면 로그인 화면으로 보낸다', async () => {
     const router = open('/');
     await router;
-    expect(await screen.findByText('판매자 계정으로 로그인합니다.')).toBeTruthy();
+    expect(await screen.findByText('관리자에게 받은 매장 계정으로 로그인해 주세요')).toBeTruthy();
     expect(router.getPathname()).toBe('/login');
   });
 
   it('refreshToken이 있으면 복원해 홈 탭을 띄우고, 세션이 끝나면 로그인으로 돌아간다', async () => {
     mockSecureStore.set('caquick.refreshToken', 'rt');
-    server.use(restOk('/seller/refresh', session()));
+    server.use(restOk('/seller/refresh', session()), sellerMe, ...home);
     const router = open('/');
     await router;
-    expect(await screen.findByText('오늘의 현황')).toBeTruthy();
+    expect(await screen.findByText('12개')).toBeTruthy();
     expect(router.getPathname()).toBe('/');
     expect(mockSecureStore.get('caquick.refreshToken')).toBe('rt2');
 
     await act(() => Promise.resolve(useSessionStore.getState().clear()));
     await waitFor(() => expect(router.getPathname()).toBe('/login'));
+  });
+
+  it('새 주문은 주문 탭이 아니어도(홈) 앱 전역 리스너가 토스트로 알린다', async () => {
+    mockSecureStore.set('caquick.refreshToken', 'rt');
+    server.use(restOk('/seller/refresh', session()), sellerMe, ...home);
+    // 실제 Toaster는 jest의 reanimated 목에서 그려지지 않는다
+    const info = jest.spyOn(showToast, 'info').mockImplementation(() => 0);
+    await open('/');
+    expect(await screen.findByText('12개')).toBeTruthy();
+    const [, , sink] = jest
+      .mocked(subscribe)
+      .mock.calls.find(([doc]) => doc.toString().includes('subscription SellerOrdersUpdated'))!;
+    await act(() =>
+      Promise.resolve(
+        sink.next({
+          sellerOrderUpdated: {
+            orderId: '77',
+            status: 'SUBMITTED',
+            pickupAt: '2026-10-12T02:00:00.000Z',
+            buyerName: '김다은',
+            totalPrice: 38000,
+            productName: '딸기 타르트',
+            updatedAt: '2026-10-06T02:00:00.000Z',
+          },
+        }),
+      ),
+    );
+    expect(info).toHaveBeenCalledWith(
+      '새 주문: 딸기 타르트 · 픽업 10/12 11:00',
+      expect.any(Function),
+    );
+    info.mockRestore();
   });
 
   it('비밀번호 변경이 강제된 세션은 앱 대신 변경 화면으로 보낸다', async () => {
@@ -130,12 +199,12 @@ describe('앱 셸', () => {
     const router = open('/');
     await router;
     await waitFor(() => expect(router.getPathname()).toBe('/change-password'));
-    expect(screen.getByText('계속하려면 먼저 비밀번호를 바꿔야 합니다.')).toBeTruthy();
+    expect(screen.getByText(/초기 비밀번호로 로그인했어요/)).toBeTruthy();
   });
 
   it('로그인된 상태로 로그인 화면에 오면 앱으로 보낸다', async () => {
     mockSecureStore.set('caquick.refreshToken', 'rt');
-    server.use(restOk('/seller/refresh', session()));
+    server.use(restOk('/seller/refresh', session()), sellerMe, ...home);
     const router = open('/login');
     await router;
     await waitFor(() => expect(router.getPathname()).toBe('/'));
@@ -149,9 +218,9 @@ describe('앱 셸', () => {
       .mock.calls.filter(([type]) => type === 'change')
       .map(([, fn]) => fn as (s: string) => void);
     expect(listeners.length).toBeGreaterThan(0);
-    listeners.forEach((fn) => fn('background'));
+    act(() => listeners.forEach((fn) => fn('background')));
     expect(focusManager.isFocused()).toBe(false);
-    listeners.forEach((fn) => fn('active'));
+    act(() => listeners.forEach((fn) => fn('active')));
     expect(focusManager.isFocused()).toBe(true);
   });
 });
