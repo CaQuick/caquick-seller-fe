@@ -298,6 +298,39 @@ describe('ChatRoomScreen', () => {
     expect(screen.getAllByText('레터링 문구를 바꿀 수 있을까요?')).toHaveLength(1);
   });
 
+  it('첫 조회 응답 전에 도착한 메시지는 다시 불러와 그린다', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let arrived = false;
+    let requests = 0;
+    const late = msg('9', { bodyText: '조회 중 도착', createdAt: at(9) });
+    server.use(
+      graphql.query('SellerChatsMessages', async () => {
+        requests += 1;
+        // 요청 시점 스냅샷 — 메시지 도착 전 요청은 붙잡아 뒀다가 이벤트 뒤에 돌려준다
+        const items = arrived ? [late, ...MESSAGES] : MESSAGES;
+        if (!arrived) await gate;
+        return HttpResponse.json({
+          data: {
+            sellerConversationMessages: {
+              items,
+              totalCount: items.length,
+              hasMore: false,
+              nextCursor: null,
+            },
+          },
+        });
+      }),
+    );
+    await open();
+    await waitFor(() => expect(requests).toBe(1));
+    arrived = true;
+    await emitMessage({ id: '9', bodyText: '조회 중 도착', createdAt: at(9) });
+    await inAct(() => release());
+    expect(await screen.findByText('조회 중 도착')).toBeTruthy();
+    expect(screen.getByText('네, 가능합니다.')).toBeTruthy();
+  });
+
   it('TEXT로 보내고, 전송 중에는 입력과 보내기를 막는다', async () => {
     let release!: () => void;
     let sent: unknown = null;

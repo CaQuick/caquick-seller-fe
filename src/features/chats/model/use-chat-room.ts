@@ -48,8 +48,11 @@ export function useChatRoom(conversationId: string, onBuyerMessage: () => void) 
       {
         next: ({ conversationMessageAdded: message }) => {
           const data = queryClient.getQueryData<MessagePages>(messagesKey);
-          if (!data || hasMessage(data, message.id)) return;
-          queryClient.setQueryData(messagesKey, upsertMessage(data, message));
+          if (hasMessage(data, message.id)) return;
+          if (data) queryClient.setQueryData(messagesKey, upsertMessage(data, message));
+          // 첫 조회 중이면 응답이 이 메시지 전 스냅샷일 수 있다.
+          // 데이터 없는 조회는 무효화로 취소되지 않아(진행 중 요청을 재사용) 초기화해 다시 부른다
+          else void queryClient.resetQueries({ queryKey: messagesKey });
           if (message.senderType === 'USER') onBuyer.current();
           // 보낸 계정을 모르는 판매자 메시지(다른 기기 답장)는 재조회로 바로잡는다. 내 전송은 응답이 채운다
           else if (message.senderType === 'STORE' && inFlight.current === 0)
