@@ -39,11 +39,13 @@ pnpm start           # Metro(localhost:8081). 끝나면 종료합니다
 1. 맥미니에서 백엔드를 `PORT=4100 yarn start:dev`로 띄우고, 이 레포에서 `pnpm start`를 실행합니다. 구독 이벤트·푸시까지 보려면 백엔드 worker(`APP_ROLE=worker PORT=4101 yarn start:dev`)도 띄웁니다.
 2. 로그인 계정이 없으면 백엔드에서 `SELLER_SEED_PASSWORD=<비밀번호> yarn prisma:seed`를 돌립니다. `seed-seller-a`·`seed-seller-b` 판매자가 생깁니다.
 3. 맥북에서 포트를 포워딩합니다: `ssh -N -L 8081:127.0.0.1:8081 -L 4100:127.0.0.1:4100 mini`
-4. dev client `.app`을 시뮬레이터에 설치합니다. EAS 클라우드의 `development` 프로필(iOS 시뮬레이터 빌드)로 한 번 받으며, Expo 조직 생성과 `eas init`이 먼저입니다.
+4. dev client `.app`을 시뮬레이터에 설치합니다. 네이티브 의존성이 바뀔 때만 EAS 클라우드 `development` 프로필(iOS 시뮬레이터 빌드)로 다시 만듭니다.
+   - 빌드: `eas build -p ios --profile development` (Expo 조직 `caquick` 멤버 계정으로 `eas login`, 또는 `EXPO_TOKEN`)
+   - 설치: 맥북에서 `eas build:run -p ios --latest --profile development`가 최신 빌드를 받아 부팅된 시뮬레이터에 설치합니다.
 5. dev client에서 `http://localhost:8081`을 입력하면 `.env.development`의 주소로 로컬 백엔드에 붙습니다.
 6. 세션이 끝나면 Metro와 nest watch를 종료합니다. 맥미니는 운영 호스트입니다.
 
-`app.config.ts`에 EAS `projectId`가 없는 동안은 푸시 토큰 등록(경고 로그)과 OTA 확인을 건너뜁니다.
+iOS는 Apple 계정(APNs 자격 증명)이 생기기 전까지 푸시 토큰을 받지 못합니다. 등록 실패는 경고 로그로 끝나고 앱은 계속 동작하므로, 그전까지 푸시 수신은 Android로 확인합니다.
 
 ## 화면
 
