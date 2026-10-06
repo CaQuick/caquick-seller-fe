@@ -100,12 +100,13 @@ jobs:
           node -v; pnpm -v
           eas whoami
           if [ "$PLATFORM" != android ]; then
-            xcodebuild -version | head -1
+            # head는 첫 줄 뒤 파이프를 닫아 xcodebuild가 Broken pipe로 죽는다(pipefail) — 끝까지 읽는 sed로
+            xcodebuild -version | sed -n 1p
             pod --version
             fastlane --version | tail -1
           fi
           if [ "$PLATFORM" != ios ]; then
-            java -version 2>&1 | head -1
+            java -version 2>&1 | sed -n 1p
             # cmdline-tools 23부터 목록이 `ndk/…`처럼 `/`로 나온다 — 두 구분자를 다 받고, 패키지마다 따로 확인한다
             installed=$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list_installed)
             for pkg in 'ndk[;/]' 'build-tools[;/]36' 'platforms[;/]android-36'; do
