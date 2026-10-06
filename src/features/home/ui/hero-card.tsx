@@ -1,34 +1,43 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
-import { colors, shadow, tracking } from '@/shared/config/tokens';
+import { gradient, shadow, tracking } from '@/shared/config/tokens';
 import { cn } from '@/shared/lib/cn';
 import { formatCount } from '@/shared/lib/format';
 import { Button } from '@/shared/ui';
 
+import { cssGradientLine } from '../model/gradient';
 import { HOME_COPY } from '../model/home';
 
-const GRADIENT: [number, string][] = [
-  [0, colors.stepDone],
-  [0.4, colors.tint2],
-  [0.6, colors.bg],
-  [1, colors.gray2],
-];
-
-/** 히어로 배경(.hero 45deg 그라디언트). RN 스타일에는 그라디언트가 없어 SVG로 깐다 */
+/** 히어로 배경(.hero). 각도를 실제 픽셀로 맞추려고 카드 크기를 재서 userSpace 좌표로 그린다 */
 function HeroBackground() {
+  const [box, setBox] = useState<{ width: number; height: number } | null>(null);
+  const { angle, stops } = gradient.hero;
   return (
-    <Svg style={StyleSheet.absoluteFill} viewBox="0 0 100 100" preserveAspectRatio="none">
-      <Defs>
-        <LinearGradient id="home-hero" x1="0" y1="1" x2="1" y2="0">
-          {GRADIENT.map(([offset, color]) => (
-            <Stop key={offset} offset={offset} stopColor={color} />
-          ))}
-        </LinearGradient>
-      </Defs>
-      <Rect width="100" height="100" fill="url(#home-hero)" />
-    </Svg>
+    <View
+      testID="hero-background"
+      style={StyleSheet.absoluteFill}
+      onLayout={(e) => setBox(e.nativeEvent.layout)}
+    >
+      {box && (
+        <Svg width={box.width} height={box.height}>
+          <Defs>
+            <LinearGradient
+              id="home-hero"
+              gradientUnits="userSpaceOnUse"
+              {...cssGradientLine(angle, box.width, box.height)}
+            >
+              {stops.map(([offset, color]) => (
+                <Stop key={offset} offset={offset} stopColor={color} />
+              ))}
+            </LinearGradient>
+          </Defs>
+          <Rect width={box.width} height={box.height} fill="url(#home-hero)" />
+        </Svg>
+      )}
+    </View>
   );
 }
 
@@ -39,7 +48,7 @@ const sentenceStyle = { letterSpacing: tracking(22, -0.02) };
 export function HeroCard({ remainingCapacity }: { remainingCapacity: number | null }) {
   const router = useRouter();
   return (
-    <View style={shadow.native.card} className="mx-[18px] mt-6 rounded-xl">
+    <View testID="hero" style={shadow.native.hero} className="mx-[18px] mt-6 rounded-xl bg-surface">
       <View className="overflow-hidden rounded-xl border border-line2 p-6">
         <HeroBackground />
         {remainingCapacity === null ? (
