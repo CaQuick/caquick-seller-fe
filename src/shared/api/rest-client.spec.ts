@@ -247,6 +247,52 @@ describe('authRequest', () => {
     });
   });
 
+  describe('devIssueToken', () => {
+    const g = globalThis as unknown as { __DEV__: boolean };
+
+    it('accountId를 바디로 보내고 Authorization은 붙이지 않는다', async () => {
+      registerSessionHooks({ getAccessToken: () => 'tok' });
+      let seen: { body: unknown; auth: string | null; xClient: string | null } | null = null;
+      server.use(
+        http.post(`${AUTH_URL}/dev/issue-token`, async ({ request }) => {
+          seen = {
+            body: await request.json(),
+            auth: request.headers.get('authorization'),
+            xClient: request.headers.get('x-client'),
+          };
+          return HttpResponse.json({
+            accessToken: 'a',
+            tokenType: 'Bearer',
+            expiresInSeconds: 900,
+          });
+        }),
+      );
+      await expect(sellerAuthApi.devIssueToken('12')).resolves.toMatchObject({ accessToken: 'a' });
+      expect(seen).toEqual({ body: { accountId: '12' }, auth: null, xClient: 'mobile' });
+    });
+
+    it('반증: __DEV__가 false면 요청 없이 DEV_ONLY_ENDPOINT로 거절한다', async () => {
+      let called = 0;
+      server.use(
+        http.post(`${AUTH_URL}/dev/issue-token`, () => {
+          called += 1;
+          return HttpResponse.json({});
+        }),
+      );
+      const dev = g.__DEV__;
+      g.__DEV__ = false;
+      try {
+        await expect(sellerAuthApi.devIssueToken('12')).rejects.toMatchObject({
+          code: 'DEV_ONLY_ENDPOINT',
+          classification: 'FORBIDDEN',
+        });
+      } finally {
+        g.__DEV__ = dev;
+      }
+      expect(called).toBe(0);
+    });
+  });
+
   it('네트워크 실패는 NETWORK', async () => {
     server.use(http.post(`${AUTH_URL}/seller/login`, () => HttpResponse.error()));
     await expect(authRequest('/seller/login', { body: {} })).rejects.toMatchObject({

@@ -11,8 +11,15 @@ import { ApiError, messageFor } from '@/shared/api';
 import { type LoginValues, loginSchema } from '../model/password-rules';
 import { login } from '../model/session';
 import { useSessionStore } from '../model/session-store';
+import type { DevLoginEntry as DevLoginEntryComponent } from './dev-login-sheet';
 import { AuthField, SubmitButton } from './form-field';
 import logo from '../../../../assets/images/caquick-logo.png';
+
+// 정적 import면 운영 번들에 모듈이 남는다 — __DEV__ 상수 접기로 require째 빠지게 한다
+const DevLoginEntry: typeof DevLoginEntryComponent | null = __DEV__
+  ? // eslint-disable-next-line @typescript-eslint/no-require-imports
+    (require('./dev-login-sheet') as { DevLoginEntry: typeof DevLoginEntryComponent }).DevLoginEntry
+  : null;
 
 interface Failure {
   code: string | null;
@@ -44,6 +51,9 @@ export function LoginScreen() {
   };
   const invalid = failure?.code === 'INVALID_CREDENTIALS';
   const { errors, isSubmitting } = form.formState;
+  const brand = (
+    <Image source={logo} accessibilityLabel="케이퀵" style={{ width: 86, height: 38 }} />
+  );
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-bg"
@@ -54,7 +64,7 @@ export function LoginScreen() {
         contentContainerClassName="grow px-6"
         contentContainerStyle={{ paddingTop: insets.top + 72 }}
       >
-        <Image source={logo} accessibilityLabel="케이퀵" style={{ width: 86, height: 38 }} />
+        {__DEV__ && DevLoginEntry ? <DevLoginEntry>{brand}</DevLoginEntry> : brand}
         <Text className="text-text-2 mt-[18px] font-sans text-5xl font-bold leading-[32px] tracking-tighter">
           판매자 로그인
         </Text>
