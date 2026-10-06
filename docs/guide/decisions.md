@@ -60,6 +60,7 @@
 | D54 | 2026-10-06 | Expo 조직 `caquick`·프로젝트 `@caquick/caquick-seller`, robot `caquick-seller-ci`(Developer) 토큰을 `EXPO_TOKEN`으로. projectId는 `app.config.ts` 상수(동적 설정이라 `eas init`이 못 씀). 채널 production·preview·development                           | 개인 계정이 아닌 조직 소유(플랜 §8). robot은 빌드·OTA·credentials에 필요한 최소 역할                                    |
 | D55 | 2026-10-06 | Android 네이티브는 64비트 ARM만 빌드한다(`expo-build-properties` `android.buildArchs: [arm64-v8a]`). x86·x86_64·armeabi-v7a 제외                                                                                                                        | 사용자 결정. x86은 에뮬레이터용, 32비트 전용 OS 기기(Android Go 저가폰)는 Play에서 설치 불가를 감수                     |
 | D56 | 2026-10-06 | 리뷰 봇은 Codex만 쓴다. CodeRabbit은 BE 전용 — `.coderabbit.yaml`은 자동 리뷰를 끈 최소 설정만 둔다                                                                                                                                                     | 사용자 결정(관리자 FE도 같음). 머지 게이트는 Codex 상태기계 + 필수 체크                                                 |
+| D57 | 2026-10-06 | 토스트는 화면 아래 가운데에 시안 `.toast` 다크 스타일로(어두운 바탕·흰 14px·r12, 성공 민트 ✓·실패 연한 빨강 !·안내는 표시 없음). 바닥 거리는 max(안전 영역, iOS 키보드) + 탭바 70 + 16으로 탭바·하단 CTA 바 위                                          | 사용자 피드백(Expo Go). 상단 토스트가 iPhone 상태바·다이나믹 아일랜드와 겹침                                            |
 
 ## 시안 대비 남은 차이
 
@@ -67,7 +68,7 @@
 
 - 공통
   - 토큰에 없는 시안 hex는 가장 가까운 토큰으로 그립니다(셀렉트 값·드롭존·태그 ×·chevron·옵션 아이템 테두리·매장 메타 글자). 홈 히어로 그라디언트도 `stepDone → tint2 → bg → gray2`로 근사해 오른쪽 위 크림색이 회색 쪽입니다.
-  - 토스트는 공용 sonner 스타일 한 줄입니다. 어두운 토스트, 두 줄짜리 새 주문 토스트, '되돌리기' 액션(특별휴무·옵션 아이템 삭제)은 없습니다(`showToast`에 액션 없음).
+  - 토스트는 시안(상단)과 달리 화면 아래에 뜹니다(D57). 두 줄짜리 새 주문 토스트, '되돌리기' 액션(특별휴무·옵션 아이템 삭제)은 없습니다(`showToast`에 액션 없음).
   - 44pt 터치 타깃을 위해 작은 컨트롤은 `hitSlop`을 더하고 `TimeRow` 칸은 40 → 44입니다. `ActionBar`는 화면 맨 아래 정적 배치이고 아래 여백은 `max(safe area, 16)`입니다.
   - `Skeleton`은 그라디언트 흐름 대신 투명도 깜빡임, 스플래시 로딩 점은 400ms마다 한 점씩 켜는 근사입니다.
   - 탭 화면(주문·상품·매장)은 탭 레이아웃의 네이티브 헤더, 상세 화면은 공용 `AppHeader`, 설정의 비밀번호 변경은 Stack 헤더입니다. 홈 활성 탭 아이콘은 전용 채움 대신 다른 탭과 같은 '라인 + 연보라 채움'입니다.
