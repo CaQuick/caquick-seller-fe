@@ -1,0 +1,5 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit은 BE(caquick-be) 전용 — 앱이 이 레포에 연결돼 있어도 자동 리뷰가 돌지 않게 끈다
+reviews:
+  auto_review:
+    enabled: false

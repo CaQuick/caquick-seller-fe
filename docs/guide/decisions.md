@@ -59,7 +59,7 @@
 | D53 | 2026-10-06 | Android `google-services.json`은 커밋하지 않고 시크릿 `GOOGLE_SERVICES_JSON_BASE64` → 잡이 `$RUNNER_TEMP`에 복원해 `GOOGLE_SERVICES_JSON`으로 넘김. FCM V1 키는 EAS credentials                                                                         | 공개 레포. fingerprint는 내용만 해시, `--local`은 git 기준 복사라 무시된 경로가 빠짐                                    |
 | D54 | 2026-10-06 | Expo 조직 `caquick`·프로젝트 `@caquick/caquick-seller`, robot `caquick-seller-ci`(Developer) 토큰을 `EXPO_TOKEN`으로. projectId는 `app.config.ts` 상수(동적 설정이라 `eas init`이 못 씀). 채널 production·preview·development                           | 개인 계정이 아닌 조직 소유(플랜 §8). robot은 빌드·OTA·credentials에 필요한 최소 역할                                    |
 | D55 | 2026-10-06 | Android 네이티브는 64비트 ARM만 빌드한다(`expo-build-properties` `android.buildArchs: [arm64-v8a]`). x86·x86_64·armeabi-v7a 제외                                                                                                                        | 사용자 결정. x86은 에뮬레이터용, 32비트 전용 OS 기기(Android Go 저가폰)는 Play에서 설치 불가를 감수                     |
-| D56 | 2026-10-06 | 리뷰 봇은 Codex만 쓴다. CodeRabbit은 BE 전용이라 `.coderabbit.yaml`을 두지 않는다                                                                                                                                                                       | 사용자 결정(관리자 FE도 같음). 머지 게이트는 Codex 상태기계 + 필수 체크                                                 |
+| D56 | 2026-10-06 | 리뷰 봇은 Codex만 쓴다. CodeRabbit은 BE 전용 — `.coderabbit.yaml`은 자동 리뷰를 끈 최소 설정만 둔다                                                                                                                                                     | 사용자 결정(관리자 FE도 같음). 머지 게이트는 Codex 상태기계 + 필수 체크                                                 |
 
 ## 시안 대비 남은 차이
 
