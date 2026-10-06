@@ -12,7 +12,8 @@ type ListData = InfiniteData<SellerOrdersListQuery['sellerOrderList'], string | 
 
 /**
  * sellerOrderUpdated로 목록·상세 캐시를 갱신한다. 목록에 있는 주문은 그 자리에서 고치고,
- * 처음 보는 주문(새 주문 등)은 목록을 다시 받는다. 새 주문 토스트는 useNewOrderNotices 몫
+ * 없던 목록은 이 주문이 새로 들어갈 수 있는 것(전체·같은 상태 필터)만 다시 받는다.
+ * 새 주문 토스트는 useNewOrderNotices 몫
  */
 export function useOrderUpdates() {
   const queryClient = useQueryClient();
@@ -21,16 +22,17 @@ export function useOrderUpdates() {
     return subscribe(SellerOrdersUpdatedDocument, undefined, {
       next: ({ sellerOrderUpdated: update }) => {
         if (!accept(update)) return;
-        let found = false;
         for (const [key, data] of queryClient.getQueriesData<ListData>({
           queryKey: ordersKeys.lists(),
         })) {
-          const next = data && applyOrderUpdate(data, update, (key[2] as OrderListFilter).status);
-          if (!next) continue;
-          found = true;
-          queryClient.setQueryData(key, next);
+          const { status } = key[2] as OrderListFilter;
+          const next = data && applyOrderUpdate(data, update, status);
+          if (next) {
+            queryClient.setQueryData(key, next);
+          } else if (status === undefined || status === update.status) {
+            void queryClient.invalidateQueries({ queryKey: key, exact: true });
+          }
         }
-        if (!found) void queryClient.invalidateQueries({ queryKey: ordersKeys.lists() });
         const detail = queryClient.getQueryData(orderDetailQueryOptions(update.orderId).queryKey);
         if (detail && Date.parse(detail.updatedAt) < Date.parse(update.updatedAt)) {
           void queryClient.invalidateQueries({ queryKey: ordersKeys.detail(update.orderId) });
