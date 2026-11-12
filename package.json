@@ -24,7 +24,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "coverage:merge": "tsx scripts/merge-coverage.ts",
-    "doctor": "expo-doctor",
+    "doctor": "node .github/scripts/doctor.mjs",
     "export": "expo export --platform all --output-dir .expo/export",
     "validate": "pnpm lint && pnpm typecheck && pnpm codegen:check && pnpm knip:check && pnpm test:cov && pnpm run doctor && pnpm export",
     "prepare": "husky",
