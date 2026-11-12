@@ -32,22 +32,24 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: 'expo-*'
         update-types: ['version-update:semver-major']
-      - dependency-name: 'react-native'
-        update-types: ['version-update:semver-major']
-      - dependency-name: 'react'
-        update-types: ['version-update:semver-major']
       - dependency-name: 'react-dom'
         update-types: ['version-update:semver-major']
       - dependency-name: 'expo-router'
         update-types: ['version-update:semver-major']
-      # reanimated 4.5.x·worklets 0.10.x는 expo-modules-core C++ 호환 — pnpm.overrides로도 고정
+      # SDK가 버전을 정하는 패키지(expo install --check 대상)는 Dependabot이 올리지 않는다 —
+      # SDK 범위 밖으로 올라가면 네이티브가 깨진다(#59: react-native 0.86→0.88). SDK 패치·업그레이드 때 expo install --fix로 맞춘다.
+      # reanimated·worklets는 pnpm.overrides로도 고정
+      - dependency-name: 'react'
+      - dependency-name: 'react-native'
+      - dependency-name: '@types/react'
       - dependency-name: 'react-native-reanimated'
-        update-types: ['version-update:semver-major', 'version-update:semver-minor']
       - dependency-name: 'react-native-worklets'
-        update-types: ['version-update:semver-major', 'version-update:semver-minor']
-      # gesture-handler 3은 API 대개편(SDK 57은 2.32 권장)
       - dependency-name: 'react-native-gesture-handler'
-        update-types: ['version-update:semver-major']
+      - dependency-name: 'react-native-safe-area-context'
+      - dependency-name: 'react-native-screens'
+      - dependency-name: 'react-native-svg'
+      - dependency-name: '@react-native-community/datetimepicker'
+      - dependency-name: '@react-native-async-storage/async-storage'
       - dependency-name: 'react-native-*'
         update-types: ['version-update:semver-major']
       - dependency-name: '@react-native-community/*'

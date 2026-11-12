@@ -12,6 +12,10 @@ const config: KnipConfig = {
     'expo-splash-screen',
     // 폰트 파일 복사 원본(assets/fonts)
     'pretendard',
+    // babel.config.js의 preset — expo가 의존성으로 함께 설치한다
+    'babel-preset-expo',
+    // src/test/mocks의 jest.mock 대상(@native-html/render의 하위 의존성) — 직접 import하지 않는다
+    'stringify-entities',
   ],
 };
 
