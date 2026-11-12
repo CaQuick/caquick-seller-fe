@@ -29,8 +29,8 @@ describe('textToHtml', () => {
     ],
     [
       '주소 → 링크',
-      '자세히 https://caquick.site/faq',
-      '<p>자세히 <a href="https://caquick.site/faq">https://caquick.site/faq</a></p>',
+      '자세히 https://caquick.com/faq',
+      '<p>자세히 <a href="https://caquick.com/faq">https://caquick.com/faq</a></p>',
     ],
     ['CRLF·앞뒤 공백', '  가 \r\n\r\n 나', '<p>가</p><p>나</p>'],
     ['빈 글', '  \n ', ''],
@@ -65,7 +65,7 @@ describe('htmlToText', () => {
     '첫 줄\n둘째 줄',
     '1. 주문\n2. 픽업',
     '• 가\n끝\n\n다음 문단',
-    '자세히 https://caquick.site/faq',
+    '자세히 https://caquick.com/faq',
     '<태그> & "따옴표"',
   ])('textToHtml의 역 — %s', (text) => {
     expect(htmlToText(textToHtml(text))).toBe(text);

@@ -8,12 +8,12 @@ describe('HtmlBody', () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     await render(
       <HtmlProvider>
-        <HtmlBody html='<p>안내 <a href="https://caquick.site/faq" onclick="x()">자세히</a></p><script>alert(1)</script>' />
+        <HtmlBody html='<p>안내 <a href="https://caquick.com/faq" onclick="x()">자세히</a></p><script>alert(1)</script>' />
       </HtmlProvider>,
     );
     expect(screen.queryByText(/alert/)).toBeNull();
     await fireEvent.press(screen.getByRole('link'));
-    expect(open).toHaveBeenCalledWith('https://caquick.site/faq');
+    expect(open).toHaveBeenCalledWith('https://caquick.com/faq');
     open.mockRestore();
   });
 });
