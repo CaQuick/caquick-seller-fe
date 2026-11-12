@@ -4,10 +4,10 @@ describe('환경 변수 검증', () => {
   it('http API·ws 구독 주소를 읽고 끝 슬래시를 뗀다', () => {
     expect(
       parseEnv({
-        EXPO_PUBLIC_API_BASE_URL: 'https://api.caquick.site/',
-        EXPO_PUBLIC_WS_URL: 'wss://api.caquick.site/graphql',
+        EXPO_PUBLIC_API_BASE_URL: 'https://api.caquick.com/',
+        EXPO_PUBLIC_WS_URL: 'wss://api.caquick.com/graphql',
       }),
-    ).toEqual({ apiBaseUrl: 'https://api.caquick.site', wsUrl: 'wss://api.caquick.site/graphql' });
+    ).toEqual({ apiBaseUrl: 'https://api.caquick.com', wsUrl: 'wss://api.caquick.com/graphql' });
   });
 
   it.each([

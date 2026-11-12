@@ -48,10 +48,10 @@ describe('sanitizeHtml', () => {
   it.each([
     [
       'https',
-      '<a href="https://caquick.site/a" target="_blank">링크</a>',
-      '<a href="https://caquick.site/a">링크</a>',
+      '<a href="https://caquick.com/a" target="_blank">링크</a>',
+      '<a href="https://caquick.com/a">링크</a>',
     ],
-    ['http', '<a href=" http://caquick.site ">링크</a>', '<a href="http://caquick.site">링크</a>'],
+    ['http', '<a href=" http://caquick.com ">링크</a>', '<a href="http://caquick.com">링크</a>'],
     ['javascript:', '<a href="javascript:alert(1)">링크</a>', '링크'],
     ['data:', '<a href="data:text/html,x">링크</a>', '링크'],
     ['tel:', '<a href="tel:0101234">링크</a>', '링크'],

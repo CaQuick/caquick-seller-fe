@@ -6,8 +6,8 @@
 
 ```
 케이퀵 판매자 앱(iOS·Android, Expo SDK 57)
-  ├─ GraphQL·REST ──────────> api.caquick.site (caquick-be)
-  ├─ graphql-ws 구독 ───────> wss://api.caquick.site/graphql
+  ├─ GraphQL·REST ──────────> api.caquick.com (caquick-be)
+  ├─ graphql-ws 구독 ───────> wss://api.caquick.com/graphql
   ├─ 이미지 PUT ────────────> S3 presigned URL (BE가 서명)
   ├─ 푸시 수신 <──────────── Expo Push Service <── BE worker
   └─ OTA 번들 <───────────── EAS Update (production 채널)
