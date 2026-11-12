@@ -21,7 +21,7 @@ const STORE: Store = {
   websiteUrl: null,
   businessHoursText: null,
   greetingMessage: null,
-  profileImageUrl: 'https://cdn.caquick.site/logo.jpg',
+  profileImageUrl: 'https://cdn.caquick.com/logo.jpg',
   pickupSlotIntervalMinutes: 30,
   minLeadTimeMinutes: 1440,
   maxDaysAhead: 14,
@@ -35,7 +35,7 @@ const DETAIL = {
     regionLabel: '인천 서구 청라동',
     ratingAverage: 4.8,
     reviewCount: 128,
-    images: ['https://cdn.caquick.site/hero.jpg'],
+    images: ['https://cdn.caquick.com/hero.jpg'],
   },
   storeProductCategories: [
     { id: '2', name: '크리스마스', sortOrder: 2, productCount: 1 },

@@ -54,7 +54,7 @@ export function HeroCard({ remainingCapacity }: { remainingCapacity: number | nu
         {remainingCapacity === null ? (
           <>
             <Text className={cn(sentence, 'mb-1')} style={sentenceStyle}>
-              {HOME_COPY.capacityUnset}
+              오늘 <Text className="font-bold">생산 수량</Text>을{'\n'}설정해 주세요
             </Text>
             <Pressable
               accessibilityRole="link"

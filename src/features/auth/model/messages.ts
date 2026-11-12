@@ -5,8 +5,8 @@ export const AUTH_COPY = {
   passwordChanged: '비밀번호가 변경되었어요. 다시 로그인해 주세요',
   offline: '서버에 연결할 수 없어요. 네트워크 상태를 확인해 주세요',
   passwordRule: '영문·숫자·특수문자 포함 8~64자',
-  forcedChange:
-    '관리자가 발급한 초기 비밀번호로 로그인했어요.\n계속하려면 새 비밀번호를 설정해 주세요.',
+  forcedTitle: '관리자가 발급한 초기 비밀번호로 로그인했어요',
+  forcedBody: '계속하려면 새 비밀번호를 설정해 주세요.',
 } as const;
 
 /** 세션을 끝내는 403 코드별 안내 */

@@ -12,7 +12,6 @@ export const HOME_COPY = {
   storeActive: '정상 운영 중',
   storeInactive: '운영 중지',
   checkOrders: '주문 확인하기',
-  capacityUnset: '오늘 생산 수량을\n설정해 주세요',
   setCapacity: '생산 수량 설정하기',
   recentOrders: '최근 주문',
   noOrders: '아직 주문이 없어요',
