@@ -31,7 +31,7 @@
     "knip:check": "knip"
   },
   "dependencies": {
-    "@expo/metro-runtime": "~57.0.18",
+    "@expo/metro-runtime": "~58.0.17",
     "@gorhom/bottom-sheet": "^5.2.14",
     "@graphql-typed-document-node/core": "^3.2.0",
     "@hookform/resolvers": "^5.9.1",
