@@ -8,7 +8,7 @@ import { CHATS_COPY } from '../model/copy';
 
 interface Props {
   title: string;
-  /** 이 구매자의 최근 주문이 있을 때만 '주문 보기'를 보인다 */
+  /** 이 구매자 계정의 주문이 있을 때만 '주문 보기'를 보인다 */
   hasOrder: boolean;
   onOrder: () => void;
   onMenu: () => void;

@@ -11,7 +11,9 @@ import { orderStatusView } from '../model/status';
 
 export type OrderSummary = SellerOrdersListQuery['sellerOrderList']['items'][number];
 
-/** 주문 행(.orow): 50 원형 썸네일 · 상품명 · 픽업 일시·주문자 / 금액 · 상태 칩 · chevron */
+const CUSTOM_LABEL = '커스텀';
+
+/** 주문 행(.orow): 50 원형 썸네일(커스텀 대표 이미지 우선) · 상품명 · 픽업 일시·주문자 / 금액 · 커스텀·상태 칩 · chevron */
 export function OrderRow({
   order,
   today,
@@ -25,17 +27,19 @@ export function OrderRow({
   const pickup = `${formatPickup(order.pickupAt, today)} 픽업 · ${order.buyerName}`;
   const price = formatKrw(order.totalPrice);
   const status = orderStatusView(order.status);
+  const image = order.firstItemCustomImageUrl ?? order.firstItemImageUrl;
+  const labels = [title, order.hasCustom && CUSTOM_LABEL, status.label, pickup, price];
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${title}, ${status.label}, ${pickup}, ${price}`}
+      accessibilityLabel={labels.filter(Boolean).join(', ')}
       onPress={onPress}
       style={shadow.native.card}
       className="flex-row items-center gap-3.5 rounded-xl bg-surface py-[17px] pl-4 pr-[19px]"
     >
-      {order.firstItemImageUrl ? (
+      {image ? (
         <RemoteImage
-          uri={order.firstItemImageUrl}
+          uri={image}
           style={{ width: 50, height: 50 }}
           className="rounded-full bg-gray-bg"
         />
@@ -56,7 +60,8 @@ export function OrderRow({
         </Text>
         <Text className="mt-1 font-sans text-xs tracking-tight text-muted">{price}</Text>
       </View>
-      <View>
+      <View className="items-end gap-1">
+        {order.hasCustom ? <StatusChip tone="purple" label={CUSTOM_LABEL} /> : null}
         <StatusChip tone={status.tone} label={status.label} />
       </View>
       <Icon name="chevronRight" size={14} color={colors.chevron} strokeWidth={2.5} />

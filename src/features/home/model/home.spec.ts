@@ -16,6 +16,7 @@ const dashboard = {
   pickupDay: { salesAmount: 1650000 },
   createdDay: { orderCount: 2 },
   remainingCapacity: 12,
+  pendingPaymentQuantity: 0,
   activeProductCount: 18,
   unansweredConversationCount: 3,
 };

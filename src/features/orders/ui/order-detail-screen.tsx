@@ -24,21 +24,31 @@ import {
   showToast,
   SkeletonRows,
   StatusChip,
-  TextField,
   Timeline,
 } from '@/shared/ui';
 
 import { cancelOrder, orderDetailQueryOptions, updateOrderStatus } from '../api/orders';
 import { ordersKeys } from '../api/queryKeys';
+import { CANCEL_COPY, type CancelInput } from '../model/cancel-form';
 import { formatDateTime, formatSigned } from '../model/format';
 import { orderErrorMessage } from '../model/messages';
-import { buildTimeline, orderActions, orderStatusView, paymentBreakdown } from '../model/status';
+import { cancellationRows, type PaymentRow, settlementRows } from '../model/payment';
+import {
+  autoTransitionNotice,
+  buildTimeline,
+  noShowWindow,
+  orderActions,
+  orderStatusView,
+  paymentBreakdown,
+} from '../model/status';
 import { useOrderUpdates } from '../model/use-order-updates';
 import { BuyerChatRow } from './buyer-chat-row';
+import { CancelOrderSheet } from './cancel-order-sheet';
 import { OrderItemCard } from './order-item-card';
+import { type OtherAction, OtherActionsSheet } from './other-actions-sheet';
 
-const CANCELED_TOAST = '주문을 취소했어요';
-const NOTE_MAX = 500;
+type Order = SellerOrderDetailQuery['sellerOrder'];
+type Change = { done: string } & ({ to: OrderStatusType } | { cancel: CancelInput });
 
 const backToList = () => (router.canGoBack() ? router.back() : router.replace('/orders'));
 
@@ -47,85 +57,147 @@ export function OrderDetailScreen() {
   const queryClient = useQueryClient();
   const query = useQuery(orderDetailQueryOptions(id));
   const cancelSheet = useRef<BottomSheetModal>(null);
-  const [note, setNote] = useState('');
+  const moreSheet = useRef<BottomSheetModal>(null);
+  const noShowSheet = useRef<BottomSheetModal>(null);
+  // 성공하면 다시 마운트해 취소 시트 입력을 비운다
+  const [cancelKey, setCancelKey] = useState(0);
+  // 노쇼 가능 구간은 '다른 처리'를 연 시각으로 판정한다
+  const [now, setNow] = useState(() => new Date());
   useOrderUpdates();
 
   const mutation = useMutation({
-    // 취소는 전용 mutation: 자유 입력 사유는 '기타' + 메모, 확정 뒤 취소도 전액 환불(판매자 사정)
-    mutationFn: async (v: { to: OrderStatusType; done: string; note?: string }) => {
-      if (v.to === 'CANCELED')
-        await cancelOrder({ orderId: id, reason: 'OTHER', fault: 'SELLER', note: v.note });
-      else await updateOrderStatus({ orderId: id, toStatus: v.to, note: v.note });
+    mutationFn: async (v: Change) => {
+      if ('cancel' in v) await cancelOrder({ orderId: id, ...v.cancel });
+      else await updateOrderStatus({ orderId: id, toStatus: v.to });
     },
     onSuccess: (_, v) => {
-      if (v.to === 'CANCELED') {
-        cancelSheet.current?.dismiss();
-        setNote('');
-      }
+      for (const sheet of [cancelSheet, moreSheet, noShowSheet]) sheet.current?.dismiss();
+      if ('cancel' in v) setCancelKey((k) => k + 1);
       showToast.success(v.done);
     },
     onError: (e) => showToast.error(orderErrorMessage(e)),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ordersKeys.all }),
   });
 
+  if (!query.data) {
+    return (
+      <Screen edges={['top']}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader title="주문 상세" onBack={backToList} />
+        {query.isPending ? (
+          <View className="px-5">
+            <SkeletonRows count={3} card />
+          </View>
+        ) : query.error instanceof ApiError && query.error.classification === 'NOT_FOUND' ? (
+          <ErrorState
+            title="주문을 찾을 수 없어요"
+            description="삭제되었거나 이 매장의 주문이 아니에요"
+            retryLabel="목록으로"
+            onRetry={backToList}
+          />
+        ) : (
+          <ErrorState onRetry={() => void query.refetch()} />
+        )}
+      </Screen>
+    );
+  }
+
+  const order = query.data;
+  const actions = orderActions(order.status);
+  const cancelMode = actions.cancel;
+  const noShow = noShowWindow(order, now);
+  const switchTo = (sheet: typeof cancelSheet) => {
+    moreSheet.current?.dismiss();
+    sheet.current?.present();
+  };
+  const others: OtherAction[] = [
+    ...actions.others.map((to): OtherAction =>
+      to === 'PICKED_UP'
+        ? {
+            key: to,
+            title: '픽업 완료',
+            description: '구매자가 주문을 받아 갔어요',
+            onPress: () => {
+              moreSheet.current?.dismiss();
+              mutation.mutate({ to, done: '픽업 완료로 바꿨어요' });
+            },
+          }
+        : {
+            key: to,
+            title: '노쇼',
+            description: noShow.reason,
+            onPress: noShow.enabled ? () => switchTo(noShowSheet) : undefined,
+          },
+    ),
+    ...(cancelMode === 'cancel'
+      ? [
+          {
+            key: 'CANCEL',
+            title: '주문 취소',
+            description: '사정에 따라 환불 금액이 정해져요',
+            danger: true,
+            onPress: () => switchTo(cancelSheet),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <Screen edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
       <AppHeader title="주문 상세" onBack={backToList} />
-      {query.data ? (
-        <>
-          <OrderBody order={query.data} />
-          <OrderActionBar
-            status={query.data.status}
-            busy={mutation.isPending}
-            onNext={(next) => mutation.mutate(next)}
-            onCancel={() => cancelSheet.current?.present()}
-          />
-          <ConfirmSheet
-            ref={cancelSheet}
-            title="주문을 취소할까요?"
-            description="구매자에게 취소 사유가 전달되고 결제가 취소돼요"
-            confirmLabel="취소 확정"
-            confirmDisabled={note.trim() === ''}
-            loading={mutation.isPending}
-            onConfirm={() =>
-              mutation.mutate({ to: 'CANCELED', done: CANCELED_TOAST, note: note.trim() })
-            }
-          >
-            <TextField
-              sublabel="취소 사유 (필수)"
-              accessibilityLabel="취소 사유"
-              placeholder="구매자에게 전달할 사유를 적어 주세요"
-              multiline
-              maxLength={NOTE_MAX}
-              value={note}
-              onChangeText={setNote}
-            />
-          </ConfirmSheet>
-        </>
-      ) : query.isPending ? (
-        <View className="px-5">
-          <SkeletonRows count={3} card />
-        </View>
-      ) : query.error instanceof ApiError && query.error.classification === 'NOT_FOUND' ? (
-        <ErrorState
-          title="주문을 찾을 수 없어요"
-          description="삭제되었거나 이 매장의 주문이 아니에요"
-          retryLabel="목록으로"
-          onRetry={backToList}
+      <OrderBody order={order} />
+      <OrderActionBar
+        status={order.status}
+        busy={mutation.isPending}
+        onNext={(next) => mutation.mutate(next)}
+        onReject={() => cancelSheet.current?.present()}
+        onMore={() => {
+          setNow(new Date());
+          moreSheet.current?.present();
+        }}
+      />
+      {cancelMode ? (
+        <CancelOrderSheet
+          key={`${order.status}-${cancelKey}`}
+          ref={cancelSheet}
+          mode={cancelMode}
+          total={order.totalPrice}
+          loading={mutation.isPending}
+          onSubmit={(cancel) => mutation.mutate({ cancel, done: CANCEL_COPY[cancelMode].done })}
         />
-      ) : (
-        <ErrorState onRetry={() => void query.refetch()} />
-      )}
+      ) : null}
+      {cancelMode === 'cancel' ? <OtherActionsSheet ref={moreSheet} actions={others} /> : null}
+      {actions.others.includes('NO_SHOW') ? (
+        <ConfirmSheet
+          ref={noShowSheet}
+          title="노쇼로 처리할까요?"
+          description="환불 없이 끝나고 픽업 완료와 같이 정산돼요. 되돌릴 수 없어요."
+          confirmLabel="노쇼 처리"
+          loading={mutation.isPending}
+          onConfirm={() => mutation.mutate({ to: 'NO_SHOW', done: '노쇼로 처리했어요' })}
+        />
+      ) : null}
     </Screen>
   );
 }
 
-type Order = SellerOrderDetailQuery['sellerOrder'];
+function Rows({ rows }: { rows: PaymentRow[] }) {
+  return rows.map((row) => (
+    <View key={row.label}>
+      <KeyValue label={row.label} value={row.value} />
+      {row.hint ? (
+        <Text className="text-right font-sans text-xs tracking-tight text-muted">{row.hint}</Text>
+      ) : null}
+    </View>
+  ));
+}
 
 function OrderBody({ order }: { order: Order }) {
   const pay = paymentBreakdown(order);
   const status = orderStatusView(order.status);
+  const autoNotice = autoTransitionNotice(order);
+  const canceled = cancellationRows(order);
   const call = () =>
     Linking.openURL(`tel:${order.buyerPhone.replace(/[^\d+]/g, '')}`).catch(() =>
       showToast.error('전화를 걸 수 없어요'),
@@ -147,6 +219,11 @@ function OrderBody({ order }: { order: Order }) {
           {formatDateTime(order.pickupAt, true)}
         </Text>
         <KeyValue label="주문 일시" value={formatDateTime(order.createdAt, true)} />
+        {autoNotice ? (
+          <View className="mt-2 rounded-lg bg-tint2 p-3">
+            <Text className="font-sans text-sm tracking-tight text-text3">{autoNotice}</Text>
+          </View>
+        ) : null}
       </Card>
 
       <SectionHeader title="주문자" />
@@ -168,6 +245,20 @@ function OrderBody({ order }: { order: Order }) {
         <BuyerChatRow accountId={order.accountId} />
       </MenuGroup>
 
+      {order.requestNote ? (
+        <>
+          <SectionHeader title="요청 사항" />
+          <Card>
+            <Text
+              selectable
+              className="font-sans text-base leading-[21px] tracking-tight text-text"
+            >
+              {order.requestNote}
+            </Text>
+          </Card>
+        </>
+      ) : null}
+
       <SectionHeader title="주문 상품" count={`${order.items.length}건`} />
       <View className="gap-3">
         {order.items.map((item) => (
@@ -175,7 +266,7 @@ function OrderBody({ order }: { order: Order }) {
         ))}
       </View>
 
-      <SectionHeader title="결제 금액" />
+      <SectionHeader title="결제" />
       <Card>
         <KeyValue label="상품 금액" value={formatKrw(pay.product)} />
         <KeyValue label="옵션 추가" value={formatSigned(pay.options)} />
@@ -184,6 +275,14 @@ function OrderBody({ order }: { order: Order }) {
           value={pay.discount > 0 ? `-${formatKrw(pay.discount)}` : formatKrw(0)}
         />
         <KeyValue label="총액" value={formatKrw(pay.total)} total />
+        <View className="mt-2 border-t border-line2 pt-2">
+          <Rows rows={settlementRows(order)} />
+        </View>
+        {canceled.length > 0 ? (
+          <View className="mt-2 border-t border-line2 pt-2">
+            <Rows rows={canceled} />
+          </View>
+        ) : null}
       </Card>
 
       <SectionHeader title="진행 이력" />
@@ -198,15 +297,17 @@ function OrderActionBar({
   status,
   busy,
   onNext,
-  onCancel,
+  onReject,
+  onMore,
 }: {
   status: OrderStatusType;
   busy: boolean;
   onNext: (next: { to: OrderStatusType; done: string }) => void;
-  onCancel: () => void;
+  onReject: () => void;
+  onMore: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const { next, cancellable, notice } = orderActions(status);
+  const { next, cancel, notice } = orderActions(status);
   if (!next) {
     return (
       <View
@@ -219,14 +320,16 @@ function OrderActionBar({
       </View>
     );
   }
+  const secondary =
+    cancel === 'reject'
+      ? { title: '거절', variant: 'dangerOutline' as const, onPress: onReject }
+      : cancel
+        ? { title: '다른 처리', onPress: onMore }
+        : undefined;
   return (
     <ActionBar
       primary={{ title: next.label, loading: busy, onPress: () => onNext(next) }}
-      secondary={
-        cancellable
-          ? { title: '주문 취소', variant: 'dangerOutline', disabled: busy, onPress: onCancel }
-          : undefined
-      }
+      secondary={secondary && { ...secondary, disabled: busy }}
     />
   );
 }

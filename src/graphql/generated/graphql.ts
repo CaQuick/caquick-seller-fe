@@ -125,6 +125,17 @@ export type CustomTextAlignType =
   /** 오른쪽 정렬. */
   | 'RIGHT';
 
+/** 주문·결제·정산 기록을 남긴 주체. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다. */
+export type OrderActorType =
+  /** 관리자. */
+  | 'ADMIN'
+  /** 구매자. */
+  | 'BUYER'
+  /** 판매자. */
+  | 'SELLER'
+  /** 시스템 자동 처리. */
+  | 'SYSTEM';
+
 /** 확정·제작 완료 뒤 취소의 사정. 환불액이 갈린다(판매자 사정 = 전액, 구매자 사정 = 취소자가 정한 금액). */
 export type OrderCancelFaultType =
   /** 구매자 사정. */
@@ -180,6 +191,13 @@ export type OrderStatusType =
   /** 입금이 확인돼 접수된 상태. 판매자 확인 대기. */
   | 'SUBMITTED';
 
+/** 결제 수단. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다. */
+export type PaymentMethodType =
+  /** 계좌이체(케이퀵 계좌로 입금). */
+  | 'BANK_TRANSFER'
+  /** 토스 결제. 아직 쓰지 않는다. */
+  | 'TOSS';
+
 /** 상품 리뷰 목록 조회 조건. */
 export type ProductReviewsInput = {
   /** 이전 페이지의 nextCursor 값(불투명 토큰). 동일 sort에서만 유효. */
@@ -199,6 +217,15 @@ export type PushPlatform =
   | 'ANDROID'
   /** iOS(APNs 경유) */
   | 'IOS';
+
+/** 환불 진행 상태. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다. */
+export type RefundStatusType =
+  /** 구매자의 환불 계좌 입력 대기. */
+  | 'AWAITING_ACCOUNT'
+  /** 계좌가 입력돼 케이퀵 송금 대기. */
+  | 'AWAITING_TRANSFER'
+  /** 송금 완료. */
+  | 'COMPLETED';
 
 /** 현재 위치(WGS84). */
 export type RegionByLocationInput = {
@@ -392,6 +419,15 @@ export type SellerOrderListInput = {
   /** 픽업 일시 상한(이하). */
   toPickupAt?: string | null | undefined;
 };
+
+/** 판매자 주문 갱신 종류. 값은 늘어날 수 있으니 모르는 값은 목록 재조회로 처리한다. */
+export type SellerOrderUpdateKind =
+  /** 픽업 일시가 바뀌었다. */
+  | 'PICKUP_RESCHEDULED'
+  /** 주문 상태가 바뀌었다(확정·제작 완료·픽업 완료·취소 등). */
+  | 'STATUS_CHANGED'
+  /** 입금이 확인돼 새 주문이 접수됐다. */
+  | 'SUBMITTED';
 
 /** 상품 목록 조회 조건. 필터는 AND로 결합되고 미지정 필터는 적용되지 않는다. */
 export type SellerProductListInput = {
@@ -807,14 +843,14 @@ export type SellerChatsMessagesQueryVariables = Exact<{
 }>;
 
 
-export type SellerChatsMessagesQuery = { sellerConversationMessages: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string }> } };
+export type SellerChatsMessagesQuery = { sellerConversationMessages: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string, orderCard: { orderId: string, orderNumber: string, productName: string, thumbnailUrl: string | null, pickupAt: string } | null }> } };
 
 export type SellerChatsSendMessageMutationVariables = Exact<{
   input: SellerSendConversationMessageInput;
 }>;
 
 
-export type SellerChatsSendMessageMutation = { sellerSendConversationMessage: { id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string } };
+export type SellerChatsSendMessageMutation = { sellerSendConversationMessage: { id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string, orderCard: { orderId: string, orderNumber: string, productName: string, thumbnailUrl: string | null, pickupAt: string } | null } };
 
 export type SellerChatsMarkReadMutationVariables = Exact<{
   conversationId: string | number;
@@ -828,14 +864,14 @@ export type SellerChatsMessageAddedSubscriptionVariables = Exact<{
 }>;
 
 
-export type SellerChatsMessageAddedSubscription = { conversationMessageAdded: { id: string, conversationId: string, senderType: ConversationSenderType, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string } };
+export type SellerChatsMessageAddedSubscription = { conversationMessageAdded: { id: string, conversationId: string, senderType: ConversationSenderType, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string, orderCard: { orderId: string, orderNumber: string, productName: string, thumbnailUrl: string | null, pickupAt: string } | null } };
 
-export type SellerChatsBuyerOrderQueryVariables = Exact<{
-  input?: SellerOrderListInput | null | undefined;
+export type SellerChatsBuyerLatestOrderQueryVariables = Exact<{
+  buyerAccountId: string | number;
 }>;
 
 
-export type SellerChatsBuyerOrderQuery = { sellerOrderList: { items: Array<{ id: string, buyerName: string, pickupAt: string, firstItemName: string | null }> } };
+export type SellerChatsBuyerLatestOrderQuery = { sellerOrderList: { items: Array<{ id: string, pickupAt: string, firstItemName: string | null }> } };
 
 export type SellerCustomCatalogQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -850,14 +886,14 @@ export type SellerHomeStoreQuery = { sellerMyStore: { id: string, storeName: str
 export type SellerHomeDashboardQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type SellerHomeDashboardQuery = { sellerDashboard: { date: string, newOrderCount: number, remainingCapacity: number | null, activeProductCount: number, unansweredConversationCount: number, pickupDay: { salesAmount: number }, createdDay: { orderCount: number } } };
+export type SellerHomeDashboardQuery = { sellerDashboard: { date: string, newOrderCount: number, remainingCapacity: number | null, pendingPaymentQuantity: number, activeProductCount: number, unansweredConversationCount: number, pickupDay: { salesAmount: number }, createdDay: { orderCount: number } } };
 
 export type SellerHomeRecentOrdersQueryVariables = Exact<{
   input?: SellerOrderListInput | null | undefined;
 }>;
 
 
-export type SellerHomeRecentOrdersQuery = { sellerOrderList: { items: Array<{ id: string, status: OrderStatusType, pickupAt: string, buyerName: string, firstItemName: string | null, firstItemImageUrl: string | null }> } };
+export type SellerHomeRecentOrdersQuery = { sellerOrderList: { items: Array<{ id: string, status: OrderStatusType, pickupAt: string, buyerName: string, firstItemName: string | null, firstItemImageUrl: string | null, firstItemCustomImageUrl: string | null, hasCustom: boolean }> } };
 
 export type SellerHomeOrderUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
@@ -869,14 +905,14 @@ export type SellerOrdersListQueryVariables = Exact<{
 }>;
 
 
-export type SellerOrdersListQuery = { sellerOrderList: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, orderNumber: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, firstItemName: string | null, firstItemImageUrl: string | null }> } };
+export type SellerOrdersListQuery = { sellerOrderList: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, orderNumber: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, firstItemName: string | null, firstItemImageUrl: string | null, firstItemCustomImageUrl: string | null, hasCustom: boolean }> } };
 
 export type SellerOrderDetailQueryVariables = Exact<{
   orderId: string | number;
 }>;
 
 
-export type SellerOrderDetailQuery = { sellerOrder: { id: string, orderNumber: string, accountId: string, status: OrderStatusType, pickupAt: string, buyerName: string, buyerPhone: string, subtotalPrice: number, discountPrice: number, totalPrice: number, submittedAt: string | null, confirmedAt: string | null, madeAt: string | null, pickedUpAt: string | null, canceledAt: string | null, noShowAt: string | null, createdAt: string, updatedAt: string, items: Array<{ id: string, productName: string, quantity: number, optionItems: Array<{ id: string, groupName: string, optionTitle: string, priceDelta: number }>, customTexts: Array<{ id: string, tokenKey: string, defaultText: string, valueText: string | null, sortOrder: number }>, freeEdits: Array<{ id: string, descriptionText: string, sortOrder: number, attachments: Array<{ id: string, imageUrl: string, sortOrder: number }> }> }>, statusHistories: Array<{ id: string, toStatus: OrderStatusType, changedAt: string, note: string | null }> } };
+export type SellerOrderDetailQuery = { sellerOrder: { id: string, orderNumber: string, accountId: string, status: OrderStatusType, pickupAt: string, buyerName: string, buyerPhone: string, requestNote: string | null, paymentMethod: PaymentMethodType | null, subtotalPrice: number, discountPrice: number, totalPrice: number, submittedAt: string | null, confirmedAt: string | null, madeAt: string | null, pickedUpAt: string | null, canceledAt: string | null, noShowAt: string | null, confirmDeadlineAt: string | null, autoPickupAt: string | null, canMarkNoShow: boolean, commissionRateBps: number, expectedPayoutAmount: number | null, settlementBaseAmount: number | null, createdAt: string, updatedAt: string, items: Array<{ id: string, productName: string, quantity: number, optionItems: Array<{ id: string, groupName: string, optionTitle: string, priceDelta: number }>, customTexts: Array<{ id: string, tokenKey: string, defaultText: string, valueText: string | null, sortOrder: number }>, freeEdits: Array<{ id: string, descriptionText: string, sortOrder: number, attachments: Array<{ id: string, imageUrl: string, sortOrder: number }> }> }>, statusHistories: Array<{ id: string, toStatus: OrderStatusType, changedAt: string, note: string | null }>, cancellation: { actorType: OrderActorType, reasonLabel: string, refundAmount: number, refundStatus: RefundStatusType | null } | null } };
 
 export type SellerUpdateOrderStatusMutationVariables = Exact<{
   input: SellerUpdateOrderStatusInput;
@@ -902,7 +938,7 @@ export type SellerOrderConversationsQuery = { sellerConversations: { hasMore: bo
 export type SellerOrdersUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
 
-export type SellerOrdersUpdatedSubscription = { sellerOrderUpdated: { orderId: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, productName: string, updatedAt: string } };
+export type SellerOrdersUpdatedSubscription = { sellerOrderUpdated: { kind: SellerOrderUpdateKind, orderId: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, productName: string, hasCustom: boolean, updatedAt: string } };
 
 export type SellerProductsListQueryVariables = Exact<{
   input?: SellerProductListInput | null | undefined;
@@ -1447,6 +1483,13 @@ export const SellerChatsMessagesDocument = new TypedDocumentString(`
       bodyFormat
       bodyText
       bodyHtml
+      orderCard {
+        orderId
+        orderNumber
+        productName
+        thumbnailUrl
+        pickupAt
+      }
       createdAt
     }
     totalCount
@@ -1465,6 +1508,13 @@ export const SellerChatsSendMessageDocument = new TypedDocumentString(`
     bodyFormat
     bodyText
     bodyHtml
+    orderCard {
+      orderId
+      orderNumber
+      productName
+      thumbnailUrl
+      pickupAt
+    }
     createdAt
   }
 }
@@ -1492,22 +1542,28 @@ export const SellerChatsMessageAddedDocument = new TypedDocumentString(`
     bodyFormat
     bodyText
     bodyHtml
+    orderCard {
+      orderId
+      orderNumber
+      productName
+      thumbnailUrl
+      pickupAt
+    }
     createdAt
   }
 }
     `) as unknown as TypedDocumentString<SellerChatsMessageAddedSubscription, SellerChatsMessageAddedSubscriptionVariables>;
-export const SellerChatsBuyerOrderDocument = new TypedDocumentString(`
-    query SellerChatsBuyerOrder($input: SellerOrderListInput) {
-  sellerOrderList(input: $input) {
+export const SellerChatsBuyerLatestOrderDocument = new TypedDocumentString(`
+    query SellerChatsBuyerLatestOrder($buyerAccountId: ID!) {
+  sellerOrderList(input: { buyerAccountId: $buyerAccountId, limit: 1 }) {
     items {
       id
-      buyerName
       pickupAt
       firstItemName
     }
   }
 }
-    `) as unknown as TypedDocumentString<SellerChatsBuyerOrderQuery, SellerChatsBuyerOrderQueryVariables>;
+    `) as unknown as TypedDocumentString<SellerChatsBuyerLatestOrderQuery, SellerChatsBuyerLatestOrderQueryVariables>;
 export const SellerCustomCatalogDocument = new TypedDocumentString(`
     query SellerCustomCatalog {
   customThreeDCatalog {
@@ -1544,6 +1600,7 @@ export const SellerHomeDashboardDocument = new TypedDocumentString(`
       orderCount
     }
     remainingCapacity
+    pendingPaymentQuantity
     activeProductCount
     unansweredConversationCount
   }
@@ -1559,6 +1616,8 @@ export const SellerHomeRecentOrdersDocument = new TypedDocumentString(`
       buyerName
       firstItemName
       firstItemImageUrl
+      firstItemCustomImageUrl
+      hasCustom
     }
   }
 }
@@ -1583,6 +1642,8 @@ export const SellerOrdersListDocument = new TypedDocumentString(`
       totalPrice
       firstItemName
       firstItemImageUrl
+      firstItemCustomImageUrl
+      hasCustom
     }
     totalCount
     hasMore
@@ -1600,6 +1661,8 @@ export const SellerOrderDetailDocument = new TypedDocumentString(`
     pickupAt
     buyerName
     buyerPhone
+    requestNote
+    paymentMethod
     subtotalPrice
     discountPrice
     totalPrice
@@ -1609,6 +1672,12 @@ export const SellerOrderDetailDocument = new TypedDocumentString(`
     pickedUpAt
     canceledAt
     noShowAt
+    confirmDeadlineAt
+    autoPickupAt
+    canMarkNoShow
+    commissionRateBps
+    expectedPayoutAmount
+    settlementBaseAmount
     createdAt
     updatedAt
     items {
@@ -1645,6 +1714,12 @@ export const SellerOrderDetailDocument = new TypedDocumentString(`
       changedAt
       note
     }
+    cancellation {
+      actorType
+      reasonLabel
+      refundAmount
+      refundStatus
+    }
   }
 }
     `) as unknown as TypedDocumentString<SellerOrderDetailQuery, SellerOrderDetailQueryVariables>;
@@ -1680,12 +1755,14 @@ export const SellerOrderConversationsDocument = new TypedDocumentString(`
 export const SellerOrdersUpdatedDocument = new TypedDocumentString(`
     subscription SellerOrdersUpdated {
   sellerOrderUpdated {
+    kind
     orderId
     status
     pickupAt
     buyerName
     totalPrice
     productName
+    hasCustom
     updatedAt
   }
 }

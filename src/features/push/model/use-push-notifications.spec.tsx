@@ -128,13 +128,61 @@ describe('usePushNotifications', () => {
     expect(toast).toHaveBeenCalledWith(`새 주문: ${PUSH_BODY}`, {
       onPress: expect.any(Function) as () => void,
     });
-    expect(invalidate.mock.calls.map(([f]) => f?.queryKey)).toEqual([['orders', 'list'], ['home']]);
+    expect(invalidate.mock.calls.map(([f]) => f?.queryKey)).toEqual([
+      ['orders', 'list'],
+      ['orders', 'detail', '5'],
+      ['home'],
+    ]);
     await act(() => Promise.resolve(jest.mocked(toast).mock.calls[0]![1]!.onPress!()));
     await waitFor(() => expect(r.getPathname()).toBe('/orders/5'));
 
     // 같은 주문 알림이 다시 와도 토스트는 한 번
     await received(notification(ORDER, 'n2-again', '새 주문', PUSH_BODY));
     expect(toast).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['ORDER_CANCELED', '주문 취소', '딸기 타르트 · 픽업 10/12 11:00 주문이 취소됐어요(구매자)'],
+    [
+      'ORDER_CONFIRM_REMINDER',
+      '확정 마감 임박',
+      '딸기 타르트 주문을 14:00까지 확정하지 않으면 자동 취소돼요',
+    ],
+  ])(
+    '%s는 어느 화면에서든 제목·본문 토스트로 한 번 알리고(누르면 상세) 그 주문을 다시 받게 한다',
+    async (kind, title, body) => {
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+      const r = open('/chats');
+      await r;
+      const orderId = `${kind}-7`;
+      await received(notification({ kind, orderId }, `${kind}-1`, title, body));
+      expect(toast).toHaveBeenCalledWith(`${title} · ${body}`, {
+        onPress: expect.any(Function) as () => void,
+      });
+      expect(invalidate.mock.calls.map(([f]) => f?.queryKey)).toEqual([
+        ['orders', 'list'],
+        ['orders', 'detail', orderId],
+        ['home'],
+      ]);
+      await received(notification({ kind, orderId }, `${kind}-2`, title, body));
+      expect(toast).toHaveBeenCalledTimes(1);
+      await act(() => Promise.resolve(jest.mocked(toast).mock.calls[0]![1]!.onPress!()));
+      await waitFor(() => expect(r.getPathname()).toBe(`/orders/${orderId}`));
+    },
+  );
+
+  it('새 주문을 알린 주문의 취소 알림은 막지 않는다', async () => {
+    await open();
+    await received(
+      notification({ kind: 'ORDER_SUBMITTED', orderId: '61' }, 'p61', '새 주문', PUSH_BODY),
+    );
+    await received(
+      notification({ kind: 'ORDER_CANCELED', orderId: '61' }, 'c61', '주문 취소', '취소됐어요'),
+    );
+    expect(jest.mocked(toast).mock.calls.map(([text]) => text)).toEqual([
+      `새 주문: ${PUSH_BODY}`,
+      '주문 취소 · 취소됐어요',
+    ]);
   });
 
   it('모르는 알림은 무시한다', async () => {
@@ -147,6 +195,8 @@ describe('usePushNotifications', () => {
 
   it.each([
     [ORDER, '/orders/5'],
+    [{ kind: 'ORDER_CANCELED', orderId: '6' }, '/orders/6'],
+    [{ kind: 'ORDER_CONFIRM_REMINDER', orderId: '7' }, '/orders/7'],
     [MESSAGE, '/chats/c9'],
   ])('알림을 누르면 data.kind로 화면을 연다 %j', async (data, path) => {
     const r = open();
@@ -270,12 +320,14 @@ describe('새 주문 알림: 주문 구독과 포그라운드 푸시', () => {
         sink.next({
           data: {
             sellerOrderUpdated: {
+              kind: 'SUBMITTED',
               orderId,
               status: 'SUBMITTED',
               pickupAt: '2026-10-12T02:00:00.000Z',
               buyerName: '김다은',
               totalPrice: 38000,
               productName: '딸기 타르트',
+              hasCustom: false,
               updatedAt: '2026-10-06T02:00:00.000Z',
             },
           },

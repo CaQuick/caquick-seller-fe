@@ -17,6 +17,7 @@ export const CHATS_COPY = {
   menuAutoReply: '자동응답 관리',
   menuAutoReplyDescription: '인사말·자주 묻는 질문 답변',
   menuOrder: '주문 보기',
+  orderCard: '주문 문의',
   close: '닫기',
   roomEmpty: '아직 주고받은 메시지가 없어요',
 } as const;

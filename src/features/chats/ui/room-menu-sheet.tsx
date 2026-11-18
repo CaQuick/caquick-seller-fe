@@ -9,7 +9,7 @@ import { CHATS_COPY } from '../model/copy';
 interface Props {
   ref: RefObject<BottomSheetModal | null>;
   onAutoReply: () => void;
-  /** 이 구매자의 최근 주문 요약. 없으면 주문 보기를 숨긴다 */
+  /** 이 구매자 계정의 최신 주문 요약. 없으면 주문 보기를 숨긴다 */
   orderSummary: string | null;
   onOrder: () => void;
 }

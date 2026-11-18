@@ -177,12 +177,14 @@ describe('앱 셸', () => {
       Promise.resolve(
         sink.next({
           sellerOrderUpdated: {
+            kind: 'SUBMITTED',
             orderId: '77',
             status: 'SUBMITTED',
             pickupAt: '2026-10-12T02:00:00.000Z',
             buyerName: '김다은',
             totalPrice: 38000,
             productName: '딸기 타르트',
+            hasCustom: false,
             updatedAt: '2026-10-06T02:00:00.000Z',
           },
         }),
