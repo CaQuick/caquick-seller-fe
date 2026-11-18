@@ -164,6 +164,17 @@ describe('ProductDetailScreen', () => {
     ).toBeTruthy();
   });
 
+  it.each(['NONE', 'THREE_D'] as const)(
+    '템플릿이 있어도 커스텀 방식이 %s일 때는 사용 안 함이다',
+    async (customMode) => {
+      server.use(detailOk({ ...PRODUCT, customMode }));
+      await open();
+      expect(
+        await screen.findByRole('button', { name: '커스텀 문구, 문구 슬롯 2개, 사용 안 함' }),
+      ).toBeTruthy();
+    },
+  );
+
   it('썸네일을 누르면 그 장을 고른다', async () => {
     server.use(detailOk());
     await open();

@@ -1,4 +1,8 @@
-import { type AuditActionType, type AuditTargetType } from '@/graphql/generated/graphql';
+import {
+  type AuditActionType,
+  type AuditTargetType,
+  type OrderStatusType,
+} from '@/graphql/generated/graphql';
 import { enumView } from '@/shared/lib/enum-view';
 import { formatNumber } from '@/shared/lib/format';
 import { addDays, formatYmd, kstParts, todayKst, WEEKDAYS_KO } from '@/shared/lib/kst';
@@ -77,15 +81,18 @@ const KEY_LABEL: Record<string, { label: string; unit?: string }> = {
   tokenKey: { label: '문구 키' },
 };
 
-const ORDER_STATUS: Record<string, string> = {
-  PENDING_PAYMENT: '입금 대기',
-  SUBMITTED: '접수',
-  CONFIRMED: '확정',
-  MADE: '제작 완료',
-  PICKED_UP: '픽업 완료',
-  NO_SHOW: '노쇼',
-  CANCELED: '취소',
-};
+const orderStatusLabel = enumView<string | null>(
+  {
+    PENDING_PAYMENT: '입금 대기',
+    SUBMITTED: '접수',
+    CONFIRMED: '확정',
+    MADE: '제작 완료',
+    PICKED_UP: '픽업 완료',
+    NO_SHOW: '노쇼',
+    CANCELED: '취소',
+  } satisfies Record<OrderStatusType, string>,
+  null,
+);
 
 /** 식별자는 판매자에게 의미가 없어 diff에서 뺀다(영역 판별에만 쓴다) */
 const isIdKey = (key: string) => /(^id|Ids?)$/.test(key.split('.').at(-1) ?? '');
@@ -128,7 +135,7 @@ export function formatValue(key: string, value: unknown): string {
     return `${formatNumber(value)}${KEY_LABEL[leaf]?.unit ?? ''}`;
   }
   if (typeof value === 'string') {
-    if (leaf === 'status') return ORDER_STATUS[value] ?? value;
+    if (leaf === 'status') return orderStatusLabel(value) ?? value;
     if (/^\d{4}-\d{2}-\d{2}(T00:00:00(\.000)?Z)?$/.test(value)) return value.slice(0, 10);
     if (/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(value)) {
       const k = kstParts(value);

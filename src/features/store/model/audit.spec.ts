@@ -1,3 +1,4 @@
+import { orderStatusView } from '@/features/orders/model/status';
 import { enumValues } from '@/test/generated-enums';
 
 import {
@@ -101,8 +102,6 @@ describe('formatValue', () => {
     ['unknown', 5, '5'],
     ['dayOfWeek', 6, '토'],
     ['status', 'CONFIRMED', '확정'],
-    ['status', 'PENDING_PAYMENT', '입금 대기'],
-    ['status', 'NO_SHOW', '노쇼'],
     ['status', 'WEIRD', 'WEIRD'],
     ['capacityDate', '2026-10-09', '2026-10-09'],
     ['closureDate', '2026-10-09T00:00:00.000Z', '2026-10-09'],
@@ -112,6 +111,10 @@ describe('formatValue', () => {
     ['note', '가'.repeat(61), `${'가'.repeat(60)}…`],
   ])('%s=%j → %s', (key, value, expected) => {
     expect(formatValue(key, value)).toBe(expected);
+  });
+
+  it.each(enumValues('OrderStatusType'))('주문 상태 %s의 라벨은 주문 화면과 같다', (status) => {
+    expect(formatValue('status', status)).toBe(orderStatusView(status).label);
   });
 });
 

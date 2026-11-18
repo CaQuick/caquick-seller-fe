@@ -90,6 +90,19 @@ describe('generatedEnums', () => {
     expect([...generatedEnums(source)]).toEqual([['Status', ['PENDING', 'DONE']]]);
   });
 
+  it("반증: 여러 줄 설명의 한 줄이 ';'로 끝나도 enum을 빠뜨리지 않는다", () => {
+    const source = [
+      'export type Status =',
+      '  /**',
+      '   * 입금 대기;',
+      '   * 판매자에게 보이지 않는다.',
+      '   */',
+      "  | 'PENDING'",
+      "  | 'DONE';",
+    ].join('\n');
+    expect([...generatedEnums(source)]).toEqual([['Status', ['PENDING', 'DONE']]]);
+  });
+
   it('codegen 산출물의 enum을 읽는다', () => {
     const enums = generatedEnums();
     expect(enums.size).toBeGreaterThanOrEqual(10);
