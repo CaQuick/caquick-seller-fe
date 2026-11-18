@@ -8,6 +8,7 @@ import { toast } from 'sonner-native';
 
 import {
   type OrderStatusType,
+  type SellerCancelOrderInput,
   type SellerOrderConversationsQuery,
   type SellerOrderDetailQuery,
   type SellerUpdateOrderStatusInput,
@@ -55,6 +56,7 @@ const order = (patch: Partial<Order> = {}): Order => ({
   madeAt: null,
   pickedUpAt: null,
   canceledAt: null,
+  noShowAt: null,
   createdAt: '2026-10-05T11:14:00.000Z',
   updatedAt: '2026-10-05T11:14:00.000Z',
   items: [
@@ -75,11 +77,11 @@ const order = (patch: Partial<Order> = {}): Order => ({
           valueText: '생일 축하해 다은',
           sortOrder: 1,
         },
+        { id: 't3', tokenKey: '편지', defaultText: '사랑해', valueText: null, sortOrder: 3 },
       ],
       freeEdits: [
         {
           id: 'f1',
-          cropImageUrl: 'https://img/crop.jpg',
           descriptionText: '크림은 연한 핑크로 부탁드려요',
           sortOrder: 1,
           attachments: [{ id: 'a1', imageUrl: 'https://img/ref.jpg', sortOrder: 1 }],
@@ -118,6 +120,23 @@ function mutationHandler(respond?: () => Response | undefined) {
           HttpResponse.json({
             data: { sellerUpdateOrderStatus: { id: '1', status: variables.input.toStatus } },
           })
+        );
+      },
+    ),
+  );
+  return inputs;
+}
+
+function cancelHandler(respond?: () => Response) {
+  const inputs: SellerCancelOrderInput[] = [];
+  server.use(
+    graphql.mutation<object, { input: SellerCancelOrderInput }>(
+      'SellerCancelOrder',
+      ({ variables }) => {
+        inputs.push(variables.input);
+        return (
+          respond?.() ??
+          HttpResponse.json({ data: { sellerCancelOrder: { id: '1', status: 'CANCELED' } } })
         );
       },
     ),
@@ -173,7 +192,10 @@ describe('OrderDetailScreen', () => {
     expect(screen.getByText('1호 15cm (+5,000원)')).toBeTruthy();
     expect(screen.getByText('초코 (+0원)')).toBeTruthy();
     expect(screen.getByText('생일 축하해 다은')).toBeTruthy();
-    expect(screen.getByLabelText('자유 편집 이미지-2')).toBeTruthy();
+    expect(screen.getByText('문구 없음')).toBeTruthy();
+    expect(screen.queryByText('사랑해')).toBeNull();
+    expect(screen.getByLabelText('자유 편집 이미지-1')).toBeTruthy();
+    expect(screen.queryByLabelText('자유 편집 이미지-2')).toBeNull();
     expect(screen.getByText('크림은 연한 핑크로 부탁드려요')).toBeTruthy();
     expect(screen.getByText('33,000원')).toBeTruthy();
     expect(screen.getByText('+5,000원')).toBeTruthy();
@@ -198,6 +220,34 @@ describe('OrderDetailScreen', () => {
     expect(router.getPathname()).toBe('/orders/1');
   });
 
+  it('참고 사진이 없는 자유 편집은 요청 사항만 두고, 빈 문구는 기본 문구로 보인다', async () => {
+    detailHandler(() =>
+      order({
+        items: [
+          {
+            id: 'i2',
+            productName: '레터링 케이크',
+            quantity: 1,
+            optionItems: [],
+            customTexts: [
+              { id: 't1', tokenKey: '문구', defaultText: '축하해', valueText: '', sortOrder: 1 },
+            ],
+            freeEdits: [
+              { id: 'f1', descriptionText: '왼쪽에 하트', sortOrder: 1, attachments: [] },
+              { id: 'f2', descriptionText: '', sortOrder: 2, attachments: [] },
+            ],
+          },
+        ],
+      }),
+    );
+    await open();
+    expect(await screen.findByText('축하해')).toBeTruthy();
+    expect(screen.getByText('왼쪽에 하트')).toBeTruthy();
+    expect(screen.getByText('요청 사항 1')).toBeTruthy();
+    expect(screen.queryByText('요청 사항 2')).toBeNull();
+    expect(screen.queryByText(/^자유 편집 이미지/)).toBeNull();
+  });
+
   it('전화 아이콘은 숫자만 남긴 tel: 링크를 열고, 실패하면 알린다', async () => {
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(true);
     detailHandler(() => order());
@@ -220,6 +270,13 @@ describe('OrderDetailScreen', () => {
       null,
       false,
       '취소된 주문이에요. 구매자에게 사유가 전달되었고 결제는 취소되었어요.',
+    ],
+    ['NO_SHOW', null, false, '노쇼로 처리된 주문이에요. 더 할 수 있는 작업이 없어요.'],
+    [
+      'ON_HOLD' as OrderStatusType,
+      null,
+      false,
+      '앱을 최신 버전으로 업데이트하면 이 주문을 처리할 수 있어요.',
     ],
   ])('%s 액션바: 다음 %s · 취소 %s · 안내 %s', async (status, next, cancellable, notice) => {
     detailHandler(() => order({ status }));
@@ -260,9 +317,18 @@ describe('OrderDetailScreen', () => {
     await waitFor(() => expect(calls.count).toBe(2));
   });
 
-  it('취소는 사유가 비어 있으면 확정할 수 없고, 사유를 다듬어 보낸다', async () => {
+  it('모르는 상태도 죽지 않고 확인 필요 칩과 도달한 단계만 그린다', async () => {
+    detailHandler(() => order({ status: 'ON_HOLD' as OrderStatusType }));
+    await open();
+    expect(await screen.findByText('확인 필요')).toBeTruthy();
+    expect(screen.getByLabelText('접수, 완료, 10월 5일 20:14 · 김다은')).toBeTruthy();
+    expect(screen.queryByLabelText(/현재 단계/)).toBeNull();
+  });
+
+  it('취소는 사유가 비어 있으면 확정할 수 없고, 사유를 다듬어 기타 사유·판매자 사정으로 보낸다', async () => {
     detailHandler(() => order());
-    const inputs = mutationHandler();
+    const updates = mutationHandler();
+    const inputs = cancelHandler();
     await open();
     await screen.findByRole('button', { name: '주문 취소' });
     const confirm = () => button('취소 확정');
@@ -275,13 +341,16 @@ describe('OrderDetailScreen', () => {
     await fireEvent.changeText(screen.getByLabelText('취소 사유'), ' 딸기 입고 지연 ');
     await fireEvent.press(confirm());
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('주문을 취소했어요'));
-    expect(inputs).toEqual([{ orderId: '1', toStatus: 'CANCELED', note: '딸기 입고 지연' }]);
+    expect(inputs).toEqual([
+      { orderId: '1', reason: 'OTHER', fault: 'SELLER', note: '딸기 입고 지연' },
+    ]);
+    expect(updates).toHaveLength(0);
     expect(screen.getByLabelText('취소 사유')).toHaveDisplayValue('');
   });
 
   it('취소할 수 없는 상태면 그 문구를 띄운다', async () => {
     detailHandler(() => order());
-    mutationHandler(failWith('ORDER_NOT_CANCELLABLE'));
+    cancelHandler(failWith('ORDER_NOT_CANCELLABLE'));
     await open();
     await screen.findByRole('button', { name: '주문 취소' });
     await fireEvent.changeText(screen.getByLabelText('취소 사유'), '재료 소진');

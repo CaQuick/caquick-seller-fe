@@ -34,7 +34,6 @@ const SellerProductManageDocument = graphql(`
       customTemplate {
         id
         baseImageUrl
-        isActive
         textTokens {
           id
           tokenKey
@@ -125,14 +124,6 @@ const SellerProductUpsertTemplateDocument = graphql(`
   }
 `);
 
-const SellerProductSetTemplateActiveDocument = graphql(`
-  mutation SellerProductSetTemplateActive($input: SellerSetProductCustomTemplateActiveInput!) {
-    sellerSetProductCustomTemplateActive(input: $input) {
-      id
-    }
-  }
-`);
-
 const SellerProductUpsertTextTokenDocument = graphql(`
   mutation SellerProductUpsertTextToken($input: SellerUpsertProductCustomTextTokenInput!) {
     sellerUpsertProductCustomTextToken(input: $input) {
@@ -203,20 +194,10 @@ export async function reorderOptionItems(optionGroupId: string, optionItemIds: s
   });
 }
 
-export async function upsertCustomTemplate(
-  productId: string,
-  baseImageUrl: string,
-  isActive: boolean,
-): Promise<string> {
+export async function upsertCustomTemplate(productId: string, baseImageUrl: string) {
   return (
-    await gqlRequest(SellerProductUpsertTemplateDocument, {
-      input: { productId, baseImageUrl, isActive },
-    })
+    await gqlRequest(SellerProductUpsertTemplateDocument, { input: { productId, baseImageUrl } })
   ).sellerUpsertProductCustomTemplate.id;
-}
-
-export async function setCustomTemplateActive(templateId: string, isActive: boolean) {
-  await gqlRequest(SellerProductSetTemplateActiveDocument, { input: { templateId, isActive } });
 }
 
 export async function upsertTextToken(

@@ -7,7 +7,7 @@ import { type YmdDate } from '@/shared/lib/kst';
 import { Icon, RemoteImage, StatusChip } from '@/shared/ui';
 
 import { formatPickup } from '../model/format';
-import { STATUS_LABEL, STATUS_TONE } from '../model/status';
+import { orderStatusView } from '../model/status';
 
 export type OrderSummary = SellerOrdersListQuery['sellerOrderList']['items'][number];
 
@@ -24,11 +24,11 @@ export function OrderRow({
   const title = order.firstItemName ?? order.orderNumber;
   const pickup = `${formatPickup(order.pickupAt, today)} 픽업 · ${order.buyerName}`;
   const price = formatKrw(order.totalPrice);
-  const status = STATUS_LABEL[order.status];
+  const status = orderStatusView(order.status);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${title}, ${status}, ${pickup}, ${price}`}
+      accessibilityLabel={`${title}, ${status.label}, ${pickup}, ${price}`}
       onPress={onPress}
       style={shadow.native.card}
       className="flex-row items-center gap-3.5 rounded-xl bg-surface py-[17px] pl-4 pr-[19px]"
@@ -57,7 +57,7 @@ export function OrderRow({
         <Text className="mt-1 font-sans text-xs tracking-tight text-muted">{price}</Text>
       </View>
       <View>
-        <StatusChip tone={STATUS_TONE[order.status]} label={status} />
+        <StatusChip tone={status.tone} label={status.label} />
       </View>
       <Icon name="chevronRight" size={14} color={colors.chevron} strokeWidth={2.5} />
     </Pressable>

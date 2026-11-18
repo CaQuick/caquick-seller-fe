@@ -51,7 +51,8 @@ const PRODUCT: Product = {
       optionItems: [{ id: 'o1' }, { id: 'o2' }],
     },
   ],
-  customTemplate: { id: 'ct1', isActive: true, textTokens: [{ id: 'k1' }, { id: 'k2' }] },
+  customMode: 'SLOT',
+  customTemplate: { id: 'ct1', textTokens: [{ id: 'k1' }, { id: 'k2' }] },
 };
 
 const BARE: Product = {
@@ -64,6 +65,7 @@ const BARE: Product = {
   categories: [],
   tags: [],
   optionGroups: [],
+  customMode: 'NONE',
   customTemplate: null,
 };
 

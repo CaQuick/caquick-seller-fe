@@ -61,6 +61,7 @@
 | D55 | 2026-10-06 | Android 네이티브는 64비트 ARM만 빌드한다(`expo-build-properties` `android.buildArchs: [arm64-v8a]`). x86·x86_64·armeabi-v7a 제외                                                                                                                        | 사용자 결정. x86은 에뮬레이터용, 32비트 전용 OS 기기(Android Go 저가폰)는 Play에서 설치 불가를 감수                     |
 | D56 | 2026-10-06 | 리뷰 봇은 Codex만 쓴다. CodeRabbit은 BE 전용 — `.coderabbit.yaml`은 자동 리뷰를 끈 최소 설정만 둔다                                                                                                                                                     | 사용자 결정(관리자 FE도 같음). 머지 게이트는 Codex 상태기계 + 필수 체크                                                 |
 | D57 | 2026-10-06 | 토스트는 화면 아래 가운데에 시안 `.toast` 다크 스타일로(어두운 바탕·흰 14px·r12, 성공 민트 ✓·실패 연한 빨강 !·안내는 표시 없음). 바닥 거리는 max(안전 영역, iOS 키보드) + 탭바 70 + 16으로 탭바·하단 CTA 바 위                                          | 사용자 피드백(Expo Go). 상단 토스트가 iPhone 상태바·다이나믹 아일랜드와 겹침                                            |
+| D58 | 2026-11-19 | 생성 enum 표시는 `enumView(table, fallback)`(자기 속성 조회)로만. 모르는 값 폴백: 주문 상태 '확인 필요', 처리는 '앱을 최신 버전으로…' 안내, 감사 동작 '변경'·대상 '기타', 타임라인은 도달 단계만. 표는 호출 안 `satisfies Record<Enum, V>`(가드 spec)   | BE가 앱보다 먼저 값을 늘리면 직접 인덱싱이 undefined로 화면을 죽인다(OTA를 못 받은 옛 바이너리 포함)                    |
 
 ## 시안 대비 남은 차이
 

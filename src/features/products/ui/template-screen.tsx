@@ -20,7 +20,6 @@ import {
   deleteTextToken,
   productManageQueryOptions,
   reorderTextTokens,
-  setCustomTemplateActive,
   upsertCustomTemplate,
   upsertTextToken,
 } from '../api/manage';
@@ -54,7 +53,6 @@ export function ProductCustomTemplateScreen() {
 interface Saved {
   templateId: string | null;
   baseImageUrl: string | null;
-  isActive: boolean;
   slots: Slot[];
 }
 
@@ -70,11 +68,9 @@ function TemplateBody({ product }: { product: Product }) {
   const [saved, setSaved] = useState<Saved>(() => ({
     templateId: product.customTemplate?.id ?? null,
     baseImageUrl: product.customTemplate?.baseImageUrl ?? null,
-    isActive: product.customTemplate?.isActive ?? true,
     slots: toSlots(product.customTemplate?.textTokens ?? []),
   }));
   const [baseImageUrl, setBaseImageUrl] = useState(saved.baseImageUrl);
-  const [isActive, setIsActive] = useState(saved.isActive);
   const [slots, setSlots] = useState(saved.slots);
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -91,7 +87,6 @@ function TemplateBody({ product }: { product: Product }) {
     saved.templateId == null ? baseImageUrl != null : baseImageUrl !== saved.baseImageUrl;
   const dirty =
     templateDirty ||
-    isActive !== saved.isActive ||
     deleted.length > 0 ||
     changed.length > 0 ||
     !sameOrder(idsOf(slots), idsOf(saved.slots));
@@ -136,11 +131,8 @@ function TemplateBody({ product }: { product: Product }) {
     try {
       let templateId = next.templateId;
       if (templateId == null || templateDirty) {
-        templateId = await upsertCustomTemplate(product.id, baseImageUrl, isActive);
-        commit({ templateId, baseImageUrl, isActive });
-      } else if (isActive !== next.isActive) {
-        await setCustomTemplateActive(templateId, isActive);
-        commit({ isActive });
+        templateId = await upsertCustomTemplate(product.id, baseImageUrl);
+        commit({ templateId, baseImageUrl });
       }
       for (const slot of deleted) {
         await deleteTextToken(slot.id!);
@@ -194,30 +186,6 @@ function TemplateBody({ product }: { product: Product }) {
           onPress: () => void save(),
         }}
       >
-        <View style={shadow.native.card} className="mt-4 rounded-xl bg-surface px-4 py-2.5">
-          <View className="min-h-9 flex-row items-center gap-3">
-            <View className="flex-1">
-              <Text className="font-sans text-md font-medium tracking-tight text-text">
-                {TEMPLATE_COPY.useTitle}
-              </Text>
-              <Text className="mt-0.5 font-sans text-xs tracking-tight text-muted">
-                {TEMPLATE_COPY.useDescription}
-              </Text>
-            </View>
-            <Switch
-              value={isActive}
-              onValueChange={setIsActive}
-              accessibilityLabel={TEMPLATE_COPY.useTitle}
-            />
-          </View>
-        </View>
-        {isActive ? null : (
-          <View className="mt-4 rounded-lg bg-tint2 p-3">
-            <Text className="font-sans text-sm tracking-tight text-text3">
-              {TEMPLATE_COPY.offGuide}
-            </Text>
-          </View>
-        )}
         <Text className="mb-3 mt-[18px] font-sans text-lg font-semibold tracking-tight text-text2">
           {TEMPLATE_COPY.base}
         </Text>

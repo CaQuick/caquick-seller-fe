@@ -51,7 +51,7 @@ describe('좌표 비율 변환', () => {
 });
 
 describe('toSlots', () => {
-  it('위치가 없는 슬롯은 기본 자리에, 있으면 그대로 둔다', () => {
+  it('서버 슬롯의 좌표를 그대로 박스로 쓴다', () => {
     const token = {
       id: 't1',
       tokenKey: 'name',
@@ -63,13 +63,12 @@ describe('toSlots', () => {
       width: 3000,
       height: 900,
     };
-    expect(toSlots([token, { ...token, id: 't2', posX: null }])).toEqual([
+    expect(toSlots([token])).toEqual([
       expect.objectContaining({
         id: 't1',
         maxLength: '10',
         rect: { x: 10, y: 20, width: 3000, height: 900 },
       }),
-      expect.objectContaining({ id: 't2', rect: defaultRect(1) }),
     ]);
   });
 

@@ -38,7 +38,7 @@ src/
   shared/
     api/                   config·errors·graphql-client·rest-client·session·ws-client
     ui/                    Button·TextField·Sheet·Screen 같은 공용 부품
-    lib/                   kst·format·josa·zod-locale·upload·storage(SecureStore)·cn
+    lib/                   kst·format·josa·zod-locale·upload·storage(SecureStore)·cn·enum-view
     config/                env.ts(EXPO_PUBLIC_*)·tokens.ts(색·간격·반경·자간)
   graphql/generated/       codegen 산출물(커밋)
   test/                    setup·mocks·msw·render·factories
@@ -69,6 +69,9 @@ src/
 - **RN 배선**: `onlineManager`는 네트워크 상태, `focusManager`는 AppState, 화면 포커스 refetch는 `useFocusEffect`로 잇습니다.
 - **목록**은 커서 방식(`items · totalCount · hasMore · nextCursor`)이 기본이고 무한 스크롤로 이어 붙입니다. 필터는 화면 상태(zustand 또는 로컬 state)에 둡니다.
 - **ID**는 문자열 그대로 씁니다. `"0"`·빈 문자열을 truthy 검사로 버리지 않습니다.
+- **enum 표시**는 `enumView(table, fallback)`(`shared/lib/enum-view.ts`)로만 합니다(D58). BE가 앱보다 먼저 값을 늘려도 화면이 죽지 않게 모르는 값은 폴백으로 그립니다.
+  - 표는 호출 안에서 `satisfies Record<Enum, V>`로 적어 빠진 값을 컴파일에서 잡습니다. 판매자에게 일부만 보이는 enum은 `Partial<Record<…>>`로 둡니다.
+  - `src/test/enum-view-guard.spec.ts`가 `enumView(` 인자 밖의 `Record<생성 enum, …>`을 막습니다(TypeScript AST, 생성 enum 목록은 codegen 산출물에서 읽음).
 - **날짜**는 표시·입력 KST, 전송 ISO(UTC)입니다. `shared/lib/kst.ts`가 UTC+9 산술로 처리하고 `Intl`을 쓰지 않습니다(Hermes의 플랫폼별 편차 회피). 천단위 구분도 자체 `formatNumber`입니다.
 - **업로드**(`shared/lib/upload.ts`): manipulate(≤1600px, JPEG 0.85) → `new File(uri).size` → `sellerCreateUploadUrl` → `file.upload(PUT)` → `publicUrl`. presign이 Content-Length를 서명에 넣으므로 축소를 먼저 하고 그 결과의 크기로 presign합니다.
   - shared는 GraphQL 문서를 갖지 않으므로 presign 함수는 feature가 넣습니다: 상품 이미지 `features/uploads`의 `presignUpload`, 매장 로고 store의 `presignStoreImage`. 용도(`purpose`)도 호출한 쪽이 정합니다.

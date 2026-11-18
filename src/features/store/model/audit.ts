@@ -1,4 +1,5 @@
 import { type AuditActionType, type AuditTargetType } from '@/graphql/generated/graphql';
+import { enumView } from '@/shared/lib/enum-view';
 import { formatNumber } from '@/shared/lib/format';
 import { addDays, formatYmd, kstParts, todayKst, WEEKDAYS_KO } from '@/shared/lib/kst';
 import { type StatusTone } from '@/shared/ui';
@@ -18,12 +19,20 @@ export const AUDIT_FILTERS: readonly { value: AuditTargetType | null; label: str
   { value: 'CHANGE_PASSWORD', label: '비밀번호' },
 ];
 
-export const ACTION_VIEW: Record<AuditActionType, { label: string; tone: StatusTone }> = {
-  CREATE: { label: '생성', tone: 'mint' },
-  UPDATE: { label: '수정', tone: 'purple' },
-  DELETE: { label: '삭제', tone: 'red' },
-  STATUS_CHANGE: { label: '상태 변경', tone: 'gray' },
-};
+interface ActionView {
+  label: string;
+  tone: StatusTone;
+}
+
+export const auditActionView = enumView<ActionView>(
+  {
+    CREATE: { label: '생성', tone: 'mint' },
+    UPDATE: { label: '수정', tone: 'purple' },
+    DELETE: { label: '삭제', tone: 'red' },
+    STATUS_CHANGE: { label: '상태 변경', tone: 'gray' },
+  } satisfies Record<AuditActionType, ActionView>,
+  { label: '변경', tone: 'gray' },
+);
 
 /** 어느 설정을 건드렸는지 — 기록에 남은 키로 고른다(앞이 우선) */
 const AREA: readonly [string, string][] = [
@@ -69,10 +78,12 @@ const KEY_LABEL: Record<string, { label: string; unit?: string }> = {
 };
 
 const ORDER_STATUS: Record<string, string> = {
+  PENDING_PAYMENT: '입금 대기',
   SUBMITTED: '접수',
   CONFIRMED: '확정',
   MADE: '제작 완료',
   PICKED_UP: '픽업 완료',
+  NO_SHOW: '노쇼',
   CANCELED: '취소',
 };
 
@@ -160,13 +171,17 @@ export function diffText(lines: readonly DiffLine[], max = DIFF_MAX_LINES): stri
   return shown.join('\n');
 }
 
-const TARGET_LABEL: Partial<Record<AuditTargetType, string>> = {
-  STORE: '매장',
-  PRODUCT: '상품',
-  ORDER: '주문',
-  CONVERSATION: '대화',
-  CHANGE_PASSWORD: '비밀번호',
-};
+/** 판매자 감사 로그에 나오는 대상만 적고 나머지는 '기타' */
+export const auditTargetLabel = enumView<string>(
+  {
+    STORE: '매장',
+    PRODUCT: '상품',
+    ORDER: '주문',
+    CONVERSATION: '대화',
+    CHANGE_PASSWORD: '비밀번호',
+  } satisfies Partial<Record<AuditTargetType, string>>,
+  '기타',
+);
 
 export interface AuditLogLike {
   targetType: AuditTargetType;
@@ -177,7 +192,7 @@ export interface AuditLogLike {
 
 /** 행 제목과 펼침 diff. 비밀번호 변경은 값 없이 시각만 남긴다 */
 export function describeAudit(log: AuditLogLike): { title: string; diff: DiffLine[] } {
-  const label = TARGET_LABEL[log.targetType] ?? log.targetType;
+  const label = auditTargetLabel(log.targetType);
   if (log.targetType === 'CHANGE_PASSWORD') return { title: label, diff: [] };
   const before = parseJson(log.beforeJson);
   const after = parseJson(log.afterJson);

@@ -8,7 +8,7 @@ import { Button, Chip, Empty, StatusChip } from '@/shared/ui';
 
 import { auditLogsQueryOptions } from '../api/audit';
 import {
-  ACTION_VIEW,
+  auditActionView,
   AUDIT_COPY,
   AUDIT_FILTERS,
   type AuditLogLike,
@@ -28,7 +28,7 @@ interface Log extends AuditLogLike {
 function AuditRow({ log, last }: { log: Log; last: boolean }) {
   const [open, setOpen] = useState(false);
   const { title, diff } = describeAudit(log);
-  const action = ACTION_VIEW[log.action];
+  const action = auditActionView(log.action);
   const at = formatAuditAt(log.createdAt);
   const expandable = diff.length > 0;
   const body = (

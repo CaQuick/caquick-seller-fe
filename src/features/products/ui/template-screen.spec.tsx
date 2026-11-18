@@ -59,7 +59,6 @@ type Template = NonNullable<SellerProductManageQuery['sellerProduct']['customTem
 const TEMPLATE: Template = {
   id: 'ct1',
   baseImageUrl: 'https://img/base.jpg',
-  isActive: true,
   textTokens: [
     {
       id: 'k1',
@@ -78,10 +77,10 @@ const TEMPLATE: Template = {
       defaultText: '오늘도 행복한 하루 보내',
       maxLength: 30,
       isRequired: false,
-      posX: null,
-      posY: null,
-      width: null,
-      height: null,
+      posX: 1000,
+      posY: 3000,
+      width: 8000,
+      height: 1500,
     },
   ],
 };
@@ -169,11 +168,11 @@ describe('ProductCustomTemplateScreen', () => {
     await fireEvent.press(saveButton());
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith(TEMPLATE_COPY.saved));
     expect(calls.SellerProductUpsertTemplate).toEqual([
-      { input: { productId: '7', baseImageUrl: 'https://cdn/1.jpg', isActive: true } },
+      { input: { productId: '7', baseImageUrl: 'https://cdn/1.jpg' } },
     ]);
   });
 
-  it('슬롯을 박스와 카드로 그리고, 위치가 없는 슬롯은 기본 자리에 둔다', async () => {
+  it('슬롯을 비율 좌표의 박스와 카드로 그린다', async () => {
     serve(TEMPLATE);
     await open();
     expect(await screen.findByLabelText('name 위치')).toHaveStyle({
@@ -186,18 +185,6 @@ describe('ProductCustomTemplateScreen', () => {
     expect(screen.getByLabelText('name 기본 문구')).toHaveDisplayValue('생일 축하해');
     expect(screen.getByRole('switch', { name: 'message 필수 입력' })).not.toBeChecked();
     expect(saveButton()).toBeDisabled();
-  });
-
-  it('사용을 끄면 안내를 보이고, 저장은 활성 전환 하나만 보낸다', async () => {
-    const calls = serve(TEMPLATE);
-    await open();
-    await fireEvent.press(await screen.findByRole('switch', { name: TEMPLATE_COPY.useTitle }));
-    expect(screen.getByText(TEMPLATE_COPY.offGuide)).toBeTruthy();
-    await fireEvent.press(saveButton());
-    await waitFor(() => expect(toast.success).toHaveBeenCalled());
-    expect(calls).toEqual({
-      SellerProductSetTemplateActive: [{ input: { templateId: 'ct1', isActive: false } }],
-    });
   });
 
   it('박스를 끌면 비율 좌표로 옮기고, 모서리를 끌면 크기를 바꿔 그 슬롯만 저장한다', async () => {
@@ -286,7 +273,8 @@ describe('ProductCustomTemplateScreen', () => {
   it('중간에 실패하면 알리고, 다시 저장하면 남은 요청만 보낸다', async () => {
     const calls = serve(TEMPLATE, (op, n) => op === 'SellerProductUpsertTextToken' && n === 1);
     await open();
-    await fireEvent.press(await screen.findByRole('switch', { name: TEMPLATE_COPY.useTitle }));
+    await fireEvent.press(await screen.findByRole('button', { name: 'message 슬롯 삭제' }));
+    await fireEvent.press(screen.getByRole('button', { name: '삭제하기' }));
     await fireEvent.press(screen.getByRole('switch', { name: 'name 필수 입력' }));
     await fireEvent.press(saveButton());
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('잠시 후 다시 시도해 주세요.'));
@@ -294,7 +282,7 @@ describe('ProductCustomTemplateScreen', () => {
 
     await fireEvent.press(saveButton());
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
-    expect(calls.SellerProductSetTemplateActive).toHaveLength(1);
+    expect(calls.SellerProductDeleteTextToken).toEqual([{ tokenId: 'k2' }]);
     expect(calls.SellerProductUpsertTextToken).toHaveLength(2);
   });
 });

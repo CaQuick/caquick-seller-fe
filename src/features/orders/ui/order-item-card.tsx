@@ -13,6 +13,10 @@ type OrderItem = SellerOrderDetailQuery['sellerOrder']['items'][number];
 const bySort = <T extends { sortOrder: number }>(list: readonly T[]) =>
   [...list].sort((a, b) => a.sortOrder - b.sortOrder);
 
+/** null은 구매자가 선택 자리를 비운 것이라 기본 문구로 채우지 않는다 */
+const customTextValue = (t: OrderItem['customTexts'][number]) =>
+  t.valueText === null ? '문구 없음' : t.valueText || t.defaultText;
+
 function SubLabel({ children }: { children: string }) {
   return (
     <Text className="mb-2 mt-3.5 font-sans text-sm tracking-tight text-sublabel">{children}</Text>
@@ -51,21 +55,29 @@ export function OrderItemCard({ item }: { item: OrderItem }) {
         <>
           <SubLabel>커스텀 문구</SubLabel>
           {bySort(item.customTexts).map((t) => (
-            <KeyValue key={t.id} label={t.tokenKey} value={t.valueText || t.defaultText} />
+            <KeyValue key={t.id} label={t.tokenKey} value={customTextValue(t)} />
           ))}
         </>
       ) : null}
       {edits.map((edit, i) => {
         const n = edits.length > 1 ? ` ${i + 1}` : '';
-        const images = [edit.cropImageUrl, ...bySort(edit.attachments).map((a) => a.imageUrl)];
+        const images = bySort(edit.attachments).map((a) => a.imageUrl);
         return (
           <Fragment key={edit.id}>
-            <SubLabel>{`자유 편집 이미지${n}`}</SubLabel>
-            <View className="flex-row flex-wrap gap-2.5">
-              {images.map((uri, j) => (
-                <ImageThumb key={`${uri}-${j}`} uri={uri} label={`자유 편집 이미지${n}-${j + 1}`} />
-              ))}
-            </View>
+            {images.length > 0 ? (
+              <>
+                <SubLabel>{`자유 편집 이미지${n}`}</SubLabel>
+                <View className="flex-row flex-wrap gap-2.5">
+                  {images.map((uri, j) => (
+                    <ImageThumb
+                      key={`${uri}-${j}`}
+                      uri={uri}
+                      label={`자유 편집 이미지${n}-${j + 1}`}
+                    />
+                  ))}
+                </View>
+              </>
+            ) : null}
             {edit.descriptionText ? (
               <>
                 <SubLabel>{`요청 사항${n}`}</SubLabel>
