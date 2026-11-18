@@ -1,8 +1,11 @@
+import { orderStatusView as ordersStatusView } from '@/features/orders/model/status';
+import { enumValues } from '@/test/generated-enums';
+
 import { homeKeys } from '../api/queryKeys';
 import {
   HOME_ORDER_FILTERS,
-  ORDER_STATUS_VIEW,
   createOrderWatermark,
+  orderStatusView,
   pickupLabel,
   toKpis,
 } from './home';
@@ -90,8 +93,20 @@ describe('주문 상태 표시', () => {
 
   it('필터 칩 문구와 상태 칩 문구가 같다', () => {
     for (const { label, status } of HOME_ORDER_FILTERS) {
-      if (status) expect(ORDER_STATUS_VIEW[status].label).toBe(label);
+      if (status) expect(orderStatusView(status).label).toBe(label);
     }
+  });
+
+  it.each([...enumValues('OrderStatusType'), 'ON_HOLD', 'toString'])(
+    '%s는 주문 탭과 같은 라벨·색으로 그린다',
+    (status) => {
+      expect(orderStatusView(status)).toEqual(ordersStatusView(status));
+    },
+  );
+
+  it('모르는 상태는 확인 필요로 그린다', () => {
+    expect(orderStatusView('ON_HOLD')).toEqual({ label: '확인 필요', tone: 'gray' });
+    expect(orderStatusView('NO_SHOW')).toEqual({ label: '노쇼', tone: 'red' });
   });
 });
 

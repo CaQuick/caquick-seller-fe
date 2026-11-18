@@ -33,9 +33,6 @@ export const TEMPLATE_COPY = {
   title: '커스텀 문구',
   save: '저장',
   saved: '저장되었습니다',
-  useTitle: '커스텀 문구 사용',
-  useDescription: '구매자가 주문할 때 문구를 입력해요',
-  offGuide: '꺼져 있으면 구매자에게 문구 입력란이 보이지 않아요. 아래 슬롯 설정은 그대로 남아요',
   base: '베이스 이미지',
   baseHint: '박스를 끌어 위치와 크기를 정해요',
   changeImage: '이미지 변경',
@@ -47,23 +44,20 @@ export const TEMPLATE_COPY = {
 const DEFAULT_MAX_LENGTH = 20;
 const MAX_TOKEN_KEY = 60;
 
-/** 위치가 없는 슬롯은 위에서부터 겹치지 않게 놓는다 */
+/** 새 슬롯은 위에서부터 겹치지 않게 놓는다 */
 export function defaultRect(index: number): Rect {
   return { x: 1000, y: Math.min(1000 + index * 2000, SCALE - 1500), width: 8000, height: 1500 };
 }
 
 export function toSlots(tokens: readonly Token[]): Slot[] {
-  return tokens.map((t, i) => ({
+  return tokens.map((t) => ({
     key: t.id,
     id: t.id,
     tokenKey: t.tokenKey,
     defaultText: t.defaultText,
     maxLength: String(t.maxLength),
     isRequired: t.isRequired,
-    rect:
-      t.posX != null && t.posY != null && t.width != null && t.height != null
-        ? { x: t.posX, y: t.posY, width: t.width, height: t.height }
-        : defaultRect(i),
+    rect: { x: t.posX, y: t.posY, width: t.width, height: t.height },
   }));
 }
 

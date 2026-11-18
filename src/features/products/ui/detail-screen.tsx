@@ -172,7 +172,7 @@ export function ProductDetailScreen() {
             description={
               template ? `문구 슬롯 ${template.textTokens.length}개` : '등록하지 않았어요'
             }
-            aux={template?.isActive ? '사용 중' : '사용 안 함'}
+            aux={p.customMode === 'SLOT' ? '사용 중' : '사용 안 함'}
             onPress={() => go('/products/[id]/custom-template')}
           />
           <MenuRow title="구매자 화면으로 보기" onPress={() => setPreviewOpen(true)} />

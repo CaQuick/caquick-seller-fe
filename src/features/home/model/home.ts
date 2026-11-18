@@ -1,6 +1,7 @@
 import { type Href } from 'expo-router';
 
 import { type OrderStatusType, type SellerHomeDashboardQuery } from '@/graphql/generated/graphql';
+import { enumView } from '@/shared/lib/enum-view';
 import { formatCount, formatKrw } from '@/shared/lib/format';
 import { addDays, formatYmd, kstParts, todayKst } from '@/shared/lib/kst';
 import { type StatusTone } from '@/shared/ui';
@@ -29,13 +30,24 @@ export const HOME_ORDER_FILTERS: { label: string; status: OrderStatusType | null
   { label: '제작 완료', status: 'MADE' },
 ];
 
-export const ORDER_STATUS_VIEW: Record<OrderStatusType, { label: string; tone: StatusTone }> = {
-  SUBMITTED: { label: '접수', tone: 'gray' },
-  CONFIRMED: { label: '확정', tone: 'purple' },
-  MADE: { label: '제작 완료', tone: 'mint' },
-  PICKED_UP: { label: '픽업 완료', tone: 'done' },
-  CANCELED: { label: '취소', tone: 'red' },
-};
+interface StatusView {
+  label: string;
+  tone: StatusTone;
+}
+
+/** 주문 탭과 같은 표. orders 배럴이 home을 가져와 순환을 피하려고 따로 둔다(home.spec이 같음을 확인) */
+export const orderStatusView = enumView<StatusView>(
+  {
+    PENDING_PAYMENT: { label: '입금 대기', tone: 'gray' },
+    SUBMITTED: { label: '접수', tone: 'gray' },
+    CONFIRMED: { label: '확정', tone: 'purple' },
+    MADE: { label: '제작 완료', tone: 'mint' },
+    PICKED_UP: { label: '픽업 완료', tone: 'done' },
+    NO_SHOW: { label: '노쇼', tone: 'red' },
+    CANCELED: { label: '취소', tone: 'red' },
+  } satisfies Record<OrderStatusType, StatusView>,
+  { label: '확인 필요', tone: 'gray' },
+);
 
 export interface Kpi {
   label: string;

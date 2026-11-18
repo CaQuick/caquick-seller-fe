@@ -1,6 +1,7 @@
 import { type OrderStatusType, type SellerOrderDetailQuery } from '@/graphql/generated/graphql';
+import { enumValues } from '@/test/generated-enums';
 
-import { buildTimeline, ORDER_ACTIONS, paymentBreakdown } from './status';
+import { buildTimeline, orderActions, orderStatusView, paymentBreakdown } from './status';
 
 type Order = SellerOrderDetailQuery['sellerOrder'];
 
@@ -20,6 +21,7 @@ const order = (patch: Partial<Order> = {}): Order => ({
   madeAt: null,
   pickedUpAt: null,
   canceledAt: null,
+  noShowAt: null,
   createdAt: '2026-10-05T11:14:00.000Z',
   updatedAt: '2026-10-05T11:14:00.000Z',
   items: [],
@@ -27,18 +29,64 @@ const order = (patch: Partial<Order> = {}): Order => ({
   ...patch,
 });
 
-describe('ORDER_ACTIONS', () => {
-  it.each<[OrderStatusType, string | undefined, boolean, boolean]>([
-    ['SUBMITTED', 'CONFIRMED', true, false],
-    ['CONFIRMED', 'MADE', true, false],
-    ['MADE', 'PICKED_UP', false, false],
-    ['PICKED_UP', undefined, false, true],
-    ['CANCELED', undefined, false, true],
+const STATUSES = enumValues('OrderStatusType');
+/** 앱이 모르는 상태(앱보다 새 BE)와 프로토타입 키 */
+const UNKNOWN = ['ON_HOLD', 'toString', '__proto__'] as unknown as OrderStatusType[];
+
+describe('orderStatusView', () => {
+  const table: [string, string, string][] = [
+    ['PENDING_PAYMENT', '입금 대기', 'gray'],
+    ['SUBMITTED', '접수', 'gray'],
+    ['CONFIRMED', '확정', 'purple'],
+    ['MADE', '제작 완료', 'mint'],
+    ['PICKED_UP', '픽업 완료', 'done'],
+    ['NO_SHOW', '노쇼', 'red'],
+    ['CANCELED', '취소', 'red'],
+  ];
+
+  it('표가 생성 enum 값 전부를 덮는다', () => {
+    expect(table.map(([status]) => status).sort()).toEqual([...STATUSES].sort());
+  });
+
+  it.each([...table, ...UNKNOWN.map((s) => [s, '확인 필요', 'gray'])])(
+    '%s → %s·%s',
+    (status, label, tone) => {
+      expect(orderStatusView(status)).toEqual({ label, tone });
+    },
+  );
+});
+
+describe('orderActions', () => {
+  const UPDATE = '앱을 최신 버전으로 업데이트하면 이 주문을 처리할 수 있어요.';
+
+  it.each<[string, string | undefined, boolean, string | null]>([
+    [
+      'PENDING_PAYMENT',
+      undefined,
+      false,
+      '입금 확인 전 주문이에요. 입금이 확인되면 처리할 수 있어요.',
+    ],
+    ['SUBMITTED', 'CONFIRMED', true, null],
+    ['CONFIRMED', 'MADE', true, null],
+    ['MADE', 'PICKED_UP', false, null],
+    ['PICKED_UP', undefined, false, '픽업이 끝난 주문이에요. 더 할 수 있는 작업이 없어요.'],
+    ['NO_SHOW', undefined, false, '노쇼로 처리된 주문이에요. 더 할 수 있는 작업이 없어요.'],
+    [
+      'CANCELED',
+      undefined,
+      false,
+      '취소된 주문이에요. 구매자에게 사유가 전달되었고 결제는 취소되었어요.',
+    ],
+    ...UNKNOWN.map((s): [string, undefined, boolean, string] => [s, undefined, false, UPDATE]),
   ])('%s → 다음 %s · 취소 %s · 안내 %s', (status, next, cancellable, notice) => {
-    const actions = ORDER_ACTIONS[status];
+    const actions = orderActions(status);
     expect(actions.next?.to).toBe(next);
     expect(actions.cancellable).toBe(cancellable);
-    expect(actions.notice !== undefined).toBe(notice);
+    expect(actions.notice ?? null).toBe(notice);
+  });
+
+  it('생성 enum 값마다 폴백이 아닌 처리 방법이 있다', () => {
+    for (const status of STATUSES) expect(orderActions(status).notice).not.toBe(UPDATE);
   });
 });
 
@@ -93,6 +141,40 @@ describe('buildTimeline', () => {
     ]);
     expect(items.at(-1)).toMatchObject({ at: '10월 7일 10:20', memo: '재료 소진' });
   });
+
+  it('노쇼면 도달한 단계 뒤에 메모와 함께 노쇼 행을 둔다', () => {
+    const items = buildTimeline(
+      order({
+        status: 'NO_SHOW',
+        confirmedAt: '2026-10-06T00:02:00.000Z',
+        madeAt: '2026-10-07T00:00:00.000Z',
+        noShowAt: '2026-10-08T08:00:00.000Z',
+        statusHistories: [
+          {
+            id: 'h3',
+            toStatus: 'NO_SHOW',
+            changedAt: '2026-10-08T08:00:00.000Z',
+            note: '연락 두절',
+          },
+        ],
+      }),
+    );
+    expect(items.map((i) => `${i.title}:${i.state}`)).toEqual([
+      '접수:done',
+      '확정:done',
+      '제작 완료:done',
+      '노쇼:bad',
+    ]);
+    expect(items.at(-1)).toMatchObject({ at: '10월 8일 17:00', memo: '연락 두절' });
+  });
+
+  it.each(UNKNOWN)(
+    '모르는 상태(%s)면 도달한 단계만 두고 현재 단계 행을 만들지 않는다',
+    (status) => {
+      const items = buildTimeline(order({ status, confirmedAt: '2026-10-06T00:02:00.000Z' }));
+      expect(items.map((i) => `${i.title}:${i.state}`)).toEqual(['접수:done', '확정:done']);
+    },
+  );
 
   it('취소 시각·사유가 비어 있어도 그린다', () => {
     expect(buildTimeline(order({ status: 'CANCELED' })).at(-1)).toEqual({

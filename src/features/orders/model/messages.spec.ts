@@ -9,7 +9,6 @@ describe('orderErrorMessage', () => {
   it.each([
     ['INVALID_ORDER_STATUS_TRANSITION', '주문 상태가 이미 바뀌었어요. 최신 내용을 확인해 주세요.'],
     ['ORDER_NOT_CANCELLABLE', '지금 상태에서는 주문을 취소할 수 없어요.'],
-    ['CANCELLATION_NOTE_REQUIRED', '취소 사유를 입력해 주세요.'],
   ])('%s → %s', (code, message) => {
     expect(orderErrorMessage(err(code))).toBe(message);
   });

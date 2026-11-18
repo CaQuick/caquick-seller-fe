@@ -3,6 +3,7 @@ import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { graphql } from '@/graphql/generated';
 import {
   type OrderStatusType,
+  type SellerCancelOrderInput,
   type SellerOrderConversationsQuery,
 } from '@/graphql/generated/graphql';
 import { gqlRequest } from '@/shared/api';
@@ -52,6 +53,7 @@ const SellerOrderDetailDocument = graphql(`
       madeAt
       pickedUpAt
       canceledAt
+      noShowAt
       createdAt
       updatedAt
       items {
@@ -73,7 +75,6 @@ const SellerOrderDetailDocument = graphql(`
         }
         freeEdits {
           id
-          cropImageUrl
           descriptionText
           sortOrder
           attachments {
@@ -96,6 +97,15 @@ const SellerOrderDetailDocument = graphql(`
 const SellerUpdateOrderStatusDocument = graphql(`
   mutation SellerUpdateOrderStatus($input: SellerUpdateOrderStatusInput!) {
     sellerUpdateOrderStatus(input: $input) {
+      id
+      status
+    }
+  }
+`);
+
+const SellerCancelOrderDocument = graphql(`
+  mutation SellerCancelOrder($input: SellerCancelOrderInput!) {
+    sellerCancelOrder(input: $input) {
       id
       status
     }
@@ -179,4 +189,8 @@ export function updateOrderStatus(input: {
   note?: string;
 }) {
   return gqlRequest(SellerUpdateOrderStatusDocument, { input });
+}
+
+export function cancelOrder(input: SellerCancelOrderInput) {
+  return gqlRequest(SellerCancelOrderDocument, { input });
 }

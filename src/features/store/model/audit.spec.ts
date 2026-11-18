@@ -1,4 +1,49 @@
-import { describeAudit, diffJson, diffText, formatAuditAt, formatValue, parseJson } from './audit';
+import { orderStatusView } from '@/features/orders/model/status';
+import { enumValues } from '@/test/generated-enums';
+
+import {
+  AUDIT_FILTERS,
+  auditActionView,
+  auditTargetLabel,
+  describeAudit,
+  diffJson,
+  diffText,
+  formatAuditAt,
+  formatValue,
+  parseJson,
+} from './audit';
+
+describe('auditActionView', () => {
+  const table: [string, string, string][] = [
+    ['CREATE', '생성', 'mint'],
+    ['UPDATE', '수정', 'purple'],
+    ['DELETE', '삭제', 'red'],
+    ['STATUS_CHANGE', '상태 변경', 'gray'],
+  ];
+
+  it('표가 생성 enum 값 전부를 덮는다', () => {
+    expect(table.map(([action]) => action).sort()).toEqual(
+      [...enumValues('AuditActionType')].sort(),
+    );
+  });
+
+  it.each([...table, ['NEW_ACTION', '변경', 'gray']])('%s → %s·%s', (action, label, tone) => {
+    expect(auditActionView(action)).toEqual({ label, tone });
+  });
+});
+
+describe('auditTargetLabel', () => {
+  it.each(AUDIT_FILTERS.flatMap((f) => (f.value ? [[f.value, f.label]] : [])))(
+    '판매자 필터 대상 %s → %s',
+    (target, label) => {
+      expect(auditTargetLabel(target)).toBe(label);
+    },
+  );
+
+  it('모르는 대상은 기타로 본다', () => {
+    expect(auditTargetLabel('NEW_TARGET')).toBe('기타');
+  });
+});
 
 describe('diffJson', () => {
   it('바뀐 키만 이전 → 이후로', () => {
@@ -66,6 +111,10 @@ describe('formatValue', () => {
     ['note', '가'.repeat(61), `${'가'.repeat(60)}…`],
   ])('%s=%j → %s', (key, value, expected) => {
     expect(formatValue(key, value)).toBe(expected);
+  });
+
+  it.each(enumValues('OrderStatusType'))('주문 상태 %s의 라벨은 주문 화면과 같다', (status) => {
+    expect(formatValue('status', status)).toBe(orderStatusView(status).label);
   });
 });
 
@@ -150,7 +199,7 @@ describe('describeAudit', () => {
       0,
     ],
     ['깨진 JSON', { targetType: 'STORE', targetId: '3', afterJson: '{' }, '매장', 0],
-    ['목록 밖 대상', { targetType: 'BANNER', targetId: '1' }, 'BANNER #1', 0],
+    ['목록 밖 대상', { targetType: 'BANNER', targetId: '1' }, '기타 #1', 0],
   ] as const)('%s', (_, log, title, diffCount) => {
     const result = describeAudit(log);
     expect(result.title).toBe(title);

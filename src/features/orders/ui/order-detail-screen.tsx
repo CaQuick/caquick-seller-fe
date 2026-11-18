@@ -28,17 +28,11 @@ import {
   Timeline,
 } from '@/shared/ui';
 
-import { orderDetailQueryOptions, updateOrderStatus } from '../api/orders';
+import { cancelOrder, orderDetailQueryOptions, updateOrderStatus } from '../api/orders';
 import { ordersKeys } from '../api/queryKeys';
 import { formatDateTime, formatSigned } from '../model/format';
 import { orderErrorMessage } from '../model/messages';
-import {
-  buildTimeline,
-  ORDER_ACTIONS,
-  paymentBreakdown,
-  STATUS_LABEL,
-  STATUS_TONE,
-} from '../model/status';
+import { buildTimeline, orderActions, orderStatusView, paymentBreakdown } from '../model/status';
 import { useOrderUpdates } from '../model/use-order-updates';
 import { BuyerChatRow } from './buyer-chat-row';
 import { OrderItemCard } from './order-item-card';
@@ -57,8 +51,12 @@ export function OrderDetailScreen() {
   useOrderUpdates();
 
   const mutation = useMutation({
-    mutationFn: (v: { to: OrderStatusType; done: string; note?: string }) =>
-      updateOrderStatus({ orderId: id, toStatus: v.to, note: v.note }),
+    // 취소는 전용 mutation: 자유 입력 사유는 '기타' + 메모, 확정 뒤 취소도 전액 환불(판매자 사정)
+    mutationFn: async (v: { to: OrderStatusType; done: string; note?: string }) => {
+      if (v.to === 'CANCELED')
+        await cancelOrder({ orderId: id, reason: 'OTHER', fault: 'SELLER', note: v.note });
+      else await updateOrderStatus({ orderId: id, toStatus: v.to, note: v.note });
+    },
     onSuccess: (_, v) => {
       if (v.to === 'CANCELED') {
         cancelSheet.current?.dismiss();
@@ -127,6 +125,7 @@ type Order = SellerOrderDetailQuery['sellerOrder'];
 
 function OrderBody({ order }: { order: Order }) {
   const pay = paymentBreakdown(order);
+  const status = orderStatusView(order.status);
   const call = () =>
     Linking.openURL(`tel:${order.buyerPhone.replace(/[^\d+]/g, '')}`).catch(() =>
       showToast.error('전화를 걸 수 없어요'),
@@ -135,7 +134,7 @@ function OrderBody({ order }: { order: Order }) {
     <ScrollView contentContainerClassName="px-5 pb-6">
       <Card
         title="주문번호"
-        aside={<StatusChip tone={STATUS_TONE[order.status]} label={STATUS_LABEL[order.status]} />}
+        aside={<StatusChip tone={status.tone} label={status.label} />}
         className="mt-4"
       >
         <Text selectable className="mb-2 font-sans text-sm tracking-tight text-sublabel">
@@ -207,7 +206,7 @@ function OrderActionBar({
   onCancel: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const { next, cancellable, notice } = ORDER_ACTIONS[status];
+  const { next, cancellable, notice } = orderActions(status);
   if (!next) {
     return (
       <View

@@ -51,7 +51,8 @@ const PRODUCT: Product = {
       optionItems: [{ id: 'o1' }, { id: 'o2' }],
     },
   ],
-  customTemplate: { id: 'ct1', isActive: true, textTokens: [{ id: 'k1' }, { id: 'k2' }] },
+  customMode: 'SLOT',
+  customTemplate: { id: 'ct1', textTokens: [{ id: 'k1' }, { id: 'k2' }] },
 };
 
 const BARE: Product = {
@@ -64,6 +65,7 @@ const BARE: Product = {
   categories: [],
   tags: [],
   optionGroups: [],
+  customMode: 'NONE',
   customTemplate: null,
 };
 
@@ -161,6 +163,17 @@ describe('ProductDetailScreen', () => {
       screen.getByRole('button', { name: '커스텀 문구, 등록하지 않았어요, 사용 안 함' }),
     ).toBeTruthy();
   });
+
+  it.each(['NONE', 'THREE_D'] as const)(
+    '템플릿이 있어도 커스텀 방식이 %s일 때는 사용 안 함이다',
+    async (customMode) => {
+      server.use(detailOk({ ...PRODUCT, customMode }));
+      await open();
+      expect(
+        await screen.findByRole('button', { name: '커스텀 문구, 문구 슬롯 2개, 사용 안 함' }),
+      ).toBeTruthy();
+    },
+  );
 
   it('썸네일을 누르면 그 장을 고른다', async () => {
     server.use(detailOk());

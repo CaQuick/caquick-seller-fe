@@ -35,7 +35,7 @@ import {
   toListVars,
 } from '../model/filters';
 import { groupByPickupDay } from '../model/sections';
-import { STATUS_LABEL, STATUS_SEGMENTS } from '../model/status';
+import { orderStatusView, STATUS_SEGMENTS } from '../model/status';
 import { useDebouncedValue } from '../model/use-debounced-value';
 import { useOrderUpdates } from '../model/use-order-updates';
 import { OrderRow } from './order-row';
@@ -45,7 +45,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 const ALL = 'ALL';
 const SEGMENTS = [
   { value: ALL, label: '전체' },
-  ...STATUS_SEGMENTS.map((s) => ({ value: s, label: STATUS_LABEL[s] })),
+  ...STATUS_SEGMENTS.map((s) => ({ value: s, label: orderStatusView(s).label })),
 ] as const;
 
 const rangeKey = (r: DateRange | null) => (r ? `${r.from}~${r.to}` : 'none');

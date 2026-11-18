@@ -65,9 +65,9 @@ const SellerProductDetailDocument = graphql(`
           id
         }
       }
+      customMode
       customTemplate {
         id
-        isActive
         textTokens {
           id
         }

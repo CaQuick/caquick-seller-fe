@@ -5,7 +5,7 @@ import { type SellerHomeRecentOrdersQuery } from '@/graphql/generated/graphql';
 import { colors, shadow } from '@/shared/config/tokens';
 import { Icon, RemoteImage, StatusChip } from '@/shared/ui';
 
-import { HOME_COPY, ORDER_STATUS_VIEW, pickupLabel } from '../model/home';
+import { HOME_COPY, orderStatusView, pickupLabel } from '../model/home';
 
 type Order = SellerHomeRecentOrdersQuery['sellerOrderList']['items'][number];
 
@@ -14,7 +14,7 @@ export function RecentOrderRow({ order }: { order: Order }) {
   const router = useRouter();
   const name = order.firstItemName ?? HOME_COPY.untitledItem;
   const meta = `${pickupLabel(order.pickupAt)} · ${order.buyerName}`;
-  const status = ORDER_STATUS_VIEW[order.status];
+  const status = orderStatusView(order.status);
   return (
     <Pressable
       accessibilityRole="button"
