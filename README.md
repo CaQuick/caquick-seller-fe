@@ -10,6 +10,7 @@
 - TanStack Query · fetch 래퍼 · graphql-ws · graphql-codegen(client-preset)
 - NativeWind v4(Tailwind 3.4) · 디자인 토큰 1벌 · Pretendard
 - zustand · expo-secure-store · react-hook-form + zod
+- three · polygon-clipping(3D 케이크 형상, 구매자 편집기와 같은 코드·버전)
 - Jest(jest-expo) · Testing Library(React Native) · MSW
 - EAS Build(맥미니 로컬) · EAS Submit · EAS Update(OTA)
 

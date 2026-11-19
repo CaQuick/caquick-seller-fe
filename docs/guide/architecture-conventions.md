@@ -131,6 +131,10 @@ src/
 - **원격 이미지는 `expo-image`**(D51)로 그립니다. S3 직접 URL이고 CDN이 없어 디스크 캐시가 필요하므로 공용 `RemoteImage`(`shared/ui`, `cachePolicy="memory-disk"`)를 거치고, RN `Image`는 번들 로고 PNG에만 씁니다.
 - **슬롯 문구 렌더**는 `products/model/slot-layout.ts`가 정본입니다(D61). 구매자 합성 이미지가 같은 규칙을 따르므로 글꼴·줄 높이·크기 탐색을 바꾸면 구매자 쪽과 함께 바꿉니다. 줄 폭 측정은 주입받아 글꼴 엔진과 떨어뜨립니다.
 - 월 달력은 자체 `MonthCalendar`(`shared/ui`), 시간 선택은 `@react-native-community/datetimepicker`(`TimeRow`), 드래그 정렬은 `react-native-sortables`입니다. `react-native-calendars`는 쓰지 않아 뺐습니다(D50).
+- **3D 케이크 형상**(`features/custom/model/three`)은 구매자 편집기(caquick-fe-v2 `src/screens/custom`)의 외곽선·둘레 투영·장식·데칼 지오메트리·회전 코드를 복사한 것입니다(D64). 두 앱이 같은 주문을 같은 모양으로 그려야 하므로 상수·수학을 여기서 바꾸지 않습니다.
+  - `golden.spec`이 구매자 코드로 뽑은 fixture(`__fixtures__/three-golden.json`)와 1e-9 안에서 비교합니다. 구매자 쪽이 바뀌면 같은 변경을 옮기고 `FT_DIR=<caquick-fe-v2> pnpm tsx scripts/three-golden.ts <ref>`로 fixture를 다시 만듭니다. 생성기는 구매자 레포가 있어야 해서 CI에서 돌지 않습니다.
+  - three·polygon-clipping은 구매자 lock과 같은 정확한 버전으로 고정합니다. three는 ESM 전용이라 jest가 `three.module.js`를 직접 변환합니다.
+  - 주문의 `threeDDesign`은 `parseThreeDDesign`(`custom/model/design-json.ts`)으로만 읽습니다. v1이 아니거나 모르는 모양·디자인·효과·항목 종류면 `unsupported`, 깨진 값이면 `invalid`를 돌려주고 화면은 구매자 캡처로 대신합니다. 모르는 값을 비슷한 값으로 바꿔 그리지 않습니다.
 
 ## 7. 테스트
 

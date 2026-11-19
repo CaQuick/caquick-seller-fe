@@ -16,10 +16,12 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
     // RN jest 환경의 export 조건(react-native)에서 msw/node는 null로 막혀 있다 — Node 구현을 직접 가리킨다
     '^msw/node$': '<rootDir>/node_modules/msw/lib/node/index.js',
+    // three의 CJS 입구는 ESM을 require로 다시 부르는 폐기 예정 래퍼다 — 번들러처럼 ESM 입구를 바로 쓴다
+    '^three$': '<rootDir>/node_modules/three/build/three.module.js',
   },
-  // jest-expo 기본 목록 + ESM만 배포하는 패키지(msw 2.13+의 rettime 등). 접두 일치라 react-native-*·expo-*를 전부 덮는다
+  // jest-expo 기본 목록 + ESM만 배포하는 패키지(msw 2.13+의 rettime, three 등). 접두 일치라 react-native-*·expo-*를 전부 덮는다
   transformIgnorePatterns: [
-    '/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|msw|rettime|until-async|@open-draft|@mswjs|nativewind|@gorhom|sonner-native))',
+    '/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|msw|rettime|until-async|@open-draft|@mswjs|nativewind|@gorhom|sonner-native|three))',
     '/node_modules/react-native-reanimated/plugin/',
     '/node_modules/@react-native/babel-preset/',
   ],
