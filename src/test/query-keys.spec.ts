@@ -58,6 +58,7 @@ describe('쿼리 키', () => {
       ['store', 'dailyCapacities', '2026-10'],
     ],
     ['store.faqTopics', storeKeys.faqTopics(), ['store', 'faqTopics']],
+    ['store.auditLogsAll', storeKeys.auditLogsAll(), ['store', 'auditLogs']],
     ['store.auditLogs(전체)', storeKeys.auditLogs(), ['store', 'auditLogs', 'all']],
     ['store.auditLogs(대상)', storeKeys.auditLogs('PRODUCT'), ['store', 'auditLogs', 'PRODUCT']],
     ['store.preview', storeKeys.preview('s1'), ['store', 'preview', 's1']],

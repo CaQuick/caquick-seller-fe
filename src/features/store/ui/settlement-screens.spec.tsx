@@ -1,5 +1,6 @@
-import { notifyManager, type QueryClient } from '@tanstack/react-query';
-import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
+import { notifyManager, QueryClient } from '@tanstack/react-query';
+import { router } from 'expo-router';
+import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import { graphql, HttpResponse } from 'msw';
 import { type ReactNode } from 'react';
 import { Text } from 'react-native';
@@ -15,7 +16,9 @@ import { graphqlError } from '@/test/msw/graphql';
 import { server } from '@/test/msw/server';
 import { createTestQueryClient, Providers } from '@/test/render';
 
+import { AUDIT_COPY } from '../model/audit';
 import { ACCOUNT_COPY } from '../model/settlement-account';
+import { StoreAuditLogsScreen } from './audit-logs-screen';
 import { StoreSettlementAccountScreen } from './settlement-account-screen';
 import { StoreSettlementDetailScreen } from './settlement-detail-screen';
 import { StoreSettlementsScreen } from './settlements-screen';
@@ -88,10 +91,20 @@ function upsert(respond?: () => Response) {
   return inputs;
 }
 
+/** 앱과 같은 staleTime 30초·mutation gcTime 기본값(5분). 쿼리 gcTime만 타이머가 없게 Infinity */
+const appQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: Infinity, staleTime: 30_000 },
+      mutations: { retry: false },
+    },
+  });
+
 function open(initialUrl: string, queryClient: QueryClient = createTestQueryClient()) {
   return renderRouter(
     {
       'store/settlement-account': StoreSettlementAccountScreen,
+      'store/audit-logs': StoreAuditLogsScreen,
       'store/settlements/index': StoreSettlementsScreen,
       'store/settlements/[id]': StoreSettlementDetailScreen,
       'orders/[id]': () => <Text>주문 상세</Text>,
@@ -140,7 +153,8 @@ describe('정산 계좌', () => {
   it('등록 전이면 안내하고, 은행·번호·예금주를 채워야 저장할 수 있다', async () => {
     account(null);
     const inputs = upsert();
-    const queryClient = createTestQueryClient();
+    // 화면의 gcTime: 0이 빠지면 끝난 저장 요청(원문 변수)이 5분 남는다
+    const queryClient = appQueryClient();
     await open('/store/settlement-account', queryClient);
     expect(await screen.findByText(ACCOUNT_COPY.missing)).toBeTruthy();
     expect(screen.getByText('계좌 등록')).toBeTruthy();
@@ -182,6 +196,56 @@ describe('정산 계좌', () => {
         ),
       ).not.toContain('110123456789'),
     );
+  });
+
+  it('저장하면 조작 이력을 다시 받아 같은 저장이 남긴 정산 계좌 기록을 보인다', async () => {
+    account(null);
+    upsert();
+    let logs: object[] = [];
+    let auditCalls = 0;
+    server.use(
+      graphql.query('SellerStoreAuditLogs', () => {
+        auditCalls += 1;
+        return HttpResponse.json({
+          data: {
+            sellerAuditLogs: {
+              items: logs,
+              totalCount: logs.length,
+              hasMore: false,
+              nextCursor: null,
+            },
+          },
+        });
+      }),
+    );
+    await open('/store/settlement-account', appQueryClient());
+    await screen.findByText(ACCOUNT_COPY.missing);
+    await act(() => Promise.resolve(router.push('/store/audit-logs')));
+    expect(await screen.findByText(AUDIT_COPY.emptyTitle)).toBeTruthy();
+    await act(() => Promise.resolve(router.back()));
+
+    await fireEvent.press(await screen.findByRole('button', { name: '은행' }));
+    await fireEvent.press(await screen.findByRole('radio', { name: '신한은행' }));
+    await fireEvent.changeText(screen.getByLabelText('계좌번호'), '110123456789');
+    await fireEvent.changeText(screen.getByLabelText('예금주'), '해즈');
+    logs = [
+      {
+        id: 'a1',
+        targetType: 'SETTLEMENT_ACCOUNT',
+        targetId: '1',
+        action: 'CREATE',
+        beforeJson: null,
+        afterJson: '{"bank_code":"088","account_holder":"해즈","account_number_last4":"6789"}',
+        createdAt: '2026-11-19T03:00:00.000Z',
+      },
+    ];
+    await fireEvent.press(button('저장'));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(ACCOUNT_COPY.saved));
+
+    // 30초 안에 다시 열어도 캐시(빈 목록)가 아니라 새 기록을 받는다
+    await act(() => Promise.resolve(router.push('/store/audit-logs')));
+    expect(await screen.findByLabelText(/^정산 계좌 생성, /)).toBeTruthy();
+    expect(auditCalls).toBe(2);
   });
 
   it('숫자 아닌 글자를 넣으면 바로 알리고 저장을 막는다', async () => {
@@ -398,16 +462,24 @@ describe('정산 상세', () => {
     await waitFor(() => expect(router.getPathname()).toBe('/orders/o1'));
   });
 
-  it('송금 전이면 송금 일시·계좌를 두지 않는다', async () => {
+  it('송금 전이면 송금 일시·계좌를 두지 않고, 수수료 0원에는 빼기 표시가 없다', async () => {
     server.use(
       ok('SellerStoreSettlement', {
-        sellerSettlement: { ...DETAIL, status: 'PENDING', paidAt: null, paidAccount: null },
+        sellerSettlement: {
+          ...DETAIL,
+          status: 'PENDING',
+          paidAt: null,
+          paidAccount: null,
+          commissionAmount: 0,
+        },
       }),
     );
     await open('/store/settlements/s1');
     expect(await screen.findByText('송금 대기')).toBeTruthy();
     expect(screen.queryByText('송금 일시')).toBeNull();
     expect(screen.queryByText('송금 계좌')).toBeNull();
+    expect(screen.getByText('0원')).toBeTruthy();
+    expect(screen.queryByText('-0원')).toBeNull();
   });
 
   it('그 밖의 실패는 다시 시도로 다시 받는다', async () => {

@@ -6,7 +6,8 @@ export const storeKeys = {
   specialClosures: () => [...storeKeys.all, 'specialClosures'] as const,
   dailyCapacities: (month: string) => [...storeKeys.all, 'dailyCapacities', month] as const,
   faqTopics: () => [...storeKeys.all, 'faqTopics'] as const,
-  auditLogs: (targetType?: string) => [...storeKeys.all, 'auditLogs', targetType ?? 'all'] as const,
+  auditLogsAll: () => [...storeKeys.all, 'auditLogs'] as const,
+  auditLogs: (targetType?: string) => [...storeKeys.auditLogsAll(), targetType ?? 'all'] as const,
   preview: (storeId: string) => [...storeKeys.all, 'preview', storeId] as const,
   previewProducts: (storeId: string, categoryId: string | null) =>
     [...storeKeys.preview(storeId), 'products', categoryId ?? 'all'] as const,

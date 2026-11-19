@@ -62,6 +62,8 @@ function AccountEditor({ saved }: { saved: Saved }) {
         setFormError(null);
         save.reset();
         queryClient.setQueryData(storeKeys.settlementAccount(), account);
+        // 같은 저장에서 남은 정산 계좌 조작 이력이 다음에 열 때 보이게 한다
+        void queryClient.invalidateQueries({ queryKey: storeKeys.auditLogsAll() });
         showToast.success(ACCOUNT_COPY.saved);
       },
       onError: (e) => {

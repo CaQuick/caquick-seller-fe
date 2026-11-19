@@ -77,6 +77,7 @@ export function OrderDetailScreen() {
   const [cancelKey, setCancelKey] = useState(0);
   const [pickupKey, setPickupKey] = useState(0);
   const [pickupOpened, setPickupOpened] = useState(false);
+  const [pickupError, setPickupError] = useState<string | null>(null);
   // 노쇼 가능 구간은 '다른 처리'를 연 시각으로 판정한다
   const [now, setNow] = useState(() => new Date());
   useOrderUpdates();
@@ -94,7 +95,12 @@ export function OrderDetailScreen() {
       if ('reschedule' in v) setPickupKey((k) => k + 1);
       showToast.success(v.done);
     },
-    onError: (e) => showToast.error(orderErrorMessage(e)),
+    onError: (e, v) => {
+      // 픽업 변경 거절(모두 BAD_USER_INPUT)은 열린 시트 안에 두고 다시 받은 슬롯에서 고르게 한다
+      if ('reschedule' in v && e instanceof ApiError && e.classification === 'BAD_USER_INPUT')
+        setPickupError(orderErrorMessage(e));
+      else showToast.error(orderErrorMessage(e));
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ordersKeys.all }),
   });
 
@@ -207,7 +213,16 @@ export function OrderDetailScreen() {
           pickupAt={order.pickupAt}
           active={pickupOpened}
           loading={mutation.isPending}
-          onSubmit={(reschedule) => mutation.mutate({ reschedule, done: PICKUP_CHANGE_COPY.done })}
+          error={pickupError}
+          onPick={() => setPickupError(null)}
+          onDismiss={() => {
+            setPickupOpened(false);
+            setPickupError(null);
+          }}
+          onSubmit={(reschedule) => {
+            setPickupError(null);
+            mutation.mutate({ reschedule, done: PICKUP_CHANGE_COPY.done });
+          }}
         />
       ) : null}
       {actions.others.includes('NO_SHOW') ? (

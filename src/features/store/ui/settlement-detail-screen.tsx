@@ -65,7 +65,12 @@ function Body({ detail }: { detail: Detail }) {
       >
         <KeyValue label="주문 수" value={`${detail.orderCount}건`} />
         <KeyValue label="정산 기준 금액" value={formatKrw(detail.settlementBaseAmount)} />
-        <KeyValue label="수수료" value={`-${formatKrw(detail.commissionAmount)}`} />
+        <KeyValue
+          label="수수료"
+          value={
+            detail.commissionAmount > 0 ? `-${formatKrw(detail.commissionAmount)}` : formatKrw(0)
+          }
+        />
         <KeyValue label="정산 금액" value={formatKrw(detail.payoutAmount)} total />
         {detail.paidAt ? (
           <KeyValue label="송금 일시" value={formatDateTime(detail.paidAt)} />

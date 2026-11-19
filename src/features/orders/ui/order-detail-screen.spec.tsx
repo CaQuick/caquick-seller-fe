@@ -791,20 +791,93 @@ describe('OrderDetailScreen', () => {
       ).toBeTruthy();
     });
 
-    it('메모가 없으면 보내지 않고, 서버가 막으면 그 문구를 띄운다', async () => {
+    it('메모가 없으면 보내지 않고, 서버가 막으면 시트 안에 알리며 다시 받은 슬롯에서 막힌 시간을 끈다', async () => {
+      const rejected = '고른 시간은 예약할 수 없어요. 다른 시간을 골라 주세요.';
       detailHandler(() => order({ pickupAt, confirmDeadlineAt: null }));
       pickupHandlers();
       const inputs = rescheduleHandler(failWith('PICKUP_NOT_AVAILABLE'));
       await open();
       await fireEvent.press(await screen.findByRole('button', { name: '픽업 일시 변경' }));
       await fireEvent.press(await screen.findByRole('button', { name: '11:00' }));
+      // 그사이 11:00이 마감되고 11:30이 열렸다
+      server.use(
+        gqlOk('SellerOrderPickupTimeSlots', {
+          sellerOrderPickupTimeSlots: {
+            morning: [
+              { time: '11:00', available: false },
+              { time: '11:30', available: true },
+            ],
+            afternoon: [],
+          },
+        }),
+      );
+      await fireEvent.press(button('변경'));
+
+      expect(await screen.findByText(rejected)).toBeTruthy();
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(inputs).toEqual([{ orderId: '1', pickupAt: kstToIso({ ...day, hh: 11, mm: 0 }) }]);
+      await waitFor(() => expect(button('11:00')).toBeDisabled());
+      expect(button('변경')).toBeDisabled();
+
+      // 다시 고르면 알림을 지우고, 입력과 무관한 실패는 토스트로 알린다
+      await fireEvent.press(button('11:30'));
+      expect(screen.queryByText(rejected)).toBeNull();
+      server.use(
+        gqlError('SellerRescheduleOrderPickup', {
+          message: 'x',
+          classification: 'INTERNAL_SERVER_ERROR',
+        }),
+      );
       await fireEvent.press(button('변경'));
       await waitFor(() =>
         expect(toast.error).toHaveBeenCalledWith(
-          '고른 시간은 예약할 수 없어요. 다른 시간을 골라 주세요.',
+          '서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
         ),
       );
-      expect(inputs).toEqual([{ orderId: '1', pickupAt: kstToIso({ ...day, hh: 11, mm: 0 }) }]);
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('시트를 닫으면 알림을 지우고, 그 뒤 주문이 바뀌어도 달력·슬롯을 다시 부르지 않는다', async () => {
+      const rejected = '지금과 같은 픽업 일시예요. 다른 시간을 골라 주세요.';
+      const detail = detailHandler(() => order({ pickupAt, confirmDeadlineAt: null }));
+      const calls = pickupHandlers();
+      rescheduleHandler(failWith('PICKUP_UNCHANGED'));
+      await open();
+      await fireEvent.press(await screen.findByRole('button', { name: '픽업 일시 변경' }));
+      await fireEvent.press(await screen.findByRole('button', { name: '11:00' }));
+      await fireEvent.press(button('변경'));
+      expect(await screen.findByText(rejected)).toBeTruthy();
+      // 실패 뒤 다시 받기까지 끝낸다
+      await waitFor(() => expect([calls.calendar.length, calls.slots.length]).toEqual([2, 2]));
+
+      const sheet = presentSpy.mock.contexts.find(
+        (c) =>
+          headerOf((c as { props: { children: ReactNode } }).props.children) ===
+          '픽업 일시를 바꿀까요?',
+      ) as { props: { onDismiss: () => void } };
+      await act(() => Promise.resolve(sheet.props.onDismiss()));
+      expect(screen.queryByText(rejected)).toBeNull();
+
+      await act(async () => {
+        mockSinks.forEach((sink) =>
+          sink.next({
+            data: {
+              sellerOrderUpdated: {
+                orderId: '1',
+                status: 'SUBMITTED',
+                pickupAt,
+                buyerName: '김다은',
+                totalPrice: 38000,
+                productName: '크리스마스 눈사람',
+                updatedAt: '2026-10-06T00:10:00.000Z',
+              },
+            },
+          }),
+        );
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(detail.count).toBe(3));
+      expect([calls.calendar.length, calls.slots.length]).toEqual([2, 2]);
     });
 
     it('픽업이 지났으면 이번 달에서 날짜부터 고르고, 막힌 날은 눌러도 고르지 않으며, 빈 날은 알린다', async () => {

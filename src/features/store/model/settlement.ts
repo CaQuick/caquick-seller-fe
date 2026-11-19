@@ -5,7 +5,8 @@ import { type StatusTone } from '@/shared/ui';
 
 export const SETTLEMENT_COPY = {
   emptyTitle: '아직 정산 내역이 없어요',
-  emptyDescription: '매주 월요일에 지난주(월~일) 픽업 완료·노쇼 주문을 묶어 정산해요',
+  emptyDescription:
+    '매주 월요일에 지난주(월~일) 픽업 완료·노쇼 주문과 구매자 사정 취소의 남은 금액을 묶어 정산해요',
   more: '이전 정산 더보기',
   notFound: '정산을 찾을 수 없어요',
 } as const;

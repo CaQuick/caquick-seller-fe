@@ -62,14 +62,28 @@ interface Props {
   ref: RefObject<BottomSheetModal | null>;
   orderId: string;
   pickupAt: string;
-  /** 시트를 연 뒤에만 달력·슬롯을 부른다 */
+  /** 시트가 열려 있을 때만 달력·슬롯을 부른다 */
   active: boolean;
   loading: boolean;
+  /** 서버가 거절한 이유. 다시 고르면 onPick으로 지운다 */
+  error: string | null;
+  onPick: () => void;
+  onDismiss: () => void;
   onSubmit: (input: { pickupAt: string; note?: string }) => void;
 }
 
 /** 픽업 일시 변경: 월 달력 → 그날 슬롯 칩 → 메모. 지금 일시와 예약 불가 슬롯은 고를 수 없다 */
-export function PickupChangeSheet({ ref, orderId, pickupAt, active, loading, onSubmit }: Props) {
+export function PickupChangeSheet({
+  ref,
+  orderId,
+  pickupAt,
+  active,
+  loading,
+  error,
+  onPick,
+  onDismiss,
+  onSubmit,
+}: Props) {
   const { height } = useWindowDimensions();
   const [start] = useState(() => initialPick(pickupAt, new Date()));
   const [month, setMonth] = useState(start.month);
@@ -92,6 +106,10 @@ export function PickupChangeSheet({ ref, orderId, pickupAt, active, loading, onS
   const chip = [...morning, ...afternoon].find((c) => c.time === time);
   const target = date && chip && !chip.disabled ? toPickupAt(date, chip.time) : null;
   const trimmed = note.trim();
+  const pickTime = (t: string) => {
+    setTime(t);
+    onPick();
+  };
 
   let slotArea;
   if (!date) {
@@ -100,8 +118,8 @@ export function PickupChangeSheet({ ref, orderId, pickupAt, active, loading, onS
     slotArea =
       morning.length + afternoon.length > 0 ? (
         <View className="gap-2">
-          <SlotRow label="오전" chips={morning} selected={time} onPick={setTime} />
-          <SlotRow label="오후" chips={afternoon} selected={time} onPick={setTime} />
+          <SlotRow label="오전" chips={morning} selected={time} onPick={pickTime} />
+          <SlotRow label="오후" chips={afternoon} selected={time} onPick={pickTime} />
         </View>
       ) : (
         <Text className="font-sans text-sm text-muted">{PICKUP_CHANGE_COPY.noSlots}</Text>
@@ -121,6 +139,7 @@ export function PickupChangeSheet({ ref, orderId, pickupAt, active, loading, onS
       tone="primary"
       confirmDisabled={!target}
       loading={loading}
+      onDismiss={onDismiss}
       onConfirm={() =>
         target && onSubmit({ pickupAt: target, ...(trimmed ? { note: trimmed } : {}) })
       }
@@ -138,6 +157,7 @@ export function PickupChangeSheet({ ref, orderId, pickupAt, active, loading, onS
               if (!cal.selectable.has(ymd)) return;
               setPicked(ymd);
               setTime(null);
+              onPick();
             }}
             legend={['sel', 'off', 'full']}
           />
@@ -146,6 +166,18 @@ export function PickupChangeSheet({ ref, orderId, pickupAt, active, loading, onS
         ) : (
           <SkeletonRows count={2} card />
         )}
+        {error ? (
+          <View
+            accessible
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            className="mt-4 rounded-lg bg-danger-bg p-3"
+          >
+            <Text className="font-sans text-sm leading-[19px] tracking-tight text-danger">
+              {error}
+            </Text>
+          </View>
+        ) : null}
         <View className="mt-4">{slotArea}</View>
         <TextField
           sublabel="변경 메모 (선택)"
