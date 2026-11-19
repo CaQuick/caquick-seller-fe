@@ -30,7 +30,8 @@ export default function AppLayout() {
       <Stack.Screen name="products/[id]/edit" options={{ title: '상품 수정' }} />
       <Stack.Screen name="products/[id]/images" options={{ title: '상품 이미지' }} />
       <Stack.Screen name="products/[id]/options" options={{ title: '옵션 편집' }} />
-      <Stack.Screen name="products/[id]/custom-template" options={{ title: '커스텀 템플릿' }} />
+      <Stack.Screen name="products/[id]/customization" options={{ title: '커스텀 방식' }} />
+      <Stack.Screen name="products/[id]/custom-template" options={{ title: '슬롯형 설정' }} />
       <Stack.Screen name="chats/[conversationId]" options={{ title: '대화' }} />
       <Stack.Screen name="store/basic-info" options={{ title: '기본 정보' }} />
       <Stack.Screen name="store/business-hours" options={{ title: '영업시간' }} />

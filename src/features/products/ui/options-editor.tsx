@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import Sortable from 'react-native-sortables';
 
+import { groupThreeD, keyOptions, type ThreeDChoice, threeDCategoryLabel } from '@/features/custom';
 import { messageFor } from '@/shared/api';
 import { colors, shadow } from '@/shared/config/tokens';
 import { cn } from '@/shared/lib/cn';
@@ -19,7 +20,7 @@ import {
   rangeLabel,
   requiredPatch,
 } from '../model/draft-options';
-import { GroupSheet, ItemSheet, RangeSheet } from './options-editor-sheets';
+import { GroupSheet, ItemSheet, RangeSheet, ThreeDKeySheet } from './options-editor-sheets';
 
 export interface OptionsEditorProps {
   groups: OptionGroupValue[];
@@ -33,6 +34,8 @@ export interface OptionsEditorProps {
   /** 상품 관리(즉시 저장): 아이템 행에 추가 금액 입력·활성 스위치·순서 버튼을 둔다 */
   live?: boolean;
   onReorderItems?: (groupKey: string, itemKeys: string[]) => void;
+  /** 3D 상품(즉시 저장): 아이템마다 3D 항목을 잇고, 새 아이템은 3D 항목부터 고른다 */
+  threeD?: { choices: readonly ThreeDChoice[] };
 }
 
 const NEW_GROUP = { isRequired: true, minSelect: 1, maxSelect: 1 } as const;
@@ -47,7 +50,11 @@ export function OptionsEditor(props: OptionsEditorProps) {
   const itemSheet = useRef<BottomSheetModal>(null);
   const rangeSheet = useRef<BottomSheetModal>(null);
   const removeSheet = useRef<BottomSheetModal>(null);
+  const keySheet = useRef<BottomSheetModal>(null);
   const [session, setSession] = useState(0);
+  const [keyTarget, setKeyTarget] = useState<{ groupKey: string; itemKey: string | null } | null>(
+    null,
+  );
   const [groupTarget, setGroupTarget] = useState<OptionGroupValue | null>(null);
   const [itemTarget, setItemTarget] = useState<{
     groupKey: string;
@@ -76,7 +83,19 @@ export function OptionsEditor(props: OptionsEditorProps) {
       setItemTarget({ groupKey, item });
       open(itemSheet);
     },
+    editKey: (groupKey, itemKey) => {
+      setKeyTarget({ groupKey, itemKey });
+      keySheet.current?.present();
+    },
   };
+  const keyGroup = groups.find((g) => g.key === keyTarget?.groupKey);
+  const keyPick =
+    props.threeD && keyTarget && keyGroup
+      ? {
+          ...keyOptions(props.threeD.choices, keyGroup.items, keyTarget.itemKey),
+          isNew: keyTarget.itemKey == null,
+        }
+      : null;
 
   return (
     <View>
@@ -123,6 +142,27 @@ export function OptionsEditor(props: OptionsEditorProps) {
           else props.onAddItem(itemTarget.groupKey, { ...fields, imageUrl: null });
         }}
       />
+      <ThreeDKeySheet
+        ref={keySheet}
+        target={keyPick}
+        onSelect={(choice) => {
+          if (!keyTarget) return;
+          if (keyTarget.itemKey == null)
+            props.onAddItem(keyTarget.groupKey, {
+              title: choice.label,
+              description: '',
+              priceDelta: choice.defaultPriceDelta,
+              imageUrl: null,
+              threeDKey: choice.key,
+            });
+          else props.onChangeItem(keyTarget.groupKey, keyTarget.itemKey, { threeDKey: choice.key });
+        }}
+        onUnlink={() =>
+          keyTarget?.itemKey != null &&
+          props.onChangeItem(keyTarget.groupKey, keyTarget.itemKey, { threeDKey: null })
+        }
+        onManual={() => keyTarget && handlers.editItem(keyTarget.groupKey, null)}
+      />
       <ConfirmSheet
         ref={removeSheet}
         title={`'${groupTarget?.name ?? ''}' 그룹을 삭제할까요?`}
@@ -142,6 +182,7 @@ interface CardHandlers {
   editRange: (group: OptionGroupValue) => void;
   removeGroup: (group: OptionGroupValue) => void;
   editItem: (groupKey: string, item: OptionItemValue | null) => void;
+  editKey: (groupKey: string, itemKey: string | null) => void;
 }
 
 function GroupCard({
@@ -153,6 +194,10 @@ function GroupCard({
   handlers: CardHandlers;
   editor: OptionsEditorProps;
 }) {
+  const choices = editor.threeD?.choices;
+  const threeD = choices ? groupThreeD(choices, group.items) : null;
+  const keyLabel = (key: string | null | undefined) =>
+    key ? (choices?.find((c) => c.key === key)?.label ?? key) : null;
   return (
     <View
       testID={`option-group-${group.key}`}
@@ -220,7 +265,19 @@ function GroupCard({
         >
           <Text className="font-sans text-md tracking-tight text-text2">{rangeLabel(group)}</Text>
         </Pressable>
+        {threeD?.category ? (
+          <View className="h-[37px] justify-center rounded-md bg-tint2 px-[13px]">
+            <Text className="font-sans text-md tracking-tight text-primary">
+              {`3D · ${threeDCategoryLabel(threeD.category)}`}
+            </Text>
+          </View>
+        ) : null}
       </View>
+      {threeD?.mixed || threeD?.unlinked ? (
+        <Text className="mb-2 font-sans text-xs tracking-tight text-danger">
+          {threeD.mixed ? '종류가 다른 3D 항목이 섞였어요' : `3D 항목 미지정 ${threeD.unlinked}개`}
+        </Text>
+      ) : null}
       <View className="gap-2">
         {group.items.map((item, i) => {
           const row = {
@@ -240,6 +297,19 @@ function GroupCard({
               {...row}
               onUp={i > 0 ? move(i - 1) : undefined}
               onDown={i < keys.length - 1 ? move(i + 1) : undefined}
+              threeD={
+                choices
+                  ? {
+                      label: keyLabel(item.threeDKey),
+                      // 3D 그룹의 켜진 선택지만 경고한다 — 키가 하나도 없는 그룹은 3D와 무관하다
+                      warn:
+                        !item.threeDKey &&
+                        item.isActive !== false &&
+                        group.items.some((x) => x.threeDKey),
+                      onPress: () => handlers.editKey(group.key, item.key),
+                    }
+                  : undefined
+              }
             />
           );
         })}
@@ -247,7 +317,9 @@ function GroupCard({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${group.name}에 옵션 추가`}
-        onPress={() => handlers.editItem(group.key, null)}
+        onPress={() =>
+          choices ? handlers.editKey(group.key, null) : handlers.editItem(group.key, null)
+        }
         className="mt-2.5 h-11 items-center justify-center rounded-sm border border-dashed border-dash bg-surface"
       >
         <Text className="font-sans text-base tracking-tight text-muted">+ 옵션 추가</Text>
@@ -366,7 +438,13 @@ function LiveItemRow({
   onRemove,
   onUp,
   onDown,
-}: RowProps & { onUp?: () => void; onDown?: () => void }) {
+  threeD,
+}: RowProps & {
+  onUp?: () => void;
+  onDown?: () => void;
+  /** 이어진 3D 항목 이름(없으면 null)과 고르기 */
+  threeD?: { label: string | null; warn: boolean; onPress: () => void };
+}) {
   const active = item.isActive !== false;
   return (
     <View className="flex-row gap-2.5 rounded-md border border-line bg-surface px-3 py-2.5">
@@ -390,6 +468,31 @@ function LiveItemRow({
             <Text className="font-sans text-xs tracking-tight text-muted">{item.description}</Text>
           ) : null}
         </Pressable>
+        {threeD ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${item.title} 3D 항목 ${threeD.label ?? '미지정'}`}
+            onPress={threeD.onPress}
+            hitSlop={6}
+            className={cn(
+              'h-7 justify-center self-start rounded-sm border px-2.5',
+              threeD.label
+                ? 'border-primary bg-tint2'
+                : threeD.warn
+                  ? 'border-danger bg-danger-bg'
+                  : 'border-chip-border bg-surface',
+            )}
+          >
+            <Text
+              className={cn(
+                'font-sans text-xs tracking-tight',
+                threeD.label ? 'text-primary' : threeD.warn ? 'text-danger' : 'text-muted',
+              )}
+            >
+              {threeD.label ? `3D · ${threeD.label}` : '3D 항목 지정'}
+            </Text>
+          </Pressable>
+        ) : null}
         <View className="flex-row items-center justify-between gap-2">
           {/* 서버 값이 바뀌면(실패 롤백 포함) 입력을 새로 만든다 */}
           <PriceInput

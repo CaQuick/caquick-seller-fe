@@ -758,6 +758,17 @@ export type StoreReviewsInput = {
   storeId: string | number;
 };
 
+/** 3D 옵션 카테고리. 옵션 항목의 threeDKey가 가리키는 카탈로그 선택지의 종류다. */
+export type ThreeDOptionCategoryType =
+  /** 시트 디자인. 고르지 않으면 장식 없는 시트로 그린다. */
+  | 'DESIGN'
+  /** 시트·크림 맛. 고르지 않아도 되는 그룹으로 둘 수 있다. */
+  | 'FLAVOR'
+  /** 시트 모양. 3D 상품은 필수 단일 선택 그룹이 있어야 한다. */
+  | 'SHAPE'
+  /** 케이크 크기. 3D 상품은 필수 단일 선택 그룹이 있어야 한다. */
+  | 'SIZE';
+
 /**
  * 업로드 용도. 용도마다 저장 경로가 다르고, 저장 입력은 같은 용도로 발급된 URL만 받는다.
  * 역할별 허용 범위: 판매자 PRODUCT_IMAGE·STORE_IMAGE·CONVERSATION_IMAGE, 관리자 BANNER_IMAGE·STORE_IMAGE(밖이면 BAD_USER_INPUT).
@@ -825,6 +836,11 @@ export type SellerChatsBuyerOrderQueryVariables = Exact<{
 
 
 export type SellerChatsBuyerOrderQuery = { sellerOrderList: { items: Array<{ id: string, buyerName: string, pickupAt: string, firstItemName: string | null }> } };
+
+export type SellerCustomCatalogQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerCustomCatalogQuery = { customThreeDCatalog: { revision: number, textColorPresets: Array<string>, optionChoices: Array<{ key: string, category: ThreeDOptionCategoryType, label: string, defaultPriceDelta: number, selectable: boolean }> } };
 
 export type SellerHomeStoreQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -900,7 +916,7 @@ export type SellerProductDetailQueryVariables = Exact<{
 }>;
 
 
-export type SellerProductDetailQuery = { sellerProduct: { id: string, name: string, description: string | null, purchaseNotice: string | null, regularPrice: number, salePrice: number | null, preparationTimeMinutes: number, isActive: boolean, customMode: CustomModeType, images: Array<{ id: string, imageUrl: string, sortOrder: number }>, categories: Array<{ id: string, name: string }>, tags: Array<{ id: string, name: string }>, optionGroups: Array<{ id: string, name: string, isRequired: boolean, minSelect: number, maxSelect: number, isActive: boolean, optionItems: Array<{ id: string }> }>, customTemplate: { id: string, textTokens: Array<{ id: string }> } | null } };
+export type SellerProductDetailQuery = { sellerProduct: { id: string, name: string, description: string | null, purchaseNotice: string | null, regularPrice: number, salePrice: number | null, preparationTimeMinutes: number, isActive: boolean, customMode: CustomModeType, images: Array<{ id: string, imageUrl: string, sortOrder: number }>, categories: Array<{ id: string, name: string }>, tags: Array<{ id: string, name: string }>, optionGroups: Array<{ id: string, name: string, isRequired: boolean, minSelect: number, maxSelect: number, isActive: boolean, threeDCategory: ThreeDOptionCategoryType | null, optionItems: Array<{ id: string }> }>, customReadiness: Array<{ mode: CustomModeType, issues: Array<{ code: string, message: string }> }>, customTemplate: { id: string, freeEditEnabled: boolean, textTokens: Array<{ id: string }> } | null } };
 
 export type SellerProductsFilterCategoriesQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -983,7 +999,7 @@ export type SellerProductManageQueryVariables = Exact<{
 }>;
 
 
-export type SellerProductManageQuery = { sellerProduct: { id: string, optionGroups: Array<{ id: string, name: string, description: string | null, isRequired: boolean, minSelect: number, maxSelect: number, optionItems: Array<{ id: string, title: string, description: string | null, imageUrl: string | null, priceDelta: number, isActive: boolean }> }>, customTemplate: { id: string, baseImageUrl: string, textTokens: Array<{ id: string, tokenKey: string, defaultText: string, maxLength: number, isRequired: boolean, posX: number, posY: number, width: number, height: number }> } | null } };
+export type SellerProductManageQuery = { sellerProduct: { id: string, customMode: CustomModeType, optionGroups: Array<{ id: string, name: string, description: string | null, isRequired: boolean, minSelect: number, maxSelect: number, optionItems: Array<{ id: string, title: string, description: string | null, imageUrl: string | null, priceDelta: number, isActive: boolean, threeDKey: string | null }> }>, customTemplate: { id: string, baseImageUrl: string, freeEditEnabled: boolean, textTokens: Array<{ id: string, tokenKey: string, label: string, defaultText: string, maxLength: number, isRequired: boolean, posX: number, posY: number, width: number, height: number, textColor: string, textAlign: CustomTextAlignType }> } | null } };
 
 export type SellerProductUpdateMutationVariables = Exact<{
   input: SellerUpdateProductInput;
@@ -1047,6 +1063,21 @@ export type SellerProductReorderOptionItemsMutationVariables = Exact<{
 
 
 export type SellerProductReorderOptionItemsMutation = { sellerReorderOptionItems: Array<{ id: string }> };
+
+export type SellerProductSetCustomModeMutationVariables = Exact<{
+  productId: string | number;
+  customMode: CustomModeType;
+}>;
+
+
+export type SellerProductSetCustomModeMutation = { sellerSetProductCustomMode: { id: string, customMode: CustomModeType } };
+
+export type SellerProductApplyThreeDPresetMutationVariables = Exact<{
+  productId: string | number;
+}>;
+
+
+export type SellerProductApplyThreeDPresetMutation = { sellerApplyThreeDOptionPreset: { id: string } };
 
 export type SellerProductUpsertTemplateMutationVariables = Exact<{
   input: SellerUpsertProductCustomTemplateInput;
@@ -1477,6 +1508,21 @@ export const SellerChatsBuyerOrderDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerChatsBuyerOrderQuery, SellerChatsBuyerOrderQueryVariables>;
+export const SellerCustomCatalogDocument = new TypedDocumentString(`
+    query SellerCustomCatalog {
+  customThreeDCatalog {
+    revision
+    optionChoices {
+      key
+      category
+      label
+      defaultPriceDelta
+      selectable
+    }
+    textColorPresets
+  }
+}
+    `) as unknown as TypedDocumentString<SellerCustomCatalogQuery, SellerCustomCatalogQueryVariables>;
 export const SellerHomeStoreDocument = new TypedDocumentString(`
     query SellerHomeStore {
   sellerMyStore {
@@ -1699,13 +1745,22 @@ export const SellerProductDetailDocument = new TypedDocumentString(`
       minSelect
       maxSelect
       isActive
+      threeDCategory
       optionItems {
         id
       }
     }
     customMode
+    customReadiness {
+      mode
+      issues {
+        code
+        message
+      }
+    }
     customTemplate {
       id
+      freeEditEnabled
       textTokens {
         id
       }
@@ -1820,6 +1875,7 @@ export const SellerProductManageDocument = new TypedDocumentString(`
     query SellerProductManage($productId: ID!) {
   sellerProduct(productId: $productId) {
     id
+    customMode
     optionGroups {
       id
       name
@@ -1834,14 +1890,17 @@ export const SellerProductManageDocument = new TypedDocumentString(`
         imageUrl
         priceDelta
         isActive
+        threeDKey
       }
     }
     customTemplate {
       id
       baseImageUrl
+      freeEditEnabled
       textTokens {
         id
         tokenKey
+        label
         defaultText
         maxLength
         isRequired
@@ -1849,6 +1908,8 @@ export const SellerProductManageDocument = new TypedDocumentString(`
         posY
         width
         height
+        textColor
+        textAlign
       }
     }
   }
@@ -1911,6 +1972,21 @@ export const SellerProductReorderOptionItemsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerProductReorderOptionItemsMutation, SellerProductReorderOptionItemsMutationVariables>;
+export const SellerProductSetCustomModeDocument = new TypedDocumentString(`
+    mutation SellerProductSetCustomMode($productId: ID!, $customMode: CustomModeType!) {
+  sellerSetProductCustomMode(productId: $productId, customMode: $customMode) {
+    id
+    customMode
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductSetCustomModeMutation, SellerProductSetCustomModeMutationVariables>;
+export const SellerProductApplyThreeDPresetDocument = new TypedDocumentString(`
+    mutation SellerProductApplyThreeDPreset($productId: ID!) {
+  sellerApplyThreeDOptionPreset(productId: $productId) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductApplyThreeDPresetMutation, SellerProductApplyThreeDPresetMutationVariables>;
 export const SellerProductUpsertTemplateDocument = new TypedDocumentString(`
     mutation SellerProductUpsertTemplate($input: SellerUpsertProductCustomTemplateInput!) {
   sellerUpsertProductCustomTemplate(input: $input) {

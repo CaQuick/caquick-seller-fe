@@ -2,6 +2,7 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { graphql } from '@/graphql/generated';
 import {
+  type CustomModeType,
   type SellerUpdateOptionGroupInput,
   type SellerUpdateOptionItemInput,
   type SellerUpdateProductInput,
@@ -15,6 +16,7 @@ const SellerProductManageDocument = graphql(`
   query SellerProductManage($productId: ID!) {
     sellerProduct(productId: $productId) {
       id
+      customMode
       optionGroups {
         id
         name
@@ -29,14 +31,17 @@ const SellerProductManageDocument = graphql(`
           imageUrl
           priceDelta
           isActive
+          threeDKey
         }
       }
       customTemplate {
         id
         baseImageUrl
+        freeEditEnabled
         textTokens {
           id
           tokenKey
+          label
           defaultText
           maxLength
           isRequired
@@ -44,6 +49,8 @@ const SellerProductManageDocument = graphql(`
           posY
           width
           height
+          textColor
+          textAlign
         }
       }
     }
@@ -111,6 +118,23 @@ const SellerProductDeleteOptionItemDocument = graphql(`
 const SellerProductReorderOptionItemsDocument = graphql(`
   mutation SellerProductReorderOptionItems($input: SellerReorderOptionItemsInput!) {
     sellerReorderOptionItems(input: $input) {
+      id
+    }
+  }
+`);
+
+const SellerProductSetCustomModeDocument = graphql(`
+  mutation SellerProductSetCustomMode($productId: ID!, $customMode: CustomModeType!) {
+    sellerSetProductCustomMode(productId: $productId, customMode: $customMode) {
+      id
+      customMode
+    }
+  }
+`);
+
+const SellerProductApplyThreeDPresetDocument = graphql(`
+  mutation SellerProductApplyThreeDPreset($productId: ID!) {
+    sellerApplyThreeDOptionPreset(productId: $productId) {
       id
     }
   }
@@ -194,9 +218,23 @@ export async function reorderOptionItems(optionGroupId: string, optionItemIds: s
   });
 }
 
-export async function upsertCustomTemplate(productId: string, baseImageUrl: string) {
+export async function setCustomMode(productId: string, customMode: CustomModeType) {
+  await gqlRequest(SellerProductSetCustomModeDocument, { productId, customMode });
+}
+
+export async function applyThreeDPreset(productId: string) {
+  await gqlRequest(SellerProductApplyThreeDPresetDocument, { productId });
+}
+
+export async function upsertCustomTemplate(
+  productId: string,
+  baseImageUrl: string,
+  freeEditEnabled: boolean,
+) {
   return (
-    await gqlRequest(SellerProductUpsertTemplateDocument, { input: { productId, baseImageUrl } })
+    await gqlRequest(SellerProductUpsertTemplateDocument, {
+      input: { productId, baseImageUrl, freeEditEnabled },
+    })
   ).sellerUpsertProductCustomTemplate.id;
 }
 

@@ -11,12 +11,20 @@ import {
 } from './upload';
 
 /** manipulate 체인 기록: resize 인자와 saveAsync 옵션 */
-const manip = { resize: [] as unknown[], save: [] as unknown[] };
+const manip = { crop: [] as unknown[], resize: [] as unknown[], save: [] as unknown[] };
 jest.mock('expo-image-manipulator', () => ({
   SaveFormat: { JPEG: 'jpeg', PNG: 'png' },
   ImageManipulator: {
     manipulate: jest.fn(() => {
-      const context: { resize: (size: unknown) => unknown; renderAsync: () => Promise<unknown> } = {
+      const context: {
+        crop: (rect: unknown) => unknown;
+        resize: (size: unknown) => unknown;
+        renderAsync: () => Promise<unknown>;
+      } = {
+        crop: (rect) => {
+          manip.crop.push(rect);
+          return context;
+        },
         resize: (size) => {
           manip.resize.push(size);
           return context;
@@ -58,6 +66,7 @@ describe('targetSize', () => {
 
 describe('uploadImage', () => {
   beforeEach(() => {
+    manip.crop = [];
     manip.resize = [];
     manip.save = [];
     jest.mocked(ImageManipulator.manipulate).mockClear();
@@ -90,9 +99,26 @@ describe('uploadImage', () => {
     ]);
   });
 
+  it('잘라 올릴 영역이 있으면 자른 뒤 그 크기로 축소를 정한다', async () => {
+    mockFileSizes.set('file:///cache/shrunk.jpg', 10);
+    const crop = { originX: 500, originY: 0, width: 2000, height: 2000 };
+    await uploadImage('PRODUCT_IMAGE', { ...image(3000, 2000), crop }, presignOk());
+    expect(manip.crop).toEqual([crop]);
+    expect(manip.resize).toEqual([{ width: 1600 }]);
+
+    manip.resize = [];
+    await uploadImage(
+      'PRODUCT_IMAGE',
+      { ...image(4000, 1500), crop: { ...crop, width: 1500, height: 1500 } },
+      presignOk(),
+    );
+    expect(manip.resize).toEqual([]);
+  });
+
   it('작은 이미지는 resize 없이 JPEG로만 다시 저장한다', async () => {
     mockFileSizes.set('file:///cache/shrunk.jpg', 10);
     await uploadImage('STORE_IMAGE', image(1000, 500), presignOk());
+    expect(manip.crop).toEqual([]);
     expect(manip.resize).toEqual([]);
     expect(manip.save).toHaveLength(1);
   });

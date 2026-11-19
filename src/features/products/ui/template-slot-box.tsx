@@ -1,8 +1,18 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { moveRect, type Rect, resizeRect, type Slot, toPx } from '../model/template-slots';
+import { layoutSlotText, SLOT_FONT, slotLines } from '../model/slot-layout';
+import {
+  cleanText,
+  isHexColor,
+  moveRect,
+  type Rect,
+  resizeRect,
+  SCALE,
+  type Slot,
+  toPx,
+} from '../model/template-slots';
 
 interface Props {
   slot: Slot;
@@ -41,6 +51,7 @@ export function SlotBox({ slot, label, side, onRect, onDragging }: Props) {
         style={toPx(slot.rect, side)}
         className="absolute rounded-badge border-[1.5px] border-dashed border-primary"
       >
+        <SlotTextPreview slot={slot} side={side} />
         <View className="absolute -top-5 left-[-1.5px] h-[18px] justify-center rounded-xs bg-primary px-1.5">
           <Text numberOfLines={1} className="font-sans text-2xs font-semibold text-surface">
             {label}
@@ -55,5 +66,63 @@ export function SlotBox({ slot, label, side, onRect, onDragging }: Props) {
         </GestureDetector>
       </View>
     </GestureDetector>
+  );
+}
+
+/** 줄 폭은 이 크기로 한 번 재고 비례로 늘린다 */
+const MEASURE_SIZE = 40;
+const FONT = { fontFamily: SLOT_FONT.family, fontWeight: SLOT_FONT.weight } as const;
+
+/** 기본 문구를 슬롯 렌더 규칙대로 그린다. 줄 폭은 숨긴 글자의 onTextLayout으로 잰다 */
+function SlotTextPreview({ slot, side }: { slot: Slot; side: number }) {
+  const text = cleanText(slot.defaultText);
+  const [measured, setMeasured] = useState<{ text: string; widths: number[] } | null>(null);
+  const lines = slotLines(text);
+  const widths = measured?.text === text ? measured.widths : null;
+  const layout = widths
+    ? layoutSlotText(
+        text,
+        slot.rect,
+        slot.textAlign,
+        (line, size) => (widths[lines.indexOf(line)]! * size) / MEASURE_SIZE,
+      )
+    : null;
+  const k = side / SCALE;
+  return (
+    <View pointerEvents="none" className="absolute inset-0">
+      {/* 줄바꿈 없이 재도록 넓은 틀에 두고, 글자는 내용 폭만 차지한다. 화면 낭독에서도 숨긴다 */}
+      <View aria-hidden style={{ position: 'absolute', width: MEASURE_SIZE * 100, opacity: 0 }}>
+        <Text
+          testID={`slot-measure-${slot.key}`}
+          style={{ ...FONT, fontSize: MEASURE_SIZE, alignSelf: 'flex-start' }}
+          onTextLayout={(e) => {
+            const reported = e.nativeEvent.lines.map((l) => l.width);
+            if (reported.length === lines.length) setMeasured({ text, widths: reported });
+          }}
+        >
+          {text}
+        </Text>
+      </View>
+      {layout?.lines.map((line, i) => (
+        <Text
+          key={i}
+          numberOfLines={1}
+          style={{
+            ...FONT,
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: (line.y - slot.rect.y) * k,
+            fontSize: layout.fontSize * k,
+            lineHeight: layout.lineHeight * k,
+            textAlign:
+              slot.textAlign === 'LEFT' ? 'left' : slot.textAlign === 'RIGHT' ? 'right' : 'center',
+            color: isHexColor(slot.textColor) ? slot.textColor : undefined,
+          }}
+        >
+          {line.text}
+        </Text>
+      ))}
+    </View>
   );
 }

@@ -2,9 +2,12 @@ import { type BottomSheetModal, BottomSheetTextInput } from '@gorhom/bottom-shee
 import { type ReactNode, type RefObject, useState } from 'react';
 import { Text, type TextInputProps, View } from 'react-native';
 
+import { type KeyOption, type ThreeDChoice, threeDCategoryLabel } from '@/features/custom';
+import { type ThreeDOptionCategoryType } from '@/graphql/generated/graphql';
 import { colors, shadow } from '@/shared/config/tokens';
 import { cn } from '@/shared/lib/cn';
-import { AppBottomSheet, Button, Stepper } from '@/shared/ui';
+import { formatNumber } from '@/shared/lib/format';
+import { AppBottomSheet, Button, Chip, Stepper } from '@/shared/ui';
 
 import { priceText, toDigits } from '../model/draft-form';
 import { type GroupFields, type ItemFields, type OptionGroupValue } from '../model/draft-options';
@@ -266,5 +269,77 @@ function RangeBody({
         onSubmit={() => onSubmit({ minSelect: min, maxSelect: max })}
       />
     </View>
+  );
+}
+
+interface KeySheetProps {
+  ref: RefObject<BottomSheetModal | null>;
+  /** null이면 고를 대상이 없다(닫힌 상태) */
+  target: {
+    options: KeyOption[];
+    category: ThreeDOptionCategoryType | null;
+    isNew: boolean;
+  } | null;
+  onSelect: (choice: ThreeDChoice) => void;
+  /** 이어진 키를 끊는다(기존 항목) */
+  onUnlink: () => void;
+  /** 3D 항목 없이 이름부터 적는다(새 항목) */
+  onManual: () => void;
+}
+
+/** 3D 항목 고르기. 새 항목은 고른 선택지의 이름·기본 가격으로 만든다 */
+export function ThreeDKeySheet({ ref, target, onSelect, onUnlink, onManual }: KeySheetProps) {
+  const close = () => ref.current?.dismiss();
+  const options = target?.options ?? [];
+  const categories = [...new Set(options.map((o) => o.choice.category))];
+  const linked = options.some((o) => o.selected);
+  return (
+    <AppBottomSheet ref={ref} title="3D 항목">
+      <View testID="three-d-key-sheet">
+        {target?.category ? (
+          <Text className="mb-3 font-sans text-sm tracking-tight text-sublabel">
+            {`이 그룹은 ${threeDCategoryLabel(target.category)} 항목만 이을 수 있어요`}
+          </Text>
+        ) : null}
+        {categories.map((category) => (
+          <View key={category} className="mb-4">
+            <Text className="mb-2 font-sans text-base font-semibold tracking-tight text-text2">
+              {threeDCategoryLabel(category)}
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {options
+                .filter((o) => o.choice.category === category)
+                .map(({ choice, selected, disabled }) => (
+                  <Chip
+                    key={choice.key}
+                    label={
+                      target?.isNew && choice.defaultPriceDelta > 0
+                        ? `${choice.label} +${formatNumber(choice.defaultPriceDelta)}원`
+                        : choice.label
+                    }
+                    selected={selected}
+                    disabled={disabled}
+                    onPress={() => {
+                      onSelect(choice);
+                      close();
+                    }}
+                  />
+                ))}
+            </View>
+          </View>
+        ))}
+        {target?.isNew || linked ? (
+          <Button
+            title={target?.isNew ? '3D 항목 없이 직접 입력' : '3D 연결 끊기'}
+            variant="secondary"
+            onPress={() => {
+              close();
+              if (target?.isNew) onManual();
+              else onUnlink();
+            }}
+          />
+        ) : null}
+      </View>
+    </AppBottomSheet>
   );
 }

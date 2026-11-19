@@ -21,6 +21,7 @@ import R_app_tabs_store from '../../app/(app)/(tabs)/store';
 import R_app_chats_conversationId from '../../app/(app)/chats/[conversationId]';
 import R_app_orders_id from '../../app/(app)/orders/[id]';
 import R_app_products_id_custom_template from '../../app/(app)/products/[id]/custom-template';
+import R_app_products_id_customization from '../../app/(app)/products/[id]/customization';
 import R_app_products_id_edit from '../../app/(app)/products/[id]/edit';
 import R_app_products_id_images from '../../app/(app)/products/[id]/images';
 import R_app_products_id_index from '../../app/(app)/products/[id]/index';
@@ -68,6 +69,7 @@ const routes = {
   '(app)/chats/[conversationId]': R_app_chats_conversationId,
   '(app)/orders/[id]': R_app_orders_id,
   '(app)/products/[id]/custom-template': R_app_products_id_custom_template,
+  '(app)/products/[id]/customization': R_app_products_id_customization,
   '(app)/products/[id]/edit': R_app_products_id_edit,
   '(app)/products/[id]/images': R_app_products_id_images,
   '(app)/products/[id]/index': R_app_products_id_index,

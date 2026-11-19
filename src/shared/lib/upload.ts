@@ -10,6 +10,8 @@ export interface PickedImage {
   uri: string;
   width: number;
   height: number;
+  /** 이 영역만 잘라 올린다(원본 픽셀 기준) */
+  crop?: { originX: number; originY: number; width: number; height: number };
 }
 
 export const MAX_EDGE = 1600;
@@ -41,14 +43,15 @@ export interface UploadDeps {
 export function targetSize({
   width,
   height,
-}: PickedImage): { width: number } | { height: number } | null {
+}: Pick<PickedImage, 'width' | 'height'>): { width: number } | { height: number } | null {
   if (Math.max(width, height) <= MAX_EDGE) return null;
   return width >= height ? { width: MAX_EDGE } : { height: MAX_EDGE };
 }
 
 async function shrinkWithExpo(image: PickedImage): Promise<string> {
   const context = ImageManipulator.manipulate(image.uri);
-  const size = targetSize(image);
+  if (image.crop) context.crop(image.crop);
+  const size = targetSize(image.crop ?? image);
   if (size) context.resize(size);
   const rendered = await context.renderAsync();
   const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: JPEG_QUALITY });

@@ -26,6 +26,7 @@ import {
 
 import { productDetailQueryOptions } from '../api/browse';
 import { BROWSE_COPY, formatPreparation, optionGroupSummary, priceView } from '../model/browse';
+import { CUSTOMIZATION_COPY, customModeLabel, modeRowDescription } from '../model/customization';
 import { useDeleteProduct, useSetProductActive } from '../model/use-browse';
 import { BuyerPreview } from './detail-buyer-preview';
 import { DetailGallery } from './detail-gallery';
@@ -34,7 +35,7 @@ type SubRoute =
   | '/products/[id]/edit'
   | '/products/[id]/images'
   | '/products/[id]/options'
-  | '/products/[id]/custom-template';
+  | '/products/[id]/customization';
 
 const backToList = () => (router.canGoBack() ? router.back() : router.replace('/products'));
 
@@ -73,7 +74,6 @@ export function ProductDetailScreen() {
     body = <ErrorState onRetry={() => void query.refetch()} />;
   } else {
     const { price, original, rate } = priceView(p.regularPrice, p.salePrice);
-    const template = p.customTemplate;
     body = (
       <>
         <DetailGallery urls={p.images.map((image) => image.imageUrl)} />
@@ -168,12 +168,10 @@ export function ProductDetailScreen() {
             onPress={() => go('/products/[id]/images')}
           />
           <MenuRow
-            title="커스텀 문구"
-            description={
-              template ? `문구 슬롯 ${template.textTokens.length}개` : '등록하지 않았어요'
-            }
-            aux={p.customMode === 'SLOT' ? '사용 중' : '사용 안 함'}
-            onPress={() => go('/products/[id]/custom-template')}
+            title={CUSTOMIZATION_COPY.title}
+            description={modeRowDescription(p)}
+            aux={customModeLabel(p.customMode)}
+            onPress={() => go('/products/[id]/customization')}
           />
           <MenuRow title="구매자 화면으로 보기" onPress={() => setPreviewOpen(true)} />
         </MenuGroup>

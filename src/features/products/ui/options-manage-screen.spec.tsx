@@ -13,6 +13,7 @@ import { graphqlError } from '@/test/msw/graphql';
 import { server } from '@/test/msw/server';
 import { createTestQueryClient, Providers } from '@/test/render';
 
+import { CUSTOMIZATION_COPY } from '../model/customization';
 import { OPTIONS_COPY } from '../model/options-live';
 import { ProductOptionsScreen } from './options-manage-screen';
 
@@ -53,6 +54,7 @@ const item = (id: string, title: string, priceDelta: number, isActive = true) =>
   imageUrl: null,
   priceDelta,
   isActive,
+  threeDKey: null as string | null,
 });
 const GROUPS: Group[] = [
   {
@@ -75,6 +77,29 @@ const GROUPS: Group[] = [
   },
 ];
 
+const CATALOG = {
+  revision: 1,
+  textColorPresets: [],
+  optionChoices: [
+    { key: 'size.mini', category: 'SIZE', label: '도시락', defaultPriceDelta: 0, selectable: true },
+    { key: 'size.no1', category: 'SIZE', label: '1호', defaultPriceDelta: 5000, selectable: true },
+    {
+      key: 'shape.heart',
+      category: 'SHAPE',
+      label: '하트',
+      defaultPriceDelta: 1000,
+      selectable: true,
+    },
+  ],
+};
+const THREE_D_GROUPS: Group[] = [
+  {
+    ...GROUPS[0]!,
+    optionItems: [{ ...item('o1', '0호', 0), threeDKey: 'size.mini' }, item('o2', '1호', 5000)],
+  },
+  GROUPS[1]!,
+];
+
 const FAIL = graphqlError({
   message: '잠시 후 다시 시도해 주세요.',
   code: 'TEMPORARY_UNAVAILABLE',
@@ -86,8 +111,8 @@ const FAIL = graphqlError({
  * 옵션 조회는 서버 상태를 돌려주고, mutation은 변수를 기록한 뒤 mutate로 상태를 바꾼다.
  * fail에 든 operation은 오류로 답하고 상태를 바꾸지 않는다
  */
-function serve(fail: string[] = []) {
-  let groups = GROUPS;
+function serve(fail: string[] = [], { customMode = 'NONE', groups: initial = GROUPS } = {}) {
+  let groups = initial;
   const calls: Record<string, unknown[]> = {};
   const updateItem = (id: string, patch: object) => {
     groups = groups.map((g) => ({
@@ -97,11 +122,15 @@ function serve(fail: string[] = []) {
   };
   server.use(
     graphql.operation(({ operationName, variables }) => {
+      (calls[operationName] ??= []).push(variables);
       if (operationName === 'SellerProductManage')
         return HttpResponse.json({
-          data: { sellerProduct: { id: '7', optionGroups: groups, customTemplate: null } },
+          data: {
+            sellerProduct: { id: '7', customMode, optionGroups: groups, customTemplate: null },
+          },
         });
-      (calls[operationName] ??= []).push(variables);
+      if (operationName === 'SellerCustomCatalog')
+        return HttpResponse.json({ data: { customThreeDCatalog: CATALOG } });
       if (fail.includes(operationName)) return HttpResponse.json({ data: null, errors: [FAIL] });
       const input = variables.input as Record<string, unknown> | undefined;
       if (operationName === 'SellerProductUpdateOptionItem') {
@@ -145,6 +174,8 @@ describe('ProductOptionsScreen', () => {
     expect(screen.getByLabelText('고구마 추가 금액')).toBeDisabled();
     expect(screen.queryByRole('button', { name: '0호 위로 이동' })).toBeNull();
     expect(screen.queryByRole('button', { name: '1호 아래로 이동' })).toBeNull();
+    expect(screen.queryByText(OPTIONS_COPY.threeDGuide)).toBeNull();
+    expect(screen.queryByRole('button', { name: /3D 항목/ })).toBeNull();
   });
 
   it('활성 스위치는 바로 저장하고 다시 받은 값으로 그린다', async () => {
@@ -186,6 +217,7 @@ describe('ProductOptionsScreen', () => {
           data: {
             sellerProduct: {
               id: '7',
+              customMode: 'NONE',
               optionGroups: [{ ...size!, optionItems: items }, ...rest],
               customTemplate: null,
             },
@@ -316,5 +348,90 @@ describe('ProductOptionsScreen', () => {
       { input: { optionGroupId: 'g2', isRequired: false, minSelect: 0 } },
     ]);
     expect(calls.SellerProductUpdateOptionItem).toBeUndefined();
+  });
+
+  describe('3D 상품', () => {
+    const open3d = async (fail: string[] = []) => {
+      const calls = serve(fail, { customMode: 'THREE_D', groups: THREE_D_GROUPS });
+      await open();
+      await screen.findByText(OPTIONS_COPY.threeDGuide);
+      return calls;
+    };
+
+    it('그룹 칩·미지정 경고를 그리고, 고를 키는 그룹 카테고리로 묶고 쓰는 키는 막는다', async () => {
+      const calls = await open3d();
+      expect(await screen.findByText('3D · 크기')).toBeTruthy();
+      expect(screen.getByText('3D 항목 미지정 1개')).toBeTruthy();
+      expect(screen.getByRole('button', { name: '고구마 3D 항목 미지정' })).toBeTruthy();
+
+      await fireEvent.press(screen.getByRole('button', { name: '1호 3D 항목 미지정' }));
+      const keys = sheet('three-d-key-sheet');
+      expect(keys.getByText('이 그룹은 크기 항목만 이을 수 있어요')).toBeTruthy();
+      expect(keys.getByRole('button', { name: '도시락' })).toBeDisabled();
+      expect(keys.queryByRole('button', { name: '하트' })).toBeNull();
+      await fireEvent.press(keys.getByRole('button', { name: '1호' }));
+      await waitFor(() =>
+        expect(calls.SellerProductUpdateOptionItem).toEqual([
+          { input: { optionItemId: 'o2', threeDKey: 'size.no1' } },
+        ]),
+      );
+      await waitFor(() => expect(screen.queryByText('3D 항목 미지정 1개')).toBeNull());
+    });
+
+    it('연결을 끊으면 키를 null로 보낸다', async () => {
+      const calls = await open3d();
+      await fireEvent.press(await screen.findByRole('button', { name: '0호 3D 항목 도시락' }));
+      await fireEvent.press(
+        sheet('three-d-key-sheet').getByRole('button', { name: '3D 연결 끊기' }),
+      );
+      await waitFor(() =>
+        expect(calls.SellerProductUpdateOptionItem).toEqual([
+          { input: { optionItemId: 'o1', threeDKey: null } },
+        ]),
+      );
+    });
+
+    it('새 옵션은 3D 항목부터 골라 이름·기본 가격을 채우고, 직접 입력도 고를 수 있다', async () => {
+      const calls = await open3d();
+      await fireEvent.press(screen.getByRole('button', { name: '케이크 맛에 옵션 추가' }));
+      await fireEvent.press(
+        sheet('three-d-key-sheet').getByRole('button', { name: '1호 +5,000원' }),
+      );
+      await waitFor(() =>
+        expect(calls.SellerProductCreateOptionItem).toEqual([
+          {
+            input: {
+              optionGroupId: 'g2',
+              title: '1호',
+              priceDelta: 5000,
+              threeDKey: 'size.no1',
+              sortOrder: 1,
+            },
+          },
+        ]),
+      );
+
+      await fireEvent.press(screen.getByRole('button', { name: '케이크 맛에 옵션 추가' }));
+      await fireEvent.press(
+        sheet('three-d-key-sheet').getByRole('button', { name: '3D 항목 없이 직접 입력' }),
+      );
+      await fireEvent.changeText(sheet('item-sheet').getByLabelText('옵션 이름'), '초코');
+      await fireEvent.press(sheet('item-sheet').getByRole('button', { name: '추가' }));
+      await waitFor(() => expect(calls.SellerProductCreateOptionItem).toHaveLength(2));
+      expect(calls.SellerProductCreateOptionItem![1]).toEqual({
+        input: { optionGroupId: 'g2', title: '초코', priceDelta: 0, sortOrder: 1 },
+      });
+    });
+
+    it('3D 기본 세트를 불러오고 다시 받는다', async () => {
+      const calls = await open3d();
+      const fetched = calls.SellerProductManage!.length;
+      await fireEvent.press(screen.getByRole('button', { name: CUSTOMIZATION_COPY.preset }));
+      await waitFor(() =>
+        expect(toast.success).toHaveBeenCalledWith(CUSTOMIZATION_COPY.presetDone),
+      );
+      expect(calls.SellerProductApplyThreeDPreset).toEqual([{ productId: '7' }]);
+      await waitFor(() => expect(calls.SellerProductManage!.length).toBeGreaterThan(fetched));
+    });
   });
 });

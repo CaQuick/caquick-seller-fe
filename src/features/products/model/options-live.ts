@@ -32,6 +32,7 @@ export const OPTIONS_COPY = {
   guide: '바꾸는 즉시 저장돼요. 저장 버튼이 따로 없어요',
   section: '옵션 그룹',
   hint: '꺼진 옵션은 구매자에게 보이지 않아요. 그룹을 길게 눌러 순서를 바꿉니다',
+  threeDGuide: '3D 상품이에요. 크기·맛·모양·디자인 옵션은 선택지마다 3D 항목을 이어 주세요',
 } as const;
 
 /** 서버 id를 편집기 key로 쓴다 */
@@ -50,6 +51,7 @@ export function toOptionGroups(product: ManageProduct): Groups {
       priceDelta: i.priceDelta,
       imageUrl: i.imageUrl,
       isActive: i.isActive,
+      threeDKey: i.threeDKey,
     })),
   }));
 }
@@ -144,6 +146,7 @@ export function useLiveOptions(product: ManageProduct) {
           description: fields.description || undefined,
           priceDelta: fields.priceDelta,
           imageUrl: fields.imageUrl ?? undefined,
+          threeDKey: fields.threeDKey ?? undefined,
           sortOrder: group(groupKey)?.items.length ?? 0,
         }),
       ),
