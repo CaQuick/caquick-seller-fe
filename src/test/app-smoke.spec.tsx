@@ -42,6 +42,9 @@ import R_app_store_pickup_policy from '../../app/(app)/store/pickup-policy';
 import R_app_store_preview from '../../app/(app)/store/preview';
 import R_app_store_reviews_id from '../../app/(app)/store/reviews/[id]';
 import R_app_store_reviews_index from '../../app/(app)/store/reviews/index';
+import R_app_store_settlement_account from '../../app/(app)/store/settlement-account';
+import R_app_store_settlements_id from '../../app/(app)/store/settlements/[id]';
+import R_app_store_settlements_index from '../../app/(app)/store/settlements/index';
 import R_app_store_special_closures from '../../app/(app)/store/special-closures';
 import R_auth_layout from '../../app/(auth)/_layout';
 import R_auth_change_password from '../../app/(auth)/change-password';
@@ -90,6 +93,9 @@ const routes = {
   '(app)/store/preview': R_app_store_preview,
   '(app)/store/reviews/[id]': R_app_store_reviews_id,
   '(app)/store/reviews/index': R_app_store_reviews_index,
+  '(app)/store/settlement-account': R_app_store_settlement_account,
+  '(app)/store/settlements/[id]': R_app_store_settlements_id,
+  '(app)/store/settlements/index': R_app_store_settlements_index,
   '(app)/store/special-closures': R_app_store_special_closures,
   '(auth)/_layout': R_auth_layout,
   '(auth)/change-password': R_auth_change_password,

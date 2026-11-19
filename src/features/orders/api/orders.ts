@@ -5,6 +5,7 @@ import {
   type OrderStatusType,
   type SellerCancelOrderInput,
   type SellerOrderConversationsQuery,
+  type SellerRescheduleOrderPickupInput,
 } from '@/graphql/generated/graphql';
 import { gqlRequest } from '@/shared/api';
 
@@ -106,6 +107,13 @@ const SellerOrderDetailDocument = graphql(`
         refundAmount
         refundStatus
       }
+      pickupChanges {
+        id
+        fromPickupAt
+        toPickupAt
+        changedAt
+        note
+      }
     }
   }
 `);
@@ -124,6 +132,42 @@ const SellerCancelOrderDocument = graphql(`
     sellerCancelOrder(input: $input) {
       id
       status
+    }
+  }
+`);
+
+const SellerOrderPickupCalendarDocument = graphql(`
+  query SellerOrderPickupCalendar($orderId: ID!, $yearMonth: String!) {
+    sellerOrderPickupCalendar(orderId: $orderId, yearMonth: $yearMonth) {
+      days {
+        date
+        selectable
+        reason
+      }
+    }
+  }
+`);
+
+const SellerOrderPickupTimeSlotsDocument = graphql(`
+  query SellerOrderPickupTimeSlots($orderId: ID!, $date: String!) {
+    sellerOrderPickupTimeSlots(orderId: $orderId, date: $date) {
+      morning {
+        time
+        available
+      }
+      afternoon {
+        time
+        available
+      }
+    }
+  }
+`);
+
+const SellerRescheduleOrderPickupDocument = graphql(`
+  mutation SellerRescheduleOrderPickup($input: SellerRescheduleOrderPickupInput!) {
+    sellerRescheduleOrderPickup(input: $input) {
+      id
+      pickupAt
     }
   }
 `);
@@ -212,4 +256,25 @@ export function updateOrderStatus(input: {
 
 export function cancelOrder(input: SellerCancelOrderInput) {
   return gqlRequest(SellerCancelOrderDocument, { input });
+}
+
+/** 픽업 일시 변경 달력. 이 주문이 점유한 수량은 빼고 센다 */
+export const pickupChangeCalendarQueryOptions = (orderId: string, yearMonth: string) =>
+  queryOptions({
+    queryKey: ordersKeys.pickupCalendar(orderId, yearMonth),
+    queryFn: async () =>
+      (await gqlRequest(SellerOrderPickupCalendarDocument, { orderId, yearMonth }))
+        .sellerOrderPickupCalendar.days,
+  });
+
+export const pickupChangeSlotsQueryOptions = (orderId: string, date: string) =>
+  queryOptions({
+    queryKey: ordersKeys.pickupSlots(orderId, date),
+    queryFn: async () =>
+      (await gqlRequest(SellerOrderPickupTimeSlotsDocument, { orderId, date }))
+        .sellerOrderPickupTimeSlots,
+  });
+
+export function rescheduleOrderPickup(input: SellerRescheduleOrderPickupInput) {
+  return gqlRequest(SellerRescheduleOrderPickupDocument, { input });
 }

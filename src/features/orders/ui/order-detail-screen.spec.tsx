@@ -12,8 +12,10 @@ import {
   type SellerCancelOrderInput,
   type SellerOrderConversationsQuery,
   type SellerOrderDetailQuery,
+  type SellerRescheduleOrderPickupInput,
   type SellerUpdateOrderStatusInput,
 } from '@/graphql/generated/graphql';
+import { addDays, formatYmd, kstToIso, todayKst } from '@/shared/lib/kst';
 import { gqlError, gqlOk } from '@/test/msw/graphql';
 import { server } from '@/test/msw/server';
 import { createTestQueryClient, Providers } from '@/test/render';
@@ -100,6 +102,7 @@ const order = (patch: Partial<Order> = {}): Order => ({
   ],
   statusHistories: [],
   cancellation: null,
+  pickupChanges: [],
   ...patch,
 });
 
@@ -658,6 +661,302 @@ describe('OrderDetailScreen', () => {
     expect(await screen.findByText('주문을 찾을 수 없어요')).toBeTruthy();
     await fireEvent.press(button('목록으로'));
     await waitFor(() => expect(router.getPathname()).toBe('/orders'));
+  });
+
+  describe('픽업 일시 변경', () => {
+    // 지금 픽업: 사흘 뒤 KST 15:30. 날짜는 실행 시각에서 잡아 달·슬롯 조회가 시트를 연 달과 맞게 한다
+    const day = addDays(todayKst(), 3);
+    const ymd = formatYmd(day);
+    const pickupAt = kstToIso({ ...day, hh: 15, mm: 30 });
+
+    function pickupHandlers() {
+      const calls = { calendar: [] as unknown[], slots: [] as unknown[] };
+      server.use(
+        graphql.query('SellerOrderPickupCalendar', ({ variables }) => {
+          calls.calendar.push(variables);
+          return HttpResponse.json({
+            data: {
+              sellerOrderPickupCalendar: {
+                days: [
+                  { date: ymd, selectable: true, reason: null },
+                  { date: formatYmd(addDays(day, -1)), selectable: false, reason: 'CLOSED' },
+                ],
+              },
+            },
+          });
+        }),
+        graphql.query('SellerOrderPickupTimeSlots', ({ variables }) => {
+          calls.slots.push(variables);
+          return HttpResponse.json({
+            data: {
+              sellerOrderPickupTimeSlots: {
+                morning: [
+                  { time: '11:00', available: true },
+                  { time: '11:30', available: false },
+                ],
+                afternoon: [{ time: '15:30', available: true }],
+              },
+            },
+          });
+        }),
+      );
+      return calls;
+    }
+
+    function rescheduleHandler(respond?: () => Response) {
+      const inputs: SellerRescheduleOrderPickupInput[] = [];
+      server.use(
+        graphql.mutation<object, { input: SellerRescheduleOrderPickupInput }>(
+          'SellerRescheduleOrderPickup',
+          ({ variables }) => {
+            inputs.push(variables.input);
+            return (
+              respond?.() ??
+              HttpResponse.json({
+                data: {
+                  sellerRescheduleOrderPickup: { id: '1', pickupAt: variables.input.pickupAt },
+                },
+              })
+            );
+          },
+        ),
+      );
+      return inputs;
+    }
+
+    it.each<[OrderStatusType, boolean]>([
+      ['SUBMITTED', true],
+      ['CONFIRMED', true],
+      ['MADE', true],
+      ['PENDING_PAYMENT', false],
+      ['PICKED_UP', false],
+      ['NO_SHOW', false],
+      ['CANCELED', false],
+      ['ON_HOLD' as OrderStatusType, false],
+    ])('%s 주문의 변경 링크 %s', async (status, shown) => {
+      detailHandler(() => order({ status }));
+      await open();
+      await screen.findByText('10월 8일 (목) 15:30');
+      expect(screen.queryByRole('button', { name: '픽업 일시 변경' }) !== null).toBe(shown);
+    });
+
+    it('시트를 열어야 달력·슬롯을 부르고, 지금 시각·예약 불가 슬롯은 막으며 고른 일시·메모로 바꾼다', async () => {
+      let current = order({ pickupAt, confirmDeadlineAt: null });
+      detailHandler(() => current);
+      const calls = pickupHandlers();
+      const inputs = rescheduleHandler();
+      await open();
+      const link = await screen.findByRole('button', { name: '픽업 일시 변경' });
+      // 시트와 함께 마운트된 채팅 행의 조회가 끝날 때까지 달력 요청이 없어야 한다
+      await screen.findByRole('button', { name: '구매자와 채팅, 아직 대화가 없어요' });
+      expect(calls.calendar).toEqual([]);
+      await fireEvent.press(link);
+      expect(presented()).toContain('픽업 일시를 바꿀까요?');
+      expect(calls.calendar).toEqual([{ orderId: '1', yearMonth: ymd.slice(0, 7) }]);
+
+      const morning = await screen.findByRole('button', { name: '11:00' });
+      expect(calls.slots).toEqual([{ orderId: '1', date: ymd }]);
+      expect(button('11:30')).toBeDisabled();
+      expect(button('15:30 현재')).toBeDisabled();
+      expect(button('변경')).toBeDisabled();
+
+      await fireEvent.press(morning);
+      await fireEvent.changeText(screen.getByLabelText('변경 메모'), '  재료 입고가 늦어요 ');
+      current = order({
+        pickupAt: kstToIso({ ...day, hh: 11, mm: 0 }),
+        confirmDeadlineAt: null,
+        pickupChanges: [
+          {
+            id: 'p1',
+            fromPickupAt: pickupAt,
+            toPickupAt: kstToIso({ ...day, hh: 11, mm: 0 }),
+            changedAt: '2026-10-06T00:12:00.000Z',
+            note: '재료 입고가 늦어요',
+          },
+        ],
+      });
+      await fireEvent.press(button('변경'));
+      await waitFor(() => expect(toast.success).toHaveBeenCalledWith('픽업 일시를 바꿨어요'));
+      expect(inputs).toEqual([
+        {
+          orderId: '1',
+          pickupAt: kstToIso({ ...day, hh: 11, mm: 0 }),
+          note: '재료 입고가 늦어요',
+        },
+      ]);
+      expect(await screen.findByRole('header', { name: '픽업 변경 이력 1건' })).toBeTruthy();
+      expect(screen.getByText('재료 입고가 늦어요')).toBeTruthy();
+      expect(
+        screen.getByLabelText(/^.+ 15:30 → .+ 11:00, 완료, 10월 6일 09:12 변경$/),
+      ).toBeTruthy();
+    });
+
+    it('메모가 없으면 보내지 않고, 서버가 막으면 시트 안에 알리며 다시 받은 슬롯에서 막힌 시간을 끈다', async () => {
+      const rejected = '고른 시간은 예약할 수 없어요. 다른 시간을 골라 주세요.';
+      detailHandler(() => order({ pickupAt, confirmDeadlineAt: null }));
+      pickupHandlers();
+      const inputs = rescheduleHandler(failWith('PICKUP_NOT_AVAILABLE'));
+      await open();
+      await fireEvent.press(await screen.findByRole('button', { name: '픽업 일시 변경' }));
+      await fireEvent.press(await screen.findByRole('button', { name: '11:00' }));
+      // 그사이 11:00이 마감되고 11:30이 열렸다
+      server.use(
+        gqlOk('SellerOrderPickupTimeSlots', {
+          sellerOrderPickupTimeSlots: {
+            morning: [
+              { time: '11:00', available: false },
+              { time: '11:30', available: true },
+            ],
+            afternoon: [],
+          },
+        }),
+      );
+      await fireEvent.press(button('변경'));
+
+      expect(await screen.findByText(rejected)).toBeTruthy();
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(inputs).toEqual([{ orderId: '1', pickupAt: kstToIso({ ...day, hh: 11, mm: 0 }) }]);
+      await waitFor(() => expect(button('11:00')).toBeDisabled());
+      expect(button('변경')).toBeDisabled();
+
+      // 다시 고르면 알림을 지우고, 입력과 무관한 실패는 토스트로 알린다
+      await fireEvent.press(button('11:30'));
+      expect(screen.queryByText(rejected)).toBeNull();
+      server.use(
+        gqlError('SellerRescheduleOrderPickup', {
+          message: 'x',
+          classification: 'INTERNAL_SERVER_ERROR',
+        }),
+      );
+      await fireEvent.press(button('변경'));
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          '서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+        ),
+      );
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('시트를 닫으면 알림을 지우고, 그 뒤 주문이 바뀌어도 달력·슬롯을 다시 부르지 않는다', async () => {
+      const rejected = '지금과 같은 픽업 일시예요. 다른 시간을 골라 주세요.';
+      const detail = detailHandler(() => order({ pickupAt, confirmDeadlineAt: null }));
+      const calls = pickupHandlers();
+      rescheduleHandler(failWith('PICKUP_UNCHANGED'));
+      await open();
+      await fireEvent.press(await screen.findByRole('button', { name: '픽업 일시 변경' }));
+      await fireEvent.press(await screen.findByRole('button', { name: '11:00' }));
+      await fireEvent.press(button('변경'));
+      expect(await screen.findByText(rejected)).toBeTruthy();
+      // 실패 뒤 다시 받기까지 끝낸다
+      await waitFor(() => expect([calls.calendar.length, calls.slots.length]).toEqual([2, 2]));
+
+      const sheet = presentSpy.mock.contexts.find(
+        (c) =>
+          headerOf((c as { props: { children: ReactNode } }).props.children) ===
+          '픽업 일시를 바꿀까요?',
+      ) as { props: { onDismiss: () => void } };
+      await act(() => Promise.resolve(sheet.props.onDismiss()));
+      expect(screen.queryByText(rejected)).toBeNull();
+
+      await act(async () => {
+        mockSinks.forEach((sink) =>
+          sink.next({
+            data: {
+              sellerOrderUpdated: {
+                orderId: '1',
+                status: 'SUBMITTED',
+                pickupAt,
+                buyerName: '김다은',
+                totalPrice: 38000,
+                productName: '크리스마스 눈사람',
+                updatedAt: '2026-10-06T00:10:00.000Z',
+              },
+            },
+          }),
+        );
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(detail.count).toBe(3));
+      expect([calls.calendar.length, calls.slots.length]).toEqual([2, 2]);
+    });
+
+    it('픽업이 지났으면 이번 달에서 날짜부터 고르고, 막힌 날은 눌러도 고르지 않으며, 빈 날은 알린다', async () => {
+      const today = todayKst();
+      const closed = { ...today, d: today.d === 1 ? 2 : 1 };
+      const months: unknown[] = [];
+      detailHandler(() =>
+        order({
+          status: 'MADE',
+          pickupAt: '2026-01-05T06:30:00.000Z',
+          confirmDeadlineAt: null,
+        }),
+      );
+      server.use(
+        graphql.query('SellerOrderPickupCalendar', ({ variables }) => {
+          months.push(variables.yearMonth);
+          return HttpResponse.json({
+            data: {
+              sellerOrderPickupCalendar: {
+                days: [
+                  { date: formatYmd(today), selectable: true, reason: null },
+                  { date: formatYmd(closed), selectable: false, reason: 'CLOSED' },
+                ],
+              },
+            },
+          });
+        }),
+        gqlOk('SellerOrderPickupTimeSlots', {
+          sellerOrderPickupTimeSlots: { morning: [], afternoon: [] },
+        }),
+      );
+      await open();
+      await fireEvent.press(await screen.findByRole('button', { name: '픽업 일시 변경' }));
+      expect(await screen.findByText('바꿀 날짜를 골라 주세요')).toBeTruthy();
+
+      await fireEvent.press(button(`${closed.m}월 ${closed.d}일, 휴무`));
+      expect(screen.getByText('바꿀 날짜를 골라 주세요')).toBeTruthy();
+      await fireEvent.press(button(`${today.m}월 ${today.d}일`));
+      expect(await screen.findByText('이날은 픽업 시간이 없어요')).toBeTruthy();
+      expect(button('변경')).toBeDisabled();
+
+      await fireEvent.press(button('다음 달'));
+      const key = (m: { y: number; m: number }) => formatYmd({ ...m, d: 1 }).slice(0, 7);
+      await waitFor(() =>
+        expect(months).toEqual([key(today), key(addDays({ ...today, d: 1 }, 31))]),
+      );
+    });
+
+    it('달력·슬롯을 못 받으면 시트 안에서 다시 받는다', async () => {
+      detailHandler(() => order({ pickupAt, confirmDeadlineAt: null }));
+      server.use(
+        gqlError('SellerOrderPickupCalendar', {
+          message: 'x',
+          classification: 'INTERNAL_SERVER_ERROR',
+        }),
+      );
+      await open();
+      await fireEvent.press(await screen.findByRole('button', { name: '픽업 일시 변경' }));
+      const retry = await screen.findByRole('button', { name: '다시 시도' });
+      pickupHandlers();
+      server.use(
+        gqlError('SellerOrderPickupTimeSlots', {
+          message: 'x',
+          classification: 'INTERNAL_SERVER_ERROR',
+        }),
+      );
+      await fireEvent.press(retry);
+      await fireEvent.press(await screen.findByRole('button', { name: '다시 시도' }));
+      pickupHandlers();
+      await fireEvent.press(button('다시 시도'));
+      expect(await screen.findByRole('button', { name: '11:00' })).toBeTruthy();
+    });
+
+    it('변경 이력이 없으면 이력 칸을 두지 않는다', async () => {
+      detailHandler(() => order());
+      await open();
+      await screen.findByText('10월 8일 (목) 15:30');
+      expect(screen.queryByRole('header', { name: /^픽업 변경 이력/ })).toBeNull();
+    });
   });
 
   it('그 밖의 실패는 다시 시도로 다시 받는다', async () => {

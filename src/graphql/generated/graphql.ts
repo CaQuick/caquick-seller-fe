@@ -493,6 +493,15 @@ export type SellerReorderProductImagesInput = {
   productId: string | number;
 };
 
+/** 판매자 픽업 일시 변경 입력. */
+export type SellerRescheduleOrderPickupInput = {
+  /** 변경 메모. 선택, 최대 500자. 변경 이력에 남고 구매자도 본다. */
+  note?: string | null | undefined;
+  orderId: string | number;
+  /** 새 픽업 일시. sellerOrderPickupTimeSlots의 슬롯 시각이어야 한다(초 이하는 0). */
+  pickupAt: string;
+};
+
 /**
  * 판매자 메시지 발송 입력. bodyFormat에 맞는 본문 필드가 비어 있으면 BAD_USER_INPUT.
  * 내 매장의 대화방이 아니면 NOT_FOUND.
@@ -540,6 +549,14 @@ export type SellerSetProductTagsByNameInput = {
    */
   names: Array<string>;
   productId: string | number;
+};
+
+/** 주간 정산 목록 조회 조건. */
+export type SellerSettlementListInput = {
+  /** 이전 응답의 nextCursor. 첫 페이지는 생략한다. */
+  cursor?: string | null | undefined;
+  /** 한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
 };
 
 /** 태그 검색 입력. */
@@ -724,6 +741,16 @@ export type SellerUpsertProductCustomTextTokenInput = {
   width: number;
 };
 
+/** 정산 계좌 등록·변경 입력. */
+export type SellerUpsertSettlementAccountInput = {
+  /** 예금주(1~50자). */
+  accountHolder: string;
+  /** 계좌번호. 하이픈을 빼고 숫자 8~20자리여야 하며 숫자만 저장한다. */
+  accountNumber: string;
+  /** 은행 코드(paymentBanks의 code). */
+  bankCode: string;
+};
+
 /**
  * 요일별 영업시간 등록·수정 입력. dayOfWeek 기준으로 upsert되므로 같은 요일을 다시
  * 보내면 덮어쓴다.
@@ -758,6 +785,13 @@ export type SellerUpsertStoreSpecialClosureInput = {
   /** 휴무 사유. */
   reason?: string | null | undefined;
 };
+
+/** 주간 정산 상태. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다. */
+export type SettlementStatusType =
+  /** 송금 완료. */
+  | 'PAID'
+  /** 케이퀵의 매장 송금 대기. */
+  | 'PENDING';
 
 /** 매장 지도 연동 provider. 구매자·판매자 API가 공용으로 쓴다. */
 export type StoreMapProvider =
@@ -912,7 +946,7 @@ export type SellerOrderDetailQueryVariables = Exact<{
 }>;
 
 
-export type SellerOrderDetailQuery = { sellerOrder: { id: string, orderNumber: string, accountId: string, status: OrderStatusType, pickupAt: string, buyerName: string, buyerPhone: string, requestNote: string | null, paymentMethod: PaymentMethodType | null, subtotalPrice: number, discountPrice: number, totalPrice: number, submittedAt: string | null, confirmedAt: string | null, madeAt: string | null, pickedUpAt: string | null, canceledAt: string | null, noShowAt: string | null, confirmDeadlineAt: string | null, autoPickupAt: string | null, canMarkNoShow: boolean, commissionRateBps: number, expectedPayoutAmount: number | null, settlementBaseAmount: number | null, createdAt: string, updatedAt: string, items: Array<{ id: string, productName: string, quantity: number, optionItems: Array<{ id: string, groupName: string, optionTitle: string, priceDelta: number }>, customTexts: Array<{ id: string, tokenKey: string, defaultText: string, valueText: string | null, sortOrder: number }>, freeEdits: Array<{ id: string, descriptionText: string, sortOrder: number, attachments: Array<{ id: string, imageUrl: string, sortOrder: number }> }> }>, statusHistories: Array<{ id: string, toStatus: OrderStatusType, changedAt: string, note: string | null }>, cancellation: { actorType: OrderActorType, reasonLabel: string, refundAmount: number, refundStatus: RefundStatusType | null } | null } };
+export type SellerOrderDetailQuery = { sellerOrder: { id: string, orderNumber: string, accountId: string, status: OrderStatusType, pickupAt: string, buyerName: string, buyerPhone: string, requestNote: string | null, paymentMethod: PaymentMethodType | null, subtotalPrice: number, discountPrice: number, totalPrice: number, submittedAt: string | null, confirmedAt: string | null, madeAt: string | null, pickedUpAt: string | null, canceledAt: string | null, noShowAt: string | null, confirmDeadlineAt: string | null, autoPickupAt: string | null, canMarkNoShow: boolean, commissionRateBps: number, expectedPayoutAmount: number | null, settlementBaseAmount: number | null, createdAt: string, updatedAt: string, items: Array<{ id: string, productName: string, quantity: number, optionItems: Array<{ id: string, groupName: string, optionTitle: string, priceDelta: number }>, customTexts: Array<{ id: string, tokenKey: string, defaultText: string, valueText: string | null, sortOrder: number }>, freeEdits: Array<{ id: string, descriptionText: string, sortOrder: number, attachments: Array<{ id: string, imageUrl: string, sortOrder: number }> }> }>, statusHistories: Array<{ id: string, toStatus: OrderStatusType, changedAt: string, note: string | null }>, cancellation: { actorType: OrderActorType, reasonLabel: string, refundAmount: number, refundStatus: RefundStatusType | null } | null, pickupChanges: Array<{ id: string, fromPickupAt: string, toPickupAt: string, changedAt: string, note: string | null }> } };
 
 export type SellerUpdateOrderStatusMutationVariables = Exact<{
   input: SellerUpdateOrderStatusInput;
@@ -927,6 +961,29 @@ export type SellerCancelOrderMutationVariables = Exact<{
 
 
 export type SellerCancelOrderMutation = { sellerCancelOrder: { id: string, status: OrderStatusType } };
+
+export type SellerOrderPickupCalendarQueryVariables = Exact<{
+  orderId: string | number;
+  yearMonth: string;
+}>;
+
+
+export type SellerOrderPickupCalendarQuery = { sellerOrderPickupCalendar: { days: Array<{ date: string, selectable: boolean, reason: string | null }> } };
+
+export type SellerOrderPickupTimeSlotsQueryVariables = Exact<{
+  orderId: string | number;
+  date: string;
+}>;
+
+
+export type SellerOrderPickupTimeSlotsQuery = { sellerOrderPickupTimeSlots: { morning: Array<{ time: string, available: boolean }>, afternoon: Array<{ time: string, available: boolean }> } };
+
+export type SellerRescheduleOrderPickupMutationVariables = Exact<{
+  input: SellerRescheduleOrderPickupInput;
+}>;
+
+
+export type SellerRescheduleOrderPickupMutation = { sellerRescheduleOrderPickup: { id: string, pickupAt: string } };
 
 export type SellerOrderConversationsQueryVariables = Exact<{
   input?: CursorInput | null | undefined;
@@ -1370,6 +1427,37 @@ export type SellerStorePickupTimeSlotsQueryVariables = Exact<{
 
 export type SellerStorePickupTimeSlotsQuery = { pickupTimeSlots: { date: string, morning: Array<{ time: string, available: boolean }>, afternoon: Array<{ time: string, available: boolean }> } };
 
+export type SellerStoreSettlementAccountQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerStoreSettlementAccountQuery = { sellerSettlementAccount: { accountHolder: string, accountNumberMasked: string, updatedByRole: OrderActorType, updatedAt: string, bank: { code: string, name: string } } | null };
+
+export type SellerStorePaymentBanksQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerStorePaymentBanksQuery = { paymentBanks: Array<{ code: string, name: string }> };
+
+export type SellerStoreUpsertSettlementAccountMutationVariables = Exact<{
+  input: SellerUpsertSettlementAccountInput;
+}>;
+
+
+export type SellerStoreUpsertSettlementAccountMutation = { sellerUpsertSettlementAccount: { accountHolder: string, accountNumberMasked: string, updatedByRole: OrderActorType, updatedAt: string, bank: { code: string, name: string } } };
+
+export type SellerStoreSettlementsQueryVariables = Exact<{
+  input?: SellerSettlementListInput | null | undefined;
+}>;
+
+
+export type SellerStoreSettlementsQuery = { sellerSettlements: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, periodStart: string, periodEnd: string, orderCount: number, commissionAmount: number, payoutAmount: number, status: SettlementStatusType, paidAt: string | null }> } };
+
+export type SellerStoreSettlementQueryVariables = Exact<{
+  settlementId: string | number;
+}>;
+
+
+export type SellerStoreSettlementQuery = { sellerSettlement: { id: string, periodStart: string, periodEnd: string, orderCount: number, settlementBaseAmount: number, commissionAmount: number, payoutAmount: number, status: SettlementStatusType, paidAt: string | null, paidAccount: { accountHolder: string, accountNumberMasked: string, bank: { name: string } } | null, orders: Array<{ orderId: string, orderNumber: string, productName: string | null, status: OrderStatusType, commissionRateBps: number, settlementBaseAmount: number, commissionAmount: number, payoutAmount: number, settlementFinalizedAt: string }> } };
+
 export type SellerUploadsCreateUploadUrlMutationVariables = Exact<{
   input: SellerCreateUploadUrlInput;
 }>;
@@ -1720,6 +1808,13 @@ export const SellerOrderDetailDocument = new TypedDocumentString(`
       refundAmount
       refundStatus
     }
+    pickupChanges {
+      id
+      fromPickupAt
+      toPickupAt
+      changedAt
+      note
+    }
   }
 }
     `) as unknown as TypedDocumentString<SellerOrderDetailQuery, SellerOrderDetailQueryVariables>;
@@ -1739,6 +1834,39 @@ export const SellerCancelOrderDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerCancelOrderMutation, SellerCancelOrderMutationVariables>;
+export const SellerOrderPickupCalendarDocument = new TypedDocumentString(`
+    query SellerOrderPickupCalendar($orderId: ID!, $yearMonth: String!) {
+  sellerOrderPickupCalendar(orderId: $orderId, yearMonth: $yearMonth) {
+    days {
+      date
+      selectable
+      reason
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<SellerOrderPickupCalendarQuery, SellerOrderPickupCalendarQueryVariables>;
+export const SellerOrderPickupTimeSlotsDocument = new TypedDocumentString(`
+    query SellerOrderPickupTimeSlots($orderId: ID!, $date: String!) {
+  sellerOrderPickupTimeSlots(orderId: $orderId, date: $date) {
+    morning {
+      time
+      available
+    }
+    afternoon {
+      time
+      available
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<SellerOrderPickupTimeSlotsQuery, SellerOrderPickupTimeSlotsQueryVariables>;
+export const SellerRescheduleOrderPickupDocument = new TypedDocumentString(`
+    mutation SellerRescheduleOrderPickup($input: SellerRescheduleOrderPickupInput!) {
+  sellerRescheduleOrderPickup(input: $input) {
+    id
+    pickupAt
+  }
+}
+    `) as unknown as TypedDocumentString<SellerRescheduleOrderPickupMutation, SellerRescheduleOrderPickupMutationVariables>;
 export const SellerOrderConversationsDocument = new TypedDocumentString(`
     query SellerOrderConversations($input: CursorInput) {
   sellerConversations(input: $input) {
@@ -2512,6 +2640,94 @@ export const SellerStorePickupTimeSlotsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerStorePickupTimeSlotsQuery, SellerStorePickupTimeSlotsQueryVariables>;
+export const SellerStoreSettlementAccountDocument = new TypedDocumentString(`
+    query SellerStoreSettlementAccount {
+  sellerSettlementAccount {
+    bank {
+      code
+      name
+    }
+    accountHolder
+    accountNumberMasked
+    updatedByRole
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreSettlementAccountQuery, SellerStoreSettlementAccountQueryVariables>;
+export const SellerStorePaymentBanksDocument = new TypedDocumentString(`
+    query SellerStorePaymentBanks {
+  paymentBanks {
+    code
+    name
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStorePaymentBanksQuery, SellerStorePaymentBanksQueryVariables>;
+export const SellerStoreUpsertSettlementAccountDocument = new TypedDocumentString(`
+    mutation SellerStoreUpsertSettlementAccount($input: SellerUpsertSettlementAccountInput!) {
+  sellerUpsertSettlementAccount(input: $input) {
+    bank {
+      code
+      name
+    }
+    accountHolder
+    accountNumberMasked
+    updatedByRole
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreUpsertSettlementAccountMutation, SellerStoreUpsertSettlementAccountMutationVariables>;
+export const SellerStoreSettlementsDocument = new TypedDocumentString(`
+    query SellerStoreSettlements($input: SellerSettlementListInput) {
+  sellerSettlements(input: $input) {
+    items {
+      id
+      periodStart
+      periodEnd
+      orderCount
+      commissionAmount
+      payoutAmount
+      status
+      paidAt
+    }
+    totalCount
+    hasMore
+    nextCursor
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreSettlementsQuery, SellerStoreSettlementsQueryVariables>;
+export const SellerStoreSettlementDocument = new TypedDocumentString(`
+    query SellerStoreSettlement($settlementId: ID!) {
+  sellerSettlement(settlementId: $settlementId) {
+    id
+    periodStart
+    periodEnd
+    orderCount
+    settlementBaseAmount
+    commissionAmount
+    payoutAmount
+    status
+    paidAt
+    paidAccount {
+      bank {
+        name
+      }
+      accountHolder
+      accountNumberMasked
+    }
+    orders {
+      orderId
+      orderNumber
+      productName
+      status
+      commissionRateBps
+      settlementBaseAmount
+      commissionAmount
+      payoutAmount
+      settlementFinalizedAt
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreSettlementQuery, SellerStoreSettlementQueryVariables>;
 export const SellerUploadsCreateUploadUrlDocument = new TypedDocumentString(`
     mutation SellerUploadsCreateUploadUrl($input: SellerCreateUploadUrlInput!) {
   sellerCreateUploadUrl(input: $input) {

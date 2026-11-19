@@ -16,7 +16,9 @@ import {
   dailyCapacitiesQueryOptions,
   specialClosuresQueryOptions,
 } from '../api/schedule';
+import { settlementAccountQueryOptions } from '../api/settlement';
 import { regionLabel, toBasicInfoValues } from '../model/basic-info';
+import { accountSummary } from '../model/settlement-account';
 import {
   closuresSummary,
   faqSummary,
@@ -101,6 +103,7 @@ export function StoreMenuScreen() {
   const closures = useInfiniteQuery(specialClosuresQueryOptions());
   const faq = useQuery(faqTopicsQueryOptions());
   const capacities = useQuery(dailyCapacitiesQueryOptions(monthKey(month), monthDateRange(month)));
+  const account = useQuery(settlementAccountQueryOptions());
 
   const closureItems = closures.data?.pages.flatMap((p) => p.items);
   const capacityCount = capacities.data?.totalCount;
@@ -164,6 +167,21 @@ export function StoreMenuScreen() {
           title="자동응답(FAQ)"
           description={faq.data && faqSummary(faq.data)}
           onPress={go('/store/faq')}
+        />
+      </MenuGroup>
+      <SectionHeader title="정산" />
+      <MenuGroup>
+        <MenuRow
+          icon="bank"
+          title="정산 계좌"
+          description={account.isSuccess ? accountSummary(account.data) : undefined}
+          onPress={go('/store/settlement-account')}
+        />
+        <MenuRow
+          icon="wallet"
+          title="정산 내역"
+          description="주간 정산 금액 · 송금 여부"
+          onPress={go('/store/settlements')}
         />
       </MenuGroup>
       <SectionHeader title="고객" />

@@ -11,6 +11,9 @@ const ORDER_ERRORS: Record<string, string> = {
   NO_SHOW_NOT_ALLOWED: '노쇼는 픽업 시각부터 24시간 안에만 처리할 수 있어요.',
   ORDER_STATUS_UNCHANGED: '이미 같은 상태인 주문이에요.',
   ORDER_NOT_FOUND: '주문을 찾을 수 없어요.',
+  PICKUP_RESCHEDULE_NOT_ALLOWED: '지금 상태에서는 픽업 일시를 바꿀 수 없어요.',
+  PICKUP_UNCHANGED: '지금과 같은 픽업 일시예요. 다른 시간을 골라 주세요.',
+  PICKUP_NOT_AVAILABLE: '고른 시간은 예약할 수 없어요. 다른 시간을 골라 주세요.',
 };
 
 export function orderErrorMessage(error: unknown): string {

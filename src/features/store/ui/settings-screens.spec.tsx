@@ -91,6 +91,7 @@ const routes = {
   'store/pickup-policy': StorePickupPolicyScreen,
   'store/business-hours': () => null,
   'store/preview': () => null,
+  'store/settlement-account': () => null,
 };
 const open = (initialUrl: string) => renderRouter(routes, { initialUrl, wrapper: Providers });
 
@@ -120,7 +121,15 @@ afterAll(() => jest.useRealTimers());
 afterEach(() => jest.clearAllMocks());
 
 describe('매장 탭', () => {
-  const hubData = () => {
+  const hubData = (
+    account: object | null = {
+      bank: { code: '004', name: 'KB국민은행' },
+      accountHolder: '해즈 케이크',
+      accountNumberMasked: '****1234',
+      updatedByRole: 'SELLER',
+      updatedAt: '2026-10-01T00:00:00.000Z',
+    },
+  ) => {
     const ratingCalls = record('SellerStoreRating', () => ({
       storeDetail: { id: '3', ratingAverage: 4.8, reviewCount: 128 },
     }));
@@ -171,6 +180,7 @@ describe('매장 탭', () => {
     const capacityCalls = record('SellerStoreDailyCapacities', () => ({
       sellerStoreDailyCapacities: { items: [], totalCount: 4 },
     }));
+    server.use(query('SellerStoreSettlementAccount', { sellerSettlementAccount: account }));
     return { ratingCalls, capacityCalls };
   };
 
@@ -189,6 +199,8 @@ describe('매장 탭', () => {
       '일별 생산 수량, 이번 달 조정 4일',
       '자동응답(FAQ), 활성 3개 · 전체 4',
       '리뷰, ★ 4.8 · 128개',
+      '정산 계좌, KB국민은행 ****1234',
+      '정산 내역, 주간 정산 금액 · 송금 여부',
     ]) {
       expect(await screen.findByRole('button', { name })).toBeTruthy();
     }
@@ -217,6 +229,17 @@ describe('매장 탭', () => {
     await router;
     await fireEvent.press(await screen.findByRole('button', { name: /^영업시간/ }));
     await waitFor(() => expect(router.getPathname()).toBe('/store/business-hours'));
+  });
+
+  it('정산 계좌가 없으면 등록이 필요하다고 적고, 누르면 정산 계좌 화면으로 간다', async () => {
+    server.use(myStore());
+    hubData(null);
+    const router = open('/store');
+    await router;
+    await fireEvent.press(
+      await screen.findByRole('button', { name: '정산 계좌, 등록이 필요해요' }),
+    );
+    await waitFor(() => expect(router.getPathname()).toBe('/store/settlement-account'));
   });
 
   it('비공개 매장은 평점을 부르지 않고 비공개라고 적는다', async () => {

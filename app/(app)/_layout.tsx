@@ -44,6 +44,9 @@ export default function AppLayout() {
       <Stack.Screen name="store/reviews/[id]" options={{ title: '리뷰 상세' }} />
       <Stack.Screen name="store/preview" options={{ title: '구매자 화면 미리보기' }} />
       <Stack.Screen name="store/audit-logs" options={{ title: '조작 이력' }} />
+      <Stack.Screen name="store/settlement-account" options={{ title: '정산 계좌' }} />
+      <Stack.Screen name="store/settlements/index" options={{ title: '정산 내역' }} />
+      <Stack.Screen name="store/settlements/[id]" options={{ title: '정산 상세' }} />
       <Stack.Screen name="settings/index" options={{ title: '설정' }} />
       <Stack.Screen name="settings/change-password" options={{ title: '비밀번호 변경' }} />
     </Stack>

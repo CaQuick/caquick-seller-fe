@@ -42,6 +42,7 @@ const order = (patch: Partial<Order> = {}): Order => ({
   items: [],
   statusHistories: [],
   cancellation: null,
+  pickupChanges: [],
   ...patch,
 });
 

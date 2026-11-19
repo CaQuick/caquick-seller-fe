@@ -14,4 +14,8 @@ export const ordersKeys = {
   list: (filter: OrderListFilter) => [...ordersKeys.lists(), filter] as const,
   detail: (id: string) => [...ordersKeys.all, 'detail', id] as const,
   conversation: (accountId: string) => [...ordersKeys.all, 'conversation', accountId] as const,
+  pickupCalendar: (id: string, month: string) =>
+    [...ordersKeys.detail(id), 'pickupCalendar', month] as const,
+  pickupSlots: (id: string, date: string) =>
+    [...ordersKeys.detail(id), 'pickupSlots', date] as const,
 };

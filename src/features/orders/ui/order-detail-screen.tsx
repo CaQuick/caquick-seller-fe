@@ -27,12 +27,18 @@ import {
   Timeline,
 } from '@/shared/ui';
 
-import { cancelOrder, orderDetailQueryOptions, updateOrderStatus } from '../api/orders';
+import {
+  cancelOrder,
+  orderDetailQueryOptions,
+  rescheduleOrderPickup,
+  updateOrderStatus,
+} from '../api/orders';
 import { ordersKeys } from '../api/queryKeys';
 import { CANCEL_COPY, type CancelInput } from '../model/cancel-form';
 import { formatDateTime, formatSigned } from '../model/format';
 import { orderErrorMessage } from '../model/messages';
 import { cancellationRows, type PaymentRow, settlementRows } from '../model/payment';
+import { PICKUP_CHANGE_COPY, pickupChangeItems } from '../model/pickup-change';
 import {
   autoTransitionNotice,
   buildTimeline,
@@ -46,9 +52,16 @@ import { BuyerChatRow } from './buyer-chat-row';
 import { CancelOrderSheet } from './cancel-order-sheet';
 import { OrderItemCard } from './order-item-card';
 import { type OtherAction, OtherActionsSheet } from './other-actions-sheet';
+import { PickupChangeSheet } from './pickup-change-sheet';
 
 type Order = SellerOrderDetailQuery['sellerOrder'];
-type Change = { done: string } & ({ to: OrderStatusType } | { cancel: CancelInput });
+interface Reschedule {
+  pickupAt: string;
+  note?: string;
+}
+type Change = { done: string } & (
+  { to: OrderStatusType } | { cancel: CancelInput } | { reschedule: Reschedule }
+);
 
 const backToList = () => (router.canGoBack() ? router.back() : router.replace('/orders'));
 
@@ -59,8 +72,12 @@ export function OrderDetailScreen() {
   const cancelSheet = useRef<BottomSheetModal>(null);
   const moreSheet = useRef<BottomSheetModal>(null);
   const noShowSheet = useRef<BottomSheetModal>(null);
-  // 성공하면 다시 마운트해 취소 시트 입력을 비운다
+  const pickupSheet = useRef<BottomSheetModal>(null);
+  // 성공하면 다시 마운트해 취소·픽업 변경 시트 입력을 비운다
   const [cancelKey, setCancelKey] = useState(0);
+  const [pickupKey, setPickupKey] = useState(0);
+  const [pickupOpened, setPickupOpened] = useState(false);
+  const [pickupError, setPickupError] = useState<string | null>(null);
   // 노쇼 가능 구간은 '다른 처리'를 연 시각으로 판정한다
   const [now, setNow] = useState(() => new Date());
   useOrderUpdates();
@@ -68,14 +85,22 @@ export function OrderDetailScreen() {
   const mutation = useMutation({
     mutationFn: async (v: Change) => {
       if ('cancel' in v) await cancelOrder({ orderId: id, ...v.cancel });
+      else if ('reschedule' in v) await rescheduleOrderPickup({ orderId: id, ...v.reschedule });
       else await updateOrderStatus({ orderId: id, toStatus: v.to });
     },
     onSuccess: (_, v) => {
-      for (const sheet of [cancelSheet, moreSheet, noShowSheet]) sheet.current?.dismiss();
+      for (const sheet of [cancelSheet, moreSheet, noShowSheet, pickupSheet])
+        sheet.current?.dismiss();
       if ('cancel' in v) setCancelKey((k) => k + 1);
+      if ('reschedule' in v) setPickupKey((k) => k + 1);
       showToast.success(v.done);
     },
-    onError: (e) => showToast.error(orderErrorMessage(e)),
+    onError: (e, v) => {
+      // 픽업 변경 거절(모두 BAD_USER_INPUT)은 열린 시트 안에 두고 다시 받은 슬롯에서 고르게 한다
+      if ('reschedule' in v && e instanceof ApiError && e.classification === 'BAD_USER_INPUT')
+        setPickupError(orderErrorMessage(e));
+      else showToast.error(orderErrorMessage(e));
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ordersKeys.all }),
   });
 
@@ -148,7 +173,17 @@ export function OrderDetailScreen() {
     <Screen edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
       <AppHeader title="주문 상세" onBack={backToList} />
-      <OrderBody order={order} />
+      <OrderBody
+        order={order}
+        onReschedule={
+          actions.reschedule
+            ? () => {
+                setPickupOpened(true);
+                pickupSheet.current?.present();
+              }
+            : undefined
+        }
+      />
       <OrderActionBar
         status={order.status}
         busy={mutation.isPending}
@@ -170,6 +205,26 @@ export function OrderDetailScreen() {
         />
       ) : null}
       {cancelMode === 'cancel' ? <OtherActionsSheet ref={moreSheet} actions={others} /> : null}
+      {actions.reschedule ? (
+        <PickupChangeSheet
+          key={`${order.pickupAt}-${pickupKey}`}
+          ref={pickupSheet}
+          orderId={order.id}
+          pickupAt={order.pickupAt}
+          active={pickupOpened}
+          loading={mutation.isPending}
+          error={pickupError}
+          onPick={() => setPickupError(null)}
+          onDismiss={() => {
+            setPickupOpened(false);
+            setPickupError(null);
+          }}
+          onSubmit={(reschedule) => {
+            setPickupError(null);
+            mutation.mutate({ reschedule, done: PICKUP_CHANGE_COPY.done });
+          }}
+        />
+      ) : null}
       {actions.others.includes('NO_SHOW') ? (
         <ConfirmSheet
           ref={noShowSheet}
@@ -195,7 +250,7 @@ function Rows({ rows }: { rows: PaymentRow[] }) {
   ));
 }
 
-function OrderBody({ order }: { order: Order }) {
+function OrderBody({ order, onReschedule }: { order: Order; onReschedule?: () => void }) {
   const pay = paymentBreakdown(order);
   const status = orderStatusView(order.status);
   const autoNotice = autoTransitionNotice(order);
@@ -220,6 +275,19 @@ function OrderBody({ order }: { order: Order }) {
         <Text className="font-sans text-4xl font-bold tracking-tighter text-text">
           {formatDateTime(order.pickupAt, true)}
         </Text>
+        {onReschedule ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={PICKUP_CHANGE_COPY.open}
+            onPress={onReschedule}
+            hitSlop={12}
+            className="mt-1.5 self-start"
+          >
+            <Text className="font-sans text-sm font-medium tracking-tight text-primary-strong">
+              {`${PICKUP_CHANGE_COPY.open} ›`}
+            </Text>
+          </Pressable>
+        ) : null}
         <KeyValue label="주문 일시" value={formatDateTime(order.createdAt, true)} />
         {autoNotice ? (
           <View className="mt-2 rounded-lg bg-tint2 p-3">
@@ -227,6 +295,18 @@ function OrderBody({ order }: { order: Order }) {
           </View>
         ) : null}
       </Card>
+
+      {order.pickupChanges.length > 0 ? (
+        <>
+          <SectionHeader
+            title={PICKUP_CHANGE_COPY.history}
+            count={`${order.pickupChanges.length}건`}
+          />
+          <Card>
+            <Timeline items={pickupChangeItems(order.pickupChanges)} />
+          </Card>
+        </>
+      ) : null}
 
       <SectionHeader title="주문자" />
       <MenuGroup>
