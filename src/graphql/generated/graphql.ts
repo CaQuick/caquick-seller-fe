@@ -902,14 +902,14 @@ export type SellerChatsMessagesQueryVariables = Exact<{
 }>;
 
 
-export type SellerChatsMessagesQuery = { sellerConversationMessages: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string, orderCard: { orderId: string, orderNumber: string, productName: string, thumbnailUrl: string | null, pickupAt: string } | null }> } };
+export type SellerChatsMessagesQuery = { sellerConversationMessages: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, imageUrl: string | null, createdAt: string, orderCard: { orderId: string, orderNumber: string, productName: string, thumbnailUrl: string | null, pickupAt: string } | null }> } };
 
 export type SellerChatsSendMessageMutationVariables = Exact<{
   input: SellerSendConversationMessageInput;
 }>;
 
 
-export type SellerChatsSendMessageMutation = { sellerSendConversationMessage: { id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string, orderCard: { orderId: string, orderNumber: string, productName: string, thumbnailUrl: string | null, pickupAt: string } | null } };
+export type SellerChatsSendMessageMutation = { sellerSendConversationMessage: { id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, imageUrl: string | null, createdAt: string, orderCard: { orderId: string, orderNumber: string, productName: string, thumbnailUrl: string | null, pickupAt: string } | null } };
 
 export type SellerChatsMarkReadMutationVariables = Exact<{
   conversationId: string | number;
@@ -923,7 +923,7 @@ export type SellerChatsMessageAddedSubscriptionVariables = Exact<{
 }>;
 
 
-export type SellerChatsMessageAddedSubscription = { conversationMessageAdded: { id: string, conversationId: string, senderType: ConversationSenderType, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string, orderCard: { orderId: string, orderNumber: string, productName: string, thumbnailUrl: string | null, pickupAt: string } | null } };
+export type SellerChatsMessageAddedSubscription = { conversationMessageAdded: { id: string, conversationId: string, senderType: ConversationSenderType, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, imageUrl: string | null, createdAt: string, orderCard: { orderId: string, orderNumber: string, productName: string, thumbnailUrl: string | null, pickupAt: string } | null } };
 
 export type SellerChatsBuyerLatestOrderQueryVariables = Exact<{
   buyerAccountId: string | number;
@@ -1613,6 +1613,7 @@ export const SellerChatsMessagesDocument = new TypedDocumentString(`
       bodyFormat
       bodyText
       bodyHtml
+      imageUrl
       orderCard {
         orderId
         orderNumber
@@ -1638,6 +1639,7 @@ export const SellerChatsSendMessageDocument = new TypedDocumentString(`
     bodyFormat
     bodyText
     bodyHtml
+    imageUrl
     orderCard {
       orderId
       orderNumber
@@ -1672,6 +1674,7 @@ export const SellerChatsMessageAddedDocument = new TypedDocumentString(`
     bodyFormat
     bodyText
     bodyHtml
+    imageUrl
     orderCard {
       orderId
       orderNumber

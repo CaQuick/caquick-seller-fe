@@ -17,6 +17,7 @@ const SellerChatsMessagesDocument = graphql(`
         bodyFormat
         bodyText
         bodyHtml
+        imageUrl
         orderCard {
           orderId
           orderNumber
@@ -43,6 +44,7 @@ const SellerChatsSendMessageDocument = graphql(`
       bodyFormat
       bodyText
       bodyHtml
+      imageUrl
       orderCard {
         orderId
         orderNumber
@@ -79,6 +81,7 @@ export const SellerChatsMessageAddedDocument = graphql(`
       bodyFormat
       bodyText
       bodyHtml
+      imageUrl
       orderCard {
         orderId
         orderNumber
@@ -135,6 +138,15 @@ export async function sendTextMessage(conversationId: string, bodyText: string) 
   return (
     await gqlRequest(SellerChatsSendMessageDocument, {
       input: { conversationId, bodyFormat: 'TEXT', bodyText },
+    })
+  ).sellerSendConversationMessage;
+}
+
+/** 올린 사진(CONVERSATION_IMAGE publicUrl) 한 장을 보낸다 */
+export async function sendImageMessage(conversationId: string, imageUrl: string) {
+  return (
+    await gqlRequest(SellerChatsSendMessageDocument, {
+      input: { conversationId, bodyFormat: 'IMAGE', imageUrl },
     })
   ).sellerSendConversationMessage;
 }

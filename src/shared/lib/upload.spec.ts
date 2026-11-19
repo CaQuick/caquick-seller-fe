@@ -7,8 +7,11 @@ import {
   type Presign,
   type PresignInput,
   targetSize,
+  type UploadPurpose,
   uploadImage,
 } from './upload';
+
+const MB = 1024 * 1024;
 
 /** manipulate 체인 기록: resize 인자와 saveAsync 옵션 */
 const manip = { crop: [] as unknown[], resize: [] as unknown[], save: [] as unknown[] };
@@ -131,18 +134,32 @@ describe('uploadImage', () => {
     expect(presign.mock.calls[0]![0]).toMatchObject({ contentLength: 777 });
   });
 
-  it.each([
-    ['빈 파일', 0, '빈 파일입니다.'],
-    ['5MB 초과', 5 * 1024 * 1024 + 1, '5MB 이하만 올릴 수 있습니다.'],
-  ])('%s은 presign 전에 BAD_USER_INPUT', async (_, size, message) => {
+  it.each<[string, UploadPurpose, number, string]>([
+    ['빈 파일', 'PRODUCT_IMAGE', 0, '빈 파일입니다.'],
+    ['상품 이미지 5MB 초과', 'PRODUCT_IMAGE', 5 * MB + 1, '5MB 이하만 올릴 수 있습니다.'],
+    ['매장 이미지 5MB 초과', 'STORE_IMAGE', 5 * MB + 1, '5MB 이하만 올릴 수 있습니다.'],
+    ['채팅 사진 10MB 초과', 'CONVERSATION_IMAGE', 10 * MB + 1, '10MB 이하만 올릴 수 있습니다.'],
+  ])('%s은 presign 전에 BAD_USER_INPUT', async (_, purpose, size, message) => {
     mockFileSizes.set('file:///cache/shrunk.jpg', size);
     const presign = presignOk();
-    await expect(uploadImage('PRODUCT_IMAGE', image(100, 100), presign)).rejects.toMatchObject({
+    await expect(uploadImage(purpose, image(100, 100), presign)).rejects.toMatchObject({
       classification: 'BAD_USER_INPUT',
       message,
     });
     expect(presign).not.toHaveBeenCalled();
     expect(mockUploads).toEqual([]);
+  });
+
+  it.each<[UploadPurpose, number]>([
+    ['PRODUCT_IMAGE', 5 * MB],
+    ['CONVERSATION_IMAGE', 10 * MB],
+  ])('%s는 %i바이트(최대 크기)까지 올린다', async (purpose, size) => {
+    mockFileSizes.set('file:///cache/shrunk.jpg', size);
+    const presign = presignOk();
+    await expect(uploadImage(purpose, image(100, 100), presign)).resolves.toBe(
+      'https://cdn.test/a.jpg',
+    );
+    expect(presign).toHaveBeenCalledWith(expect.objectContaining({ purpose, contentLength: size }));
   });
 
   it('PUT 실패·네트워크 오류는 ApiError', async () => {

@@ -61,7 +61,7 @@ src/
 - **쿼리 키**는 feature별 팩토리(`ordersKeys.list(filters)`, `ordersKeys.detail(id)`)로만 만듭니다. 문자열 리터럴 키는 쓰지 않습니다.
 - **mutation 뒤**에는 그 feature의 list·detail 키를 invalidate합니다. 낙관적 업데이트는 쓰지 않습니다. 서버 결과가 진실입니다.
   - 예외(D49): 노출 스위치처럼 즉시 피드백이 필요한 토글과 조작마다 바로 저장하는 옵션 편집기는 화면을 먼저 바꾸고, 실패하면 되돌린 뒤 토스트를 띄웁니다. 노출 스위치는 `onMutate`에서 관련 쿼리를 cancel하고 스냅샷을 잡아 캐시를 고치고, `onError`에서 스냅샷으로 되돌리며, `onSettled`에서 invalidate합니다. 옵션 편집기는 요청이 도는 동안 서버 값으로 덮지 않고, 실패하면 캐시의 서버 값으로 되돌립니다.
-  - 채팅 전송은 캐시를 미리 고치지 않고 화면 로컬의 '보내는 중' 버블로 보여 준 뒤 응답 메시지로 바꿉니다.
+  - 채팅 전송은 캐시를 미리 고치지 않고 화면 로컬의 '보내는 중' 버블로 보여 준 뒤 응답 메시지로 바꿉니다. 사진은 올리기 → 보내기 두 단계라, 올린 주소를 대기 버블에 남겨 재시도가 다시 올리지 않습니다.
 - **구독**은 `subscribe(Document, variables, sink)`(`@/shared/api`)를 feature 훅의 `useEffect`에서 부르고 해제 함수를 그대로 돌려줍니다. shared는 연결·4401 재인증만 맡고, 캐시 갱신과 워터마크 비교는 구독하는 feature의 `model/`에 순수 함수로 둡니다.
   - 주문: `orderId`별 `updatedAt`(`createOrderWatermark` — `orders/model/order-updates.ts`, `home/model/home.ts`).
   - 대화: `(lastMessageAt, sellerLastReadAt)` 사전식(`chats/model/conversation-merge.ts`). 로컬에서 읽음 처리한 뒤 도착한 이벤트의 `unreadCount`는 로컬 `sellerLastReadAt`이 더 크면 0으로 봅니다.
@@ -74,8 +74,9 @@ src/
   - `src/test/enum-view-guard.spec.ts`가 `enumView(` 인자 밖의 `Record<생성 enum, …>`을 막습니다(TypeScript AST, 생성 enum 목록은 codegen 산출물에서 읽음). 매핑 타입(`{ [K in Enum]: V }`)이나 `as const` 표를 enum 값으로 직접 인덱싱하는 것은 가드가 보지 않으니 리뷰에서 막습니다.
 - **날짜**는 표시·입력 KST, 전송 ISO(UTC)입니다. `shared/lib/kst.ts`가 UTC+9 산술로 처리하고 `Intl`을 쓰지 않습니다(Hermes의 플랫폼별 편차 회피). 천단위 구분도 자체 `formatNumber`입니다.
 - **업로드**(`shared/lib/upload.ts`): manipulate(≤1600px, JPEG 0.85) → `new File(uri).size` → `sellerCreateUploadUrl` → `file.upload(PUT)` → `publicUrl`. presign이 Content-Length를 서명에 넣으므로 축소를 먼저 하고 그 결과의 크기로 presign합니다.
-  - shared는 GraphQL 문서를 갖지 않으므로 presign 함수는 feature가 넣습니다: 상품 이미지 `features/uploads`의 `presignUpload`, 매장 로고 store의 `presignStoreImage`. 용도(`purpose`)도 호출한 쪽이 정합니다.
-  - 실패는 `ApiError`입니다: 빈 파일·5MB 초과는 `BAD_USER_INPUT`, PUT 연결 실패는 `NETWORK`, PUT 비2xx는 그 status를 담은 `INTERNAL_SERVER_ERROR`.
+  - shared는 GraphQL 문서를 갖지 않으므로 presign 함수는 feature가 넣습니다: 상품 이미지·채팅 사진은 `features/uploads`의 `presignUpload`, 매장 로고 store의 `presignStoreImage`. 용도(`purpose`)도 호출한 쪽이 정합니다.
+  - 최대 크기는 용도별입니다(채팅 사진 `CONVERSATION_IMAGE` 10MB, 그 밖 5MB, BE presign과 같은 값).
+  - 실패는 `ApiError`입니다: 빈 파일·최대 크기 초과는 `BAD_USER_INPUT`, PUT 연결 실패는 `NETWORK`, PUT 비2xx는 그 status를 담은 `INTERNAL_SERVER_ERROR`.
   - 여러 장은 장마다 따로 올립니다. 실패한 장만 '다시 올리기'가 뜨고, 초안 이미지는 재시도용 원본(`source`)을 들고 있습니다. 올리는 사이 지운 이미지에는 결과를 반영하지 않습니다.
   - 상품 이미지 상한은 6장(`MAX_IMAGES`, BE `MAX_PRODUCT_IMAGES`와 같음, D46)입니다.
   - 슬롯형 바탕은 `PickedImage.crop`(가운데 정사각)을 먼저 자르고 그 크기로 축소합니다(D62).
