@@ -20,6 +20,16 @@ describe('쿼리 키', () => {
     ['orders.list', ordersKeys.list({ status: 'PAID' }), ['orders', 'list', { status: 'PAID' }]],
     ['orders.detail', ordersKeys.detail('1'), ['orders', 'detail', '1']],
     [
+      'orders.pickupCalendar',
+      ordersKeys.pickupCalendar('1', '2026-11'),
+      ['orders', 'detail', '1', 'pickupCalendar', '2026-11'],
+    ],
+    [
+      'orders.pickupSlots',
+      ordersKeys.pickupSlots('1', '2026-11-20'),
+      ['orders', 'detail', '1', 'pickupSlots', '2026-11-20'],
+    ],
+    [
       'products.list',
       productsKeys.list({ isActive: true }),
       ['products', 'list', { isActive: true }],
@@ -51,6 +61,10 @@ describe('쿼리 키', () => {
     ['store.auditLogs(전체)', storeKeys.auditLogs(), ['store', 'auditLogs', 'all']],
     ['store.auditLogs(대상)', storeKeys.auditLogs('PRODUCT'), ['store', 'auditLogs', 'PRODUCT']],
     ['store.preview', storeKeys.preview('s1'), ['store', 'preview', 's1']],
+    ['store.settlementAccount', storeKeys.settlementAccount(), ['store', 'settlementAccount']],
+    ['store.paymentBanks', storeKeys.paymentBanks(), ['store', 'paymentBanks']],
+    ['store.settlements', storeKeys.settlements(), ['store', 'settlements']],
+    ['store.settlement', storeKeys.settlement('7'), ['store', 'settlements', '7']],
     [
       'uploads.presign',
       uploadsKeys.presign('PRODUCT_IMAGE'),

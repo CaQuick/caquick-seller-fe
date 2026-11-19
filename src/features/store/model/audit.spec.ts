@@ -198,6 +198,18 @@ describe('describeAudit', () => {
       '비밀번호',
       0,
     ],
+    [
+      '정산 계좌(번호 없이, 관리자 사유 포함)',
+      {
+        targetType: 'SETTLEMENT_ACCOUNT',
+        targetId: '4',
+        beforeJson: '{"bank_code":"004","account_holder":"해즈","account_number_last4":"1234"}',
+        afterJson:
+          '{"bank_code":"088","account_holder":"해즈","account_number_last4":"5678","reason":"판매자 요청"}',
+      },
+      '정산 계좌',
+      3,
+    ],
     ['깨진 JSON', { targetType: 'STORE', targetId: '3', afterJson: '{' }, '매장', 0],
     ['목록 밖 대상', { targetType: 'BANNER', targetId: '1' }, '기타 #1', 0],
   ] as const)('%s', (_, log, title, diffCount) => {
@@ -213,6 +225,26 @@ describe('describeAudit', () => {
     ['{"a":1}', { a: 1 }],
   ])('parseJson(%j) → %j', (raw, expected) => {
     expect(parseJson(raw)).toEqual(expected);
+  });
+});
+
+describe('정산 계좌 변경', () => {
+  it('은행 코드·끝 4자리·사유만 이전 → 이후로 보인다', () => {
+    expect(
+      diffText(
+        describeAudit({
+          targetType: 'SETTLEMENT_ACCOUNT',
+          targetId: '4',
+          beforeJson: '{"bank_code":"004","account_holder":"해즈","account_number_last4":"1234"}',
+          afterJson:
+            '{"bank_code":"088","account_holder":"해즈","account_number_last4":"5678","reason":"판매자 요청"}',
+        }).diff,
+      ),
+    ).toBe(
+      ['은행 코드: 004 → 088', '계좌번호 끝 4자리: 1234 → 5678', '사유: 없음 → 판매자 요청'].join(
+        '\n',
+      ),
+    );
   });
 });
 

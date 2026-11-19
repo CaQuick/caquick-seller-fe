@@ -21,6 +21,7 @@ export const AUDIT_FILTERS: readonly { value: AuditTargetType | null; label: str
   { value: 'ORDER', label: '주문' },
   { value: 'CONVERSATION', label: '대화' },
   { value: 'CHANGE_PASSWORD', label: '비밀번호' },
+  { value: 'SETTLEMENT_ACCOUNT', label: '정산 계좌' },
 ];
 
 interface ActionView {
@@ -79,6 +80,9 @@ const KEY_LABEL: Record<string, { label: string; unit?: string }> = {
   dayOfWeek: { label: '요일' },
   isClosed: { label: '휴무' },
   tokenKey: { label: '문구 키' },
+  bank_code: { label: '은행 코드' },
+  account_holder: { label: '예금주' },
+  account_number_last4: { label: '계좌번호 끝 4자리' },
 };
 
 const orderStatusLabel = enumView<string | null>(
@@ -186,6 +190,7 @@ export const auditTargetLabel = enumView<string>(
     ORDER: '주문',
     CONVERSATION: '대화',
     CHANGE_PASSWORD: '비밀번호',
+    SETTLEMENT_ACCOUNT: '정산 계좌',
   } satisfies Partial<Record<AuditTargetType, string>>,
   '기타',
 );
@@ -206,8 +211,9 @@ export function describeAudit(log: AuditLogLike): { title: string; diff: DiffLin
   const merged = { ...before, ...after };
   const area = AREA.find(([key]) => key in merged)?.[1];
   const name = typeof merged.name === 'string' && merged.name ? merged.name : null;
+  // 매장마다 하나뿐인 대상은 번호 없이 이름만
   const subject =
-    log.targetType === 'STORE'
+    log.targetType === 'STORE' || log.targetType === 'SETTLEMENT_ACCOUNT'
       ? label
       : log.targetType === 'PRODUCT' && name
         ? name

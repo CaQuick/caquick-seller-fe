@@ -45,6 +45,8 @@ export interface OrderActions {
   cancel?: CancelMode;
   /** '다른 처리' 시트에 둘 상태 변경 */
   others: readonly OtherStatus[];
+  /** 판매자가 픽업 일시를 바꿀 수 있는 상태 */
+  reschedule?: true;
   /** 종료 상태 안내 */
   notice?: string;
 }
@@ -59,16 +61,19 @@ export const orderActions = enumView<OrderActions>(
       next: { to: 'CONFIRMED', label: '주문 확정', done: '주문을 확정했어요' },
       cancel: 'reject',
       others: [],
+      reschedule: true,
     },
     CONFIRMED: {
       next: { to: 'MADE', label: '제작 완료', done: '제작 완료로 바꿨어요' },
       cancel: 'cancel',
       others: ['PICKED_UP', 'NO_SHOW'],
+      reschedule: true,
     },
     MADE: {
       next: { to: 'PICKED_UP', label: '픽업 완료', done: '픽업 완료로 바꿨어요' },
       cancel: 'cancel',
       others: ['NO_SHOW'],
+      reschedule: true,
     },
     PICKED_UP: {
       others: [],

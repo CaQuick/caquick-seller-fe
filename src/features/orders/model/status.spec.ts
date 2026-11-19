@@ -42,6 +42,7 @@ const order = (patch: Partial<Order> = {}): Order => ({
   items: [],
   statusHistories: [],
   cancellation: null,
+  pickupChanges: [],
   ...patch,
 });
 
@@ -106,6 +107,12 @@ describe('orderActions', () => {
 
   it('생성 enum 값마다 폴백이 아닌 처리 방법이 있다', () => {
     for (const status of STATUSES) expect(orderActions(status).notice).not.toBe(UPDATE);
+  });
+
+  it.each([...STATUSES, ...UNKNOWN])('%s 픽업 일시 변경은 접수·확정·제작 완료만', (status) => {
+    expect(orderActions(status).reschedule === true).toBe(
+      ['SUBMITTED', 'CONFIRMED', 'MADE'].includes(status),
+    );
   });
 });
 
