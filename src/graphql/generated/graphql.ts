@@ -24,7 +24,7 @@ export type AuditActionType =
   /** 수정. */
   | 'UPDATE';
 
-/** 감사 로그가 가리키는 대상 종류. 판매자 화면(sellerAuditLogs)은 STORE·PRODUCT·ORDER·CONVERSATION·CHANGE_PASSWORD만 노출하고 필터 입력도 그 범위만 받는다. */
+/** 감사 로그가 가리키는 대상 종류. 판매자 화면(sellerAuditLogs)은 STORE·PRODUCT·ORDER·CONVERSATION·CHANGE_PASSWORD·SETTLEMENT_ACCOUNT만 노출하고 필터 입력도 그 범위만 받는다. */
 export type AuditTargetType =
   /** 계정(관리자·판매자 생성, 정지/복구, 비밀번호 초기화). */
   | 'ACCOUNT'
@@ -36,12 +36,18 @@ export type AuditTargetType =
   | 'CHANGE_PASSWORD'
   /** 구매자 문의 대화. */
   | 'CONVERSATION'
+  /** 입금 기록(반환 연결·주인 모를 입금 종결). */
+  | 'DEPOSIT_RECORD'
   /** 관리자 알림 발송. */
   | 'NOTIFICATION'
   /** 주문 상태 변경. */
   | 'ORDER'
+  /** 플랫폼 결제 설정(수수료율·입금 계좌). */
+  | 'PAYMENT_SETTING'
   /** 상품과 그 하위. */
   | 'PRODUCT'
+  /** 환불(완료 처리). */
+  | 'REFUND'
   /** 지역 마스터. */
   | 'REGION'
   /** 리뷰 강제 삭제. */
@@ -52,6 +58,10 @@ export type AuditTargetType =
   | 'REVIEW_REPORT'
   /** 검색 진입 화면 키워드 바로가기 칩. 순서 변경은 순서가 바뀐 칩마다 1건씩 남는다. */
   | 'SEARCH_KEYWORD_CHIP'
+  /** 주간 정산(송금 완료 처리). */
+  | 'SETTLEMENT'
+  /** 매장 정산 계좌(판매자 본인·관리자 대리 수정). 기록에는 계좌번호 끝 4자리만 남고, 판매자 감사 로그에도 보인다. */
+  | 'SETTLEMENT_ACCOUNT'
   /** 매장 설정·콘텐츠. */
   | 'STORE'
   /** 태그 마스터. */
@@ -73,6 +83,10 @@ export type ConversationBodyFormat =
    * 서버 측 sanitize는 아직 적용돼 있지 않다.
    */
   | 'HTML'
+  /** 이미지 1장. imageUrl을 그리고, bodyText에는 대체 문구('사진을 보냈습니다.')가 있다. */
+  | 'IMAGE'
+  /** 주문 카드(구매자만 보낸다). orderCard를 그리고, bodyText에는 대체 문구('주문 문의: {상품명} ({주문번호})')가 있다. */
+  | 'ORDER_CARD'
   /** 평문. 목록 미리보기에도 원문이 그대로 쓰인다. */
   | 'TEXT';
 
@@ -94,23 +108,113 @@ export type CursorInput = {
 };
 
 /**
- * 주문 상태. 구매자·판매자 API가 공용으로 쓴다.
+ * 주문 커스텀 이미지 종류. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다.
+ * 3D 옆면은 옆면 고도 asin(0.4) 정사영이고 좌·우는 정면을 보는 사람 기준이다.
+ */
+export type CustomImageKindType =
+  /** 슬롯형 합성 이미지(바탕 + 문구, 구매자가 본 그대로). 대표 이미지다. */
+  | 'SLOT_COMPOSITE'
+  /** 3D 옆면 뒤(정면 반대). */
+  | 'THREE_D_BACK'
+  /** 3D 옆면 정면(yaw 0). */
+  | 'THREE_D_FRONT'
+  /** 3D 옆면 왼쪽. */
+  | 'THREE_D_LEFT'
+  /** 3D 옆면 오른쪽. */
+  | 'THREE_D_RIGHT'
+  /** 3D 윗면(위에서 내려다본 정사각). 대표 이미지다. */
+  | 'THREE_D_TOP';
+
+/** 상품의 커스텀 방식. 방식이 있는 상품은 구매자가 꾸민 내용 없이 주문할 수 없다. */
+export type CustomModeType =
+  /** 커스텀 없음. 옵션만 고르고 주문한다. */
+  | 'NONE'
+  /** 슬롯형. 판매자가 정한 바탕 이미지 위 문구 자리에 문구를 넣는다(자유 편집은 상품별 선택). */
+  | 'SLOT'
+  /** 3D. 모양·크기 등 옵션을 3D 케이크로 꾸민다. 자유 편집은 없다. */
+  | 'THREE_D';
+
+/** 문구 자리 안 글자 정렬. */
+export type CustomTextAlignType =
+  /** 가운데 정렬. */
+  | 'CENTER'
+  /** 왼쪽 정렬. */
+  | 'LEFT'
+  /** 오른쪽 정렬. */
+  | 'RIGHT';
+
+/** 주문·결제·정산 기록을 남긴 주체. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다. */
+export type OrderActorType =
+  /** 관리자. */
+  | 'ADMIN'
+  /** 구매자. */
+  | 'BUYER'
+  /** 판매자. */
+  | 'SELLER'
+  /** 시스템 자동 처리. */
+  | 'SYSTEM';
+
+/** 확정·제작 완료 뒤 취소의 사정. 환불액이 갈린다(판매자 사정 = 전액, 구매자 사정 = 취소자가 정한 금액). */
+export type OrderCancelFaultType =
+  /** 구매자 사정. */
+  | 'BUYER'
+  /** 판매자 사정. */
+  | 'SELLER';
+
+/**
+ * 취소 사유. 값은 늘어날 수 있으니 모르는 값은 reasonLabel(또는 '기타')로 보여 준다.
+ * 판매자는 앞의 여섯 값, 관리자는 여기에 입금 대기 주문의 PAYMENT_NOT_RECEIVED, 구매자는 BUYER_REQUEST(서버가 정한다)를 쓴다.
+ */
+export type OrderCancelReasonType =
+  /** 구매자 요청. */
+  | 'BUYER_REQUEST'
+  /** 판매자가 확정 마감까지 확정하지 않아 자동 취소. */
+  | 'CONFIRM_TIMEOUT'
+  /** 제작할 수 없는 디자인. */
+  | 'DESIGN_NOT_FEASIBLE'
+  /** 부적절한 요청. */
+  | 'INAPPROPRIATE_REQUEST'
+  /** 기타. 결제 도입 전 취소 기록도 이 값이다. */
+  | 'OTHER'
+  /** 재료 소진. */
+  | 'OUT_OF_MATERIALS'
+  /** 미입금. 입금 기한이 지났거나 관리자가 입금이 없다고 판단한 입금 대기 주문. */
+  | 'PAYMENT_NOT_RECEIVED'
+  /** 일정 불가. */
+  | 'SCHEDULE_UNAVAILABLE';
+
+/**
+ * 주문 상태. 구매자·판매자·관리자 API가 공용으로 쓴다. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다.
  *
- * 전이는 `SUBMITTED → CONFIRMED → MADE → PICKED_UP` 한 방향이며 각 단계는 직전
- * 상태에서만 진입할 수 있다. `CANCELED`는 `PICKED_UP` 이전 세 상태에서만 가능하고,
- * 어떤 상태에서도 `SUBMITTED`로 되돌아갈 수 없다.
+ * 흐름은 `PENDING_PAYMENT → SUBMITTED → CONFIRMED → MADE → PICKED_UP`이며 어떤 상태에서도
+ * 앞 단계로 되돌아갈 수 없다. 판매자가 sellerUpdateOrderStatus로 바꿀 수 있는 전이는 `SUBMITTED → CONFIRMED`,
+ * `CONFIRMED → MADE`, `CONFIRMED·MADE → PICKED_UP·NO_SHOW`뿐이고, 취소는 주체별 취소 mutation(cancelMyOrder·sellerCancelOrder·adminCancelOrder)으로만 한다.
+ * 관리자도 adminCompleteOrderPickup으로 확정·제작 완료 주문을 픽업 완료할 수 있다.
+ * 시스템은 입금 기한(1시간)이 지난 입금 대기를 취소하고, 확정 마감이 지난 접수를 취소(전액 환불)하며,
+ * 픽업 시각 + 24시간이 지난 확정·제작 완료를 픽업 완료로 바꾼다. 판매자에게는 입금이 확인된(접수된) 주문만 보인다.
  */
 export type OrderStatusType =
-  /** 취소된 종료 상태. 취소 처리에는 사유(note)가 필수다. */
+  /** 취소된 종료 상태. 주체·사유·사정·환불은 주문 상세의 cancellation에 있다. */
   | 'CANCELED'
   /** 판매자가 주문을 확인·수락한 상태. 제작 대기. */
   | 'CONFIRMED'
   /** 판매자가 제작을 완료해 픽업을 기다리는 상태. "주문 생성됨"이 아니다. */
   | 'MADE'
+  /** 노쇼. 구매자가 픽업 시간에 오지 않아 판매자가 처리한 종료 상태. 환불 없음, 리뷰 불가. */
+  | 'NO_SHOW'
+  /** 입금 대기. 주문 직후 계좌이체 입금을 기다리는 상태이고, 판매자에게 보이지 않는다. */
+  | 'PENDING_PAYMENT'
   /** 구매자가 수령을 마친 종료 상태. 이후 상태 변경 불가. */
   | 'PICKED_UP'
-  /** 구매자가 주문을 넣은 직후의 초기 상태. 판매자 확인 대기. */
+  /** 입금이 확인돼 접수된 상태. 판매자 확인 대기. */
   | 'SUBMITTED';
+
+/** 결제 수단. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다. */
+export type PaymentMethodType =
+  /** 계좌이체(케이퀵 계좌로 입금). */
+  | 'BANK_TRANSFER'
+  /** 토스 결제. 아직 쓰지 않는다. */
+  | 'TOSS';
 
 /** 상품 리뷰 목록 조회 조건. */
 export type ProductReviewsInput = {
@@ -131,6 +235,15 @@ export type PushPlatform =
   | 'ANDROID'
   /** iOS(APNs 경유) */
   | 'IOS';
+
+/** 환불 진행 상태. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다. */
+export type RefundStatusType =
+  /** 구매자의 환불 계좌 입력 대기. */
+  | 'AWAITING_ACCOUNT'
+  /** 계좌가 입력돼 케이퀵 송금 대기. */
+  | 'AWAITING_TRANSFER'
+  /** 송금 완료. */
+  | 'COMPLETED';
 
 /** 현재 위치(WGS84). */
 export type RegionByLocationInput = {
@@ -190,6 +303,19 @@ export type SellerAuditLogListInput = {
   targetType?: AuditTargetType | null | undefined;
 };
 
+/** 판매자 주문 거절·취소 입력. 허용 범위는 sellerCancelOrder 설명을 따른다. */
+export type SellerCancelOrderInput = {
+  /** 취소 사정. 확정·제작 완료 주문이면 필수이고, 접수 단계 거절에서는 무시한다. */
+  fault?: OrderCancelFaultType | null | undefined;
+  /** 취소 메모. 선택, 최대 500자. 상태 이력에 남고 구매자도 본다. */
+  note?: string | null | undefined;
+  orderId: string | number;
+  /** 취소 사유. DESIGN_NOT_FEASIBLE·OUT_OF_MATERIALS·SCHEDULE_UNAVAILABLE·INAPPROPRIATE_REQUEST·BUYER_REQUEST·OTHER 중 하나. */
+  reason: OrderCancelReasonType;
+  /** 돌려줄 금액(원, 0~결제액). fault가 BUYER일 때 필수이고, 그 밖에는 무시한다. */
+  refundAmount?: number | null | undefined;
+};
+
 /** FAQ 항목 생성 입력. */
 export type SellerCreateFaqTopicInput = {
   /** FAQ 답변 본문(HTML). */
@@ -216,10 +342,6 @@ export type SellerCreateOptionGroupInput = {
   minSelect?: number | null | undefined;
   /** 그룹명. */
   name: string;
-  /** 구매자 커스텀 입력(설명)이 필요한 그룹으로 표시한다. 기본 false. 현재는 켜면 해당 옵션 주문이 거절된다. */
-  optionRequiresDescription?: boolean | null | undefined;
-  /** 구매자 커스텀 입력(이미지)이 필요한 그룹으로 표시한다. 기본 false. 현재는 켜면 해당 옵션 주문이 거절된다. */
-  optionRequiresImage?: boolean | null | undefined;
   productId: string | number;
   /** 노출 순서. 오름차순이고 동률의 순서는 보장하지 않는다. 미지정 시 0. */
   sortOrder?: number | null | undefined;
@@ -238,6 +360,11 @@ export type SellerCreateOptionItemInput = {
   priceDelta?: number | null | undefined;
   /** 노출 순서. 오름차순이고 동률의 순서는 보장하지 않는다. 미지정 시 0. */
   sortOrder?: number | null | undefined;
+  /**
+   * 3D 카탈로그 선택지 키(customThreeDCatalog.optionChoices.key, 40자 이하). 생략하거나 빈 문자열이면 연결하지 않는다.
+   * 카탈로그에 없거나 퇴역한 키도 저장되지만 3D 준비 이슈(THREE_D_KEY_UNAVAILABLE)가 되어 3D 주문을 받을 수 없다.
+   */
+  threeDKey?: string | null | undefined;
   /** 선택지 이름. */
   title: string;
 };
@@ -247,8 +374,6 @@ export type SellerCreateOptionItemInput = {
  * (대표 이미지 1장만 여기서 함께 등록한다).
  */
 export type SellerCreateProductInput = {
-  /** 커스텀 도안의 바탕 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT. */
-  baseDesignImageUrl?: string | null | undefined;
   /** 통화 코드(ISO 4217, 대문자 3자). 기본 KRW. 다른 코드도 저장은 되지만 구매자 주문이 거절된다. */
   currency?: string | null | undefined;
   /** 상품 설명. */
@@ -271,7 +396,7 @@ export type SellerCreateProductInput = {
 
 /** 판매자 업로드 URL 발급 입력. */
 export type SellerCreateUploadUrlInput = {
-  /** 파일 크기(바이트). 1 이상 5MB 이하, 아니면 BAD_USER_INPUT. */
+  /** 파일 크기(바이트). 1 이상, 용도별 최대 크기(CONVERSATION_IMAGE 10MB, 그 밖 5MB) 이하. 아니면 BAD_USER_INPUT. */
   contentLength: number;
   /** 파일 MIME 타입. image/jpeg·image/png·image/webp만 허용, 아니면 BAD_USER_INPUT. */
   contentType: string;
@@ -293,6 +418,8 @@ export type SellerDateCursorInput = {
 
 /** 주문 목록 조회 조건. 모든 필터는 AND로 결합되고, 미지정 필터는 적용되지 않는다. */
 export type SellerOrderListInput = {
+  /** 구매자 계정 ID 필터. 채팅 상대의 주문만 볼 때 쓴다. 미지정 시 전체. */
+  buyerAccountId?: string | number | null | undefined;
   /** 이전 응답의 nextCursor. 첫 페이지는 생략한다. */
   cursor?: string | null | undefined;
   /** 주문 생성 시각 하한(이상). */
@@ -310,6 +437,15 @@ export type SellerOrderListInput = {
   /** 픽업 일시 상한(이하). */
   toPickupAt?: string | null | undefined;
 };
+
+/** 판매자 주문 갱신 종류. 값은 늘어날 수 있으니 모르는 값은 목록 재조회로 처리한다. */
+export type SellerOrderUpdateKind =
+  /** 픽업 일시가 바뀌었다. */
+  | 'PICKUP_RESCHEDULED'
+  /** 주문 상태가 바뀌었다(확정·제작 완료·픽업 완료·취소 등). */
+  | 'STATUS_CHANGED'
+  /** 입금이 확인돼 새 주문이 접수됐다. */
+  | 'SUBMITTED';
 
 /** 상품 목록 조회 조건. 필터는 AND로 결합되고 미지정 필터는 적용되지 않는다. */
 export type SellerProductListInput = {
@@ -375,18 +511,35 @@ export type SellerReorderProductImagesInput = {
   productId: string | number;
 };
 
+/** 판매자 픽업 일시 변경 입력. */
+export type SellerRescheduleOrderPickupInput = {
+  /** 변경 메모. 선택, 최대 500자. 변경 이력에 남고 구매자도 본다. */
+  note?: string | null | undefined;
+  orderId: string | number;
+  /** 새 픽업 일시. sellerOrderPickupTimeSlots의 슬롯 시각이어야 한다(초 이하는 0). */
+  pickupAt: string;
+};
+
 /**
  * 판매자 메시지 발송 입력. bodyFormat에 맞는 본문 필드가 비어 있으면 BAD_USER_INPUT.
  * 내 매장의 대화방이 아니면 NOT_FOUND.
  */
 export type SellerSendConversationMessageInput = {
-  /** 본문 형식. 이 값에 해당하는 본문 필드가 필수다(다른 쪽을 함께 넘기면 그대로 저장된다). */
+  /**
+   * 본문 형식. 이 값에 해당하는 본문 필드가 필수다(TEXT·HTML은 다른 쪽을 함께 넘기면 그대로 저장된다).
+   * IMAGE는 imageUrl만 저장하고 본문은 대체 문구로 채운다. ORDER_CARD는 INVALID_BODY_FORMAT이다.
+   */
   bodyFormat: ConversationBodyFormat;
   /** 서식 본문(최대 100000자). bodyFormat이 HTML이면 필수. */
   bodyHtml?: string | null | undefined;
   /** 평문 본문(최대 2000자). bodyFormat이 TEXT면 필수. */
   bodyText?: string | null | undefined;
   conversationId: string | number;
+  /**
+   * 이미지 URL. bodyFormat이 IMAGE면 필수(없으면 IMAGE_URL_REQUIRED)이고 sellerCreateUploadUrl(CONVERSATION_IMAGE)로
+   * 이 계정에 발급된 publicUrl이어야 한다(아니면 INVALID_IMAGE_URL). 다른 형식에서는 무시한다.
+   */
+  imageUrl?: string | null | undefined;
 };
 
 /** 상품 노출 여부 변경 입력. */
@@ -406,13 +559,6 @@ export type SellerSetProductCategoriesInput = {
   productId: string | number;
 };
 
-/** 커스텀 템플릿 활성 상태 변경 입력. */
-export type SellerSetProductCustomTemplateActiveInput = {
-  /** true면 구매자 화면에 커스텀 입력이 열린다. */
-  isActive: boolean;
-  templateId: string | number;
-};
-
 /** 이름 기반 태그 연결 설정 입력. 전달한 목록으로 통째로 교체한다. */
 export type SellerSetProductTagsByNameInput = {
   /**
@@ -421,6 +567,14 @@ export type SellerSetProductTagsByNameInput = {
    */
   names: Array<string>;
   productId: string | number;
+};
+
+/** 주간 정산 목록 조회 조건. */
+export type SellerSettlementListInput = {
+  /** 이전 응답의 nextCursor. 첫 페이지는 생략한다. */
+  cursor?: string | null | undefined;
+  /** 한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT. */
+  limit?: number | null | undefined;
 };
 
 /** 태그 검색 입력. */
@@ -465,10 +619,6 @@ export type SellerUpdateOptionGroupInput = {
   /** 그룹명. */
   name?: string | null | undefined;
   optionGroupId: string | number;
-  /** 구매자 커스텀 입력(설명)이 필요한 그룹으로 표시한다. 현재는 켜면 해당 옵션 주문이 거절된다. */
-  optionRequiresDescription?: boolean | null | undefined;
-  /** 구매자 커스텀 입력(이미지)이 필요한 그룹으로 표시한다. 현재는 켜면 해당 옵션 주문이 거절된다. */
-  optionRequiresImage?: boolean | null | undefined;
   /** 노출 순서. */
   sortOrder?: number | null | undefined;
 };
@@ -486,6 +636,8 @@ export type SellerUpdateOptionItemInput = {
   priceDelta?: number | null | undefined;
   /** 노출 순서. */
   sortOrder?: number | null | undefined;
+  /** 3D 카탈로그 선택지 키(40자 이하). null이나 빈 문자열이면 연결을 끊고, 생략하면 그대로 둔다. */
+  threeDKey?: string | null | undefined;
   /** 선택지 이름. */
   title?: string | null | undefined;
 };
@@ -495,10 +647,10 @@ export type SellerUpdateOptionItemInput = {
  * BAD_USER_INPUT으로 거절된다.
  */
 export type SellerUpdateOrderStatusInput = {
-  /** 변경 사유 메모. toStatus가 CANCELED면 필수이고, 없으면 BAD_USER_INPUT. */
+  /** 변경 메모. 선택, 최대 500자. 상태 이력에 남는다. */
   note?: string | null | undefined;
   orderId: string | number;
-  /** 변경할 상태. 현재 상태에서 진입 가능한 값이어야 한다. */
+  /** 변경할 상태. CONFIRMED·MADE·PICKED_UP·NO_SHOW 중 현재 상태에서 진입 가능한 값이어야 한다. */
   toStatus: OrderStatusType;
 };
 
@@ -517,8 +669,6 @@ export type SellerUpdatePickupPolicyInput = {
 
 /** 상품 수정 입력. 전달한 필드만 변경된다(부분 수정). 노출 여부는 별도 mutation을 쓴다. */
 export type SellerUpdateProductInput = {
-  /** 커스텀 도안의 바탕 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT. */
-  baseDesignImageUrl?: string | null | undefined;
   /** 통화 코드(ISO 4217, 대문자 3자). KRW 외에는 구매자 주문이 거절된다. */
   currency?: string | null | undefined;
   /** 상품 설명. */
@@ -571,36 +721,52 @@ export type SellerUpdateStoreBasicInfoInput = {
 
 /** 커스텀 템플릿 등록·수정 입력. 상품당 1개라 같은 상품에 다시 보내면 덮어쓴다. */
 export type SellerUpsertProductCustomTemplateInput = {
-  /** 문구를 올릴 바탕 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT. */
+  /** 문구를 올릴 바탕 이미지 URL(정사각). sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 INVALID_IMAGE_URL. */
   baseImageUrl: string;
-  /** 활성 여부. 기본 true. */
-  isActive?: boolean | null | undefined;
+  /** 자유 편집 허용 여부. 생략하면 새 템플릿은 false, 기존 템플릿은 지금 값을 둔다. */
+  freeEditEnabled?: boolean | null | undefined;
   productId: string | number;
 };
 
 /** 커스텀 문구 슬롯 등록·수정 입력. */
 export type SellerUpsertProductCustomTextTokenInput = {
-  /** 구매자가 입력하지 않았을 때 쓸 기본 문구. */
+  /** 구매자가 입력하지 않았을 때 쓸 기본 문구. maxLength 이하(코드 포인트). */
   defaultText: string;
-  /** 문구 영역 높이. */
-  height?: number | null | undefined;
+  /** 문구 영역 높이(1 이상, posY + height ≤ 10000). */
+  height: number;
   /** 필수 입력 여부. 기본 true. */
   isRequired?: boolean | null | undefined;
-  /** 입력 가능한 최대 글자 수. 기본 30. */
+  /** 표시 이름(1~30자). 생략하면 수정은 지금 값을 두고, 등록은 tokenKey 앞 30자로 채운다. */
+  label?: string | null | undefined;
+  /** 입력 가능한 최대 글자 수(코드 포인트, 1~50). 기본 20. */
   maxLength?: number | null | undefined;
-  /** 베이스 이미지 위 가로 위치. 생략 시 배치를 클라이언트가 정한다. */
-  posX?: number | null | undefined;
-  /** 베이스 이미지 위 세로 위치. */
-  posY?: number | null | undefined;
+  /** 문구 영역 왼쪽 위 모서리의 가로 위치. 바탕 이미지 한 변을 10000으로 본 정수 비율(0~10000), 원점은 왼쪽 위. */
+  posX: number;
+  /** 문구 영역 왼쪽 위 모서리의 세로 위치(0~10000). */
+  posY: number;
   /** 입력 화면 노출 순서. 오름차순이고 동률의 순서는 보장하지 않는다. 미지정 시 0. */
   sortOrder?: number | null | undefined;
   templateId: string | number;
+  /** 자리 안 글자 정렬. 생략하면 수정은 지금 값을 두고, 등록은 CENTER. */
+  textAlign?: CustomTextAlignType | null | undefined;
+  /** 글자색 #RRGGBB(대소문자 무관, 대문자로 저장). 생략하면 수정은 지금 값을 두고, 등록은 #000000. */
+  textColor?: string | null | undefined;
   /** 수정할 슬롯 ID. 생략하면 새로 등록한다. */
   tokenId?: string | number | null | undefined;
-  /** 슬롯 식별 키. 주문 스냅샷에 그대로 남는다. */
+  /** 슬롯 식별 키. 영문 소문자·숫자 1~60자(이 규칙 전에 만든 키는 바꾸지 않는 한 그대로 쓸 수 있다). 주문 스냅샷에 그대로 남는다. */
   tokenKey: string;
-  /** 문구 영역 너비. */
-  width?: number | null | undefined;
+  /** 문구 영역 너비(1 이상, posX + width ≤ 10000). */
+  width: number;
+};
+
+/** 정산 계좌 등록·변경 입력. */
+export type SellerUpsertSettlementAccountInput = {
+  /** 예금주(1~50자). */
+  accountHolder: string;
+  /** 계좌번호. 하이픈을 빼고 숫자 8~20자리여야 하며 숫자만 저장한다. */
+  accountNumber: string;
+  /** 은행 코드(paymentBanks의 code). */
+  bankCode: string;
 };
 
 /**
@@ -638,6 +804,13 @@ export type SellerUpsertStoreSpecialClosureInput = {
   reason?: string | null | undefined;
 };
 
+/** 주간 정산 상태. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다. */
+export type SettlementStatusType =
+  /** 송금 완료. */
+  | 'PAID'
+  /** 케이퀵의 매장 송금 대기. */
+  | 'PENDING';
+
 /** 매장 지도 연동 provider. 구매자·판매자 API가 공용으로 쓴다. */
 export type StoreMapProvider =
   /** 카카오맵 딥링크를 쓴다. */
@@ -673,13 +846,34 @@ export type StoreReviewsInput = {
   storeId: string | number;
 };
 
+/** 3D 디자인 항목 종류. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다. */
+export type ThreeDItemKindType =
+  /** 꾸미기 이미지. */
+  | 'DECO'
+  /** 글자. */
+  | 'TEXT';
+
+/** 3D 옵션 카테고리. 옵션 항목의 threeDKey가 가리키는 카탈로그 선택지의 종류다. */
+export type ThreeDOptionCategoryType =
+  /** 시트 디자인. 고르지 않으면 장식 없는 시트로 그린다. */
+  | 'DESIGN'
+  /** 시트·크림 맛. 고르지 않아도 되는 그룹으로 둘 수 있다. */
+  | 'FLAVOR'
+  /** 시트 모양. 3D 상품은 필수 단일 선택 그룹이 있어야 한다. */
+  | 'SHAPE'
+  /** 케이크 크기. 3D 상품은 필수 단일 선택 그룹이 있어야 한다. */
+  | 'SIZE';
+
 /**
  * 업로드 용도. 용도마다 저장 경로가 다르고, 저장 입력은 같은 용도로 발급된 URL만 받는다.
- * 역할별 허용 범위: 판매자 PRODUCT_IMAGE·STORE_IMAGE, 관리자 BANNER_IMAGE·STORE_IMAGE(밖이면 BAD_USER_INPUT).
+ * 역할별 허용 범위: 판매자 PRODUCT_IMAGE·STORE_IMAGE·CONVERSATION_IMAGE, 관리자 BANNER_IMAGE·STORE_IMAGE(밖이면 BAD_USER_INPUT).
+ * 최대 크기는 CONVERSATION_IMAGE 10MB, 그 밖의 용도 5MB다.
  */
 export type UploadPurpose =
   /** 플랫폼 배너 이미지(관리자). */
   | 'BANNER_IMAGE'
+  /** 채팅 첨부 이미지(판매자). sellerSendConversationMessage의 IMAGE 메시지가 이 용도 URL만 받는다. */
+  | 'CONVERSATION_IMAGE'
   /** 상품 이미지·커스텀 도안 바탕·옵션 선택지 이미지·커스텀 템플릿 바탕(판매자). */
   | 'PRODUCT_IMAGE'
   /** 매장 프로필(로고) 이미지(판매자·관리자). */
@@ -708,14 +902,14 @@ export type SellerChatsMessagesQueryVariables = Exact<{
 }>;
 
 
-export type SellerChatsMessagesQuery = { sellerConversationMessages: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string }> } };
+export type SellerChatsMessagesQuery = { sellerConversationMessages: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, imageUrl: string | null, createdAt: string, orderCard: { orderId: string, orderNumber: string, productName: string, thumbnailUrl: string | null, pickupAt: string } | null }> } };
 
 export type SellerChatsSendMessageMutationVariables = Exact<{
   input: SellerSendConversationMessageInput;
 }>;
 
 
-export type SellerChatsSendMessageMutation = { sellerSendConversationMessage: { id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string } };
+export type SellerChatsSendMessageMutation = { sellerSendConversationMessage: { id: string, conversationId: string, senderType: ConversationSenderType, senderAccountId: string | null, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, imageUrl: string | null, createdAt: string, orderCard: { orderId: string, orderNumber: string, productName: string, thumbnailUrl: string | null, pickupAt: string } | null } };
 
 export type SellerChatsMarkReadMutationVariables = Exact<{
   conversationId: string | number;
@@ -729,14 +923,19 @@ export type SellerChatsMessageAddedSubscriptionVariables = Exact<{
 }>;
 
 
-export type SellerChatsMessageAddedSubscription = { conversationMessageAdded: { id: string, conversationId: string, senderType: ConversationSenderType, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, createdAt: string } };
+export type SellerChatsMessageAddedSubscription = { conversationMessageAdded: { id: string, conversationId: string, senderType: ConversationSenderType, bodyFormat: ConversationBodyFormat, bodyText: string | null, bodyHtml: string | null, imageUrl: string | null, createdAt: string, orderCard: { orderId: string, orderNumber: string, productName: string, thumbnailUrl: string | null, pickupAt: string } | null } };
 
-export type SellerChatsBuyerOrderQueryVariables = Exact<{
-  input?: SellerOrderListInput | null | undefined;
+export type SellerChatsBuyerLatestOrderQueryVariables = Exact<{
+  buyerAccountId: string | number;
 }>;
 
 
-export type SellerChatsBuyerOrderQuery = { sellerOrderList: { items: Array<{ id: string, buyerName: string, pickupAt: string, firstItemName: string | null }> } };
+export type SellerChatsBuyerLatestOrderQuery = { sellerOrderList: { items: Array<{ id: string, pickupAt: string, firstItemName: string | null }> } };
+
+export type SellerCustomCatalogQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerCustomCatalogQuery = { customThreeDCatalog: { revision: number, textColorPresets: Array<string>, optionChoices: Array<{ key: string, category: ThreeDOptionCategoryType, value: string, label: string, defaultPriceDelta: number, renderScale: number | null, selectable: boolean }>, sheetColors: Array<{ key: string, hex: string }>, decos: Array<{ key: string, label: string, imageUrl: string }> } };
 
 export type SellerHomeStoreQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -746,14 +945,14 @@ export type SellerHomeStoreQuery = { sellerMyStore: { id: string, storeName: str
 export type SellerHomeDashboardQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type SellerHomeDashboardQuery = { sellerDashboard: { date: string, newOrderCount: number, remainingCapacity: number | null, activeProductCount: number, unansweredConversationCount: number, pickupDay: { salesAmount: number }, createdDay: { orderCount: number } } };
+export type SellerHomeDashboardQuery = { sellerDashboard: { date: string, newOrderCount: number, remainingCapacity: number | null, pendingPaymentQuantity: number, activeProductCount: number, unansweredConversationCount: number, pickupDay: { salesAmount: number }, createdDay: { orderCount: number } } };
 
 export type SellerHomeRecentOrdersQueryVariables = Exact<{
   input?: SellerOrderListInput | null | undefined;
 }>;
 
 
-export type SellerHomeRecentOrdersQuery = { sellerOrderList: { items: Array<{ id: string, status: OrderStatusType, pickupAt: string, buyerName: string, firstItemName: string | null, firstItemImageUrl: string | null }> } };
+export type SellerHomeRecentOrdersQuery = { sellerOrderList: { items: Array<{ id: string, status: OrderStatusType, pickupAt: string, buyerName: string, firstItemName: string | null, firstItemImageUrl: string | null, firstItemCustomImageUrl: string | null, hasCustom: boolean }> } };
 
 export type SellerHomeOrderUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
@@ -765,14 +964,16 @@ export type SellerOrdersListQueryVariables = Exact<{
 }>;
 
 
-export type SellerOrdersListQuery = { sellerOrderList: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, orderNumber: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, firstItemName: string | null, firstItemImageUrl: string | null }> } };
+export type SellerOrdersListQuery = { sellerOrderList: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, orderNumber: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, firstItemName: string | null, firstItemImageUrl: string | null, firstItemCustomImageUrl: string | null, hasCustom: boolean }> } };
+
+export type SellerOrderThreeDItemFieldsFragment = { kind: ThreeDItemKindType, x: number, y: number, size: number, text: string | null, color: string | null, decoId: string | null, effect: { type: string, intensity: number } };
 
 export type SellerOrderDetailQueryVariables = Exact<{
   orderId: string | number;
 }>;
 
 
-export type SellerOrderDetailQuery = { sellerOrder: { id: string, orderNumber: string, accountId: string, status: OrderStatusType, pickupAt: string, buyerName: string, buyerPhone: string, subtotalPrice: number, discountPrice: number, totalPrice: number, submittedAt: string | null, confirmedAt: string | null, madeAt: string | null, pickedUpAt: string | null, canceledAt: string | null, createdAt: string, updatedAt: string, items: Array<{ id: string, productName: string, quantity: number, optionItems: Array<{ id: string, groupName: string, optionTitle: string, priceDelta: number }>, customTexts: Array<{ id: string, tokenKey: string, defaultText: string, valueText: string, sortOrder: number }>, freeEdits: Array<{ id: string, cropImageUrl: string, descriptionText: string, sortOrder: number, attachments: Array<{ id: string, imageUrl: string, sortOrder: number }> }> }>, statusHistories: Array<{ id: string, toStatus: OrderStatusType, changedAt: string, note: string | null }> } };
+export type SellerOrderDetailQuery = { sellerOrder: { id: string, orderNumber: string, accountId: string, status: OrderStatusType, pickupAt: string, buyerName: string, buyerPhone: string, requestNote: string | null, paymentMethod: PaymentMethodType | null, subtotalPrice: number, discountPrice: number, totalPrice: number, submittedAt: string | null, confirmedAt: string | null, madeAt: string | null, pickedUpAt: string | null, canceledAt: string | null, noShowAt: string | null, confirmDeadlineAt: string | null, autoPickupAt: string | null, canMarkNoShow: boolean, commissionRateBps: number, expectedPayoutAmount: number | null, settlementBaseAmount: number | null, createdAt: string, updatedAt: string, items: Array<{ id: string, productName: string, quantity: number, customMode: CustomModeType, customPreviewImageUrl: string | null, customBaseImageUrl: string | null, optionItems: Array<{ id: string, groupName: string, optionTitle: string, priceDelta: number }>, customImages: Array<{ id: string, kind: CustomImageKindType, imageUrl: string }>, threeDDesign: { schemaVersion: number, basic: { shape: string, size: string, design: string | null, flavor: string | null, sheetColor: string }, top: Array<{ kind: ThreeDItemKindType, x: number, y: number, size: number, text: string | null, color: string | null, decoId: string | null, effect: { type: string, intensity: number } }>, side: Array<{ kind: ThreeDItemKindType, x: number, y: number, size: number, text: string | null, color: string | null, decoId: string | null, effect: { type: string, intensity: number } }> } | null, customTexts: Array<{ id: string, label: string, defaultText: string, valueText: string | null, sortOrder: number }>, freeEdits: Array<{ id: string, posX: number, posY: number, width: number, height: number, descriptionText: string, sortOrder: number, attachments: Array<{ id: string, imageUrl: string, sortOrder: number }> }> }>, statusHistories: Array<{ id: string, toStatus: OrderStatusType, changedAt: string, note: string | null }>, cancellation: { actorType: OrderActorType, reasonLabel: string, refundAmount: number, refundStatus: RefundStatusType | null } | null, pickupChanges: Array<{ id: string, fromPickupAt: string, toPickupAt: string, changedAt: string, note: string | null }> } };
 
 export type SellerUpdateOrderStatusMutationVariables = Exact<{
   input: SellerUpdateOrderStatusInput;
@@ -780,6 +981,36 @@ export type SellerUpdateOrderStatusMutationVariables = Exact<{
 
 
 export type SellerUpdateOrderStatusMutation = { sellerUpdateOrderStatus: { id: string, status: OrderStatusType } };
+
+export type SellerCancelOrderMutationVariables = Exact<{
+  input: SellerCancelOrderInput;
+}>;
+
+
+export type SellerCancelOrderMutation = { sellerCancelOrder: { id: string, status: OrderStatusType } };
+
+export type SellerOrderPickupCalendarQueryVariables = Exact<{
+  orderId: string | number;
+  yearMonth: string;
+}>;
+
+
+export type SellerOrderPickupCalendarQuery = { sellerOrderPickupCalendar: { days: Array<{ date: string, selectable: boolean, reason: string | null }> } };
+
+export type SellerOrderPickupTimeSlotsQueryVariables = Exact<{
+  orderId: string | number;
+  date: string;
+}>;
+
+
+export type SellerOrderPickupTimeSlotsQuery = { sellerOrderPickupTimeSlots: { morning: Array<{ time: string, available: boolean }>, afternoon: Array<{ time: string, available: boolean }> } };
+
+export type SellerRescheduleOrderPickupMutationVariables = Exact<{
+  input: SellerRescheduleOrderPickupInput;
+}>;
+
+
+export type SellerRescheduleOrderPickupMutation = { sellerRescheduleOrderPickup: { id: string, pickupAt: string } };
 
 export type SellerOrderConversationsQueryVariables = Exact<{
   input?: CursorInput | null | undefined;
@@ -791,7 +1022,7 @@ export type SellerOrderConversationsQuery = { sellerConversations: { hasMore: bo
 export type SellerOrdersUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
 
-export type SellerOrdersUpdatedSubscription = { sellerOrderUpdated: { orderId: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, productName: string, updatedAt: string } };
+export type SellerOrdersUpdatedSubscription = { sellerOrderUpdated: { kind: SellerOrderUpdateKind, orderId: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, productName: string, hasCustom: boolean, confirmDeadlineAt: string | null, updatedAt: string } };
 
 export type SellerProductsListQueryVariables = Exact<{
   input?: SellerProductListInput | null | undefined;
@@ -805,7 +1036,7 @@ export type SellerProductDetailQueryVariables = Exact<{
 }>;
 
 
-export type SellerProductDetailQuery = { sellerProduct: { id: string, name: string, description: string | null, purchaseNotice: string | null, regularPrice: number, salePrice: number | null, preparationTimeMinutes: number, isActive: boolean, images: Array<{ id: string, imageUrl: string, sortOrder: number }>, categories: Array<{ id: string, name: string }>, tags: Array<{ id: string, name: string }>, optionGroups: Array<{ id: string, name: string, isRequired: boolean, minSelect: number, maxSelect: number, isActive: boolean, optionItems: Array<{ id: string }> }>, customTemplate: { id: string, isActive: boolean, textTokens: Array<{ id: string }> } | null } };
+export type SellerProductDetailQuery = { sellerProduct: { id: string, name: string, description: string | null, purchaseNotice: string | null, regularPrice: number, salePrice: number | null, preparationTimeMinutes: number, isActive: boolean, customMode: CustomModeType, images: Array<{ id: string, imageUrl: string, sortOrder: number }>, categories: Array<{ id: string, name: string }>, tags: Array<{ id: string, name: string }>, optionGroups: Array<{ id: string, name: string, isRequired: boolean, minSelect: number, maxSelect: number, isActive: boolean, threeDCategory: ThreeDOptionCategoryType | null, optionItems: Array<{ id: string }> }>, customReadiness: Array<{ mode: CustomModeType, issues: Array<{ code: string, message: string }> }>, customTemplate: { id: string, freeEditEnabled: boolean, textTokens: Array<{ id: string }> } | null } };
 
 export type SellerProductsFilterCategoriesQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -888,7 +1119,7 @@ export type SellerProductManageQueryVariables = Exact<{
 }>;
 
 
-export type SellerProductManageQuery = { sellerProduct: { id: string, optionGroups: Array<{ id: string, name: string, description: string | null, isRequired: boolean, minSelect: number, maxSelect: number, optionItems: Array<{ id: string, title: string, description: string | null, imageUrl: string | null, priceDelta: number, isActive: boolean }> }>, customTemplate: { id: string, baseImageUrl: string, isActive: boolean, textTokens: Array<{ id: string, tokenKey: string, defaultText: string, maxLength: number, isRequired: boolean, posX: number | null, posY: number | null, width: number | null, height: number | null }> } | null } };
+export type SellerProductManageQuery = { sellerProduct: { id: string, customMode: CustomModeType, optionGroups: Array<{ id: string, name: string, description: string | null, isRequired: boolean, minSelect: number, maxSelect: number, optionItems: Array<{ id: string, title: string, description: string | null, imageUrl: string | null, priceDelta: number, isActive: boolean, threeDKey: string | null }> }>, customTemplate: { id: string, baseImageUrl: string, freeEditEnabled: boolean, textTokens: Array<{ id: string, tokenKey: string, label: string, defaultText: string, maxLength: number, isRequired: boolean, posX: number, posY: number, width: number, height: number, textColor: string, textAlign: CustomTextAlignType }> } | null } };
 
 export type SellerProductUpdateMutationVariables = Exact<{
   input: SellerUpdateProductInput;
@@ -953,19 +1184,27 @@ export type SellerProductReorderOptionItemsMutationVariables = Exact<{
 
 export type SellerProductReorderOptionItemsMutation = { sellerReorderOptionItems: Array<{ id: string }> };
 
+export type SellerProductSetCustomModeMutationVariables = Exact<{
+  productId: string | number;
+  customMode: CustomModeType;
+}>;
+
+
+export type SellerProductSetCustomModeMutation = { sellerSetProductCustomMode: { id: string, customMode: CustomModeType } };
+
+export type SellerProductApplyThreeDPresetMutationVariables = Exact<{
+  productId: string | number;
+}>;
+
+
+export type SellerProductApplyThreeDPresetMutation = { sellerApplyThreeDOptionPreset: { id: string } };
+
 export type SellerProductUpsertTemplateMutationVariables = Exact<{
   input: SellerUpsertProductCustomTemplateInput;
 }>;
 
 
 export type SellerProductUpsertTemplateMutation = { sellerUpsertProductCustomTemplate: { id: string } };
-
-export type SellerProductSetTemplateActiveMutationVariables = Exact<{
-  input: SellerSetProductCustomTemplateActiveInput;
-}>;
-
-
-export type SellerProductSetTemplateActiveMutation = { sellerSetProductCustomTemplateActive: { id: string } };
 
 export type SellerProductUpsertTextTokenMutationVariables = Exact<{
   input: SellerUpsertProductCustomTextTokenInput;
@@ -1215,6 +1454,37 @@ export type SellerStorePickupTimeSlotsQueryVariables = Exact<{
 
 export type SellerStorePickupTimeSlotsQuery = { pickupTimeSlots: { date: string, morning: Array<{ time: string, available: boolean }>, afternoon: Array<{ time: string, available: boolean }> } };
 
+export type SellerStoreSettlementAccountQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerStoreSettlementAccountQuery = { sellerSettlementAccount: { accountHolder: string, accountNumberMasked: string, updatedByRole: OrderActorType, updatedAt: string, bank: { code: string, name: string } } | null };
+
+export type SellerStorePaymentBanksQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type SellerStorePaymentBanksQuery = { paymentBanks: Array<{ code: string, name: string }> };
+
+export type SellerStoreUpsertSettlementAccountMutationVariables = Exact<{
+  input: SellerUpsertSettlementAccountInput;
+}>;
+
+
+export type SellerStoreUpsertSettlementAccountMutation = { sellerUpsertSettlementAccount: { accountHolder: string, accountNumberMasked: string, updatedByRole: OrderActorType, updatedAt: string, bank: { code: string, name: string } } };
+
+export type SellerStoreSettlementsQueryVariables = Exact<{
+  input?: SellerSettlementListInput | null | undefined;
+}>;
+
+
+export type SellerStoreSettlementsQuery = { sellerSettlements: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, periodStart: string, periodEnd: string, orderCount: number, commissionAmount: number, payoutAmount: number, status: SettlementStatusType, paidAt: string | null }> } };
+
+export type SellerStoreSettlementQueryVariables = Exact<{
+  settlementId: string | number;
+}>;
+
+
+export type SellerStoreSettlementQuery = { sellerSettlement: { id: string, periodStart: string, periodEnd: string, orderCount: number, settlementBaseAmount: number, commissionAmount: number, payoutAmount: number, status: SettlementStatusType, paidAt: string | null, paidAccount: { accountHolder: string, accountNumberMasked: string, bank: { name: string } } | null, orders: Array<{ orderId: string, orderNumber: string, productName: string | null, status: OrderStatusType, commissionRateBps: number, settlementBaseAmount: number, commissionAmount: number, payoutAmount: number, settlementFinalizedAt: string }> } };
+
 export type SellerUploadsCreateUploadUrlMutationVariables = Exact<{
   input: SellerCreateUploadUrlInput;
 }>;
@@ -1245,6 +1515,21 @@ export class TypedDocumentString<TResult, TVariables>
     return this.value;
   }
 }
+export const SellerOrderThreeDItemFieldsFragmentDoc = new TypedDocumentString(`
+    fragment SellerOrderThreeDItemFields on ThreeDDesignItem {
+  kind
+  x
+  y
+  size
+  effect {
+    type
+    intensity
+  }
+  text
+  color
+  decoId
+}
+    `, {"fragmentName":"SellerOrderThreeDItemFields"}) as unknown as TypedDocumentString<SellerOrderThreeDItemFieldsFragment, unknown>;
 export const SellerReviewMediaFieldsFragmentDoc = new TypedDocumentString(`
     fragment SellerReviewMediaFields on ReviewMedia {
   mediaType
@@ -1328,6 +1613,14 @@ export const SellerChatsMessagesDocument = new TypedDocumentString(`
       bodyFormat
       bodyText
       bodyHtml
+      imageUrl
+      orderCard {
+        orderId
+        orderNumber
+        productName
+        thumbnailUrl
+        pickupAt
+      }
       createdAt
     }
     totalCount
@@ -1346,6 +1639,14 @@ export const SellerChatsSendMessageDocument = new TypedDocumentString(`
     bodyFormat
     bodyText
     bodyHtml
+    imageUrl
+    orderCard {
+      orderId
+      orderNumber
+      productName
+      thumbnailUrl
+      pickupAt
+    }
     createdAt
   }
 }
@@ -1373,22 +1674,55 @@ export const SellerChatsMessageAddedDocument = new TypedDocumentString(`
     bodyFormat
     bodyText
     bodyHtml
+    imageUrl
+    orderCard {
+      orderId
+      orderNumber
+      productName
+      thumbnailUrl
+      pickupAt
+    }
     createdAt
   }
 }
     `) as unknown as TypedDocumentString<SellerChatsMessageAddedSubscription, SellerChatsMessageAddedSubscriptionVariables>;
-export const SellerChatsBuyerOrderDocument = new TypedDocumentString(`
-    query SellerChatsBuyerOrder($input: SellerOrderListInput) {
-  sellerOrderList(input: $input) {
+export const SellerChatsBuyerLatestOrderDocument = new TypedDocumentString(`
+    query SellerChatsBuyerLatestOrder($buyerAccountId: ID!) {
+  sellerOrderList(input: { buyerAccountId: $buyerAccountId, limit: 1 }) {
     items {
       id
-      buyerName
       pickupAt
       firstItemName
     }
   }
 }
-    `) as unknown as TypedDocumentString<SellerChatsBuyerOrderQuery, SellerChatsBuyerOrderQueryVariables>;
+    `) as unknown as TypedDocumentString<SellerChatsBuyerLatestOrderQuery, SellerChatsBuyerLatestOrderQueryVariables>;
+export const SellerCustomCatalogDocument = new TypedDocumentString(`
+    query SellerCustomCatalog {
+  customThreeDCatalog {
+    revision
+    optionChoices {
+      key
+      category
+      value
+      label
+      defaultPriceDelta
+      renderScale
+      selectable
+    }
+    sheetColors {
+      key
+      hex
+    }
+    decos {
+      key
+      label
+      imageUrl
+    }
+    textColorPresets
+  }
+}
+    `) as unknown as TypedDocumentString<SellerCustomCatalogQuery, SellerCustomCatalogQueryVariables>;
 export const SellerHomeStoreDocument = new TypedDocumentString(`
     query SellerHomeStore {
   sellerMyStore {
@@ -1410,6 +1744,7 @@ export const SellerHomeDashboardDocument = new TypedDocumentString(`
       orderCount
     }
     remainingCapacity
+    pendingPaymentQuantity
     activeProductCount
     unansweredConversationCount
   }
@@ -1425,6 +1760,8 @@ export const SellerHomeRecentOrdersDocument = new TypedDocumentString(`
       buyerName
       firstItemName
       firstItemImageUrl
+      firstItemCustomImageUrl
+      hasCustom
     }
   }
 }
@@ -1449,6 +1786,8 @@ export const SellerOrdersListDocument = new TypedDocumentString(`
       totalPrice
       firstItemName
       firstItemImageUrl
+      firstItemCustomImageUrl
+      hasCustom
     }
     totalCount
     hasMore
@@ -1466,6 +1805,8 @@ export const SellerOrderDetailDocument = new TypedDocumentString(`
     pickupAt
     buyerName
     buyerPhone
+    requestNote
+    paymentMethod
     subtotalPrice
     discountPrice
     totalPrice
@@ -1474,6 +1815,13 @@ export const SellerOrderDetailDocument = new TypedDocumentString(`
     madeAt
     pickedUpAt
     canceledAt
+    noShowAt
+    confirmDeadlineAt
+    autoPickupAt
+    canMarkNoShow
+    commissionRateBps
+    expectedPayoutAmount
+    settlementBaseAmount
     createdAt
     updatedAt
     items {
@@ -1486,16 +1834,43 @@ export const SellerOrderDetailDocument = new TypedDocumentString(`
         optionTitle
         priceDelta
       }
+      customMode
+      customPreviewImageUrl
+      customBaseImageUrl
+      customImages {
+        id
+        kind
+        imageUrl
+      }
+      threeDDesign {
+        schemaVersion
+        basic {
+          shape
+          size
+          design
+          flavor
+          sheetColor
+        }
+        top {
+          ...SellerOrderThreeDItemFields
+        }
+        side {
+          ...SellerOrderThreeDItemFields
+        }
+      }
       customTexts {
         id
-        tokenKey
+        label
         defaultText
         valueText
         sortOrder
       }
       freeEdits {
         id
-        cropImageUrl
+        posX
+        posY
+        width
+        height
         descriptionText
         sortOrder
         attachments {
@@ -1511,9 +1886,34 @@ export const SellerOrderDetailDocument = new TypedDocumentString(`
       changedAt
       note
     }
+    cancellation {
+      actorType
+      reasonLabel
+      refundAmount
+      refundStatus
+    }
+    pickupChanges {
+      id
+      fromPickupAt
+      toPickupAt
+      changedAt
+      note
+    }
   }
 }
-    `) as unknown as TypedDocumentString<SellerOrderDetailQuery, SellerOrderDetailQueryVariables>;
+    fragment SellerOrderThreeDItemFields on ThreeDDesignItem {
+  kind
+  x
+  y
+  size
+  effect {
+    type
+    intensity
+  }
+  text
+  color
+  decoId
+}`) as unknown as TypedDocumentString<SellerOrderDetailQuery, SellerOrderDetailQueryVariables>;
 export const SellerUpdateOrderStatusDocument = new TypedDocumentString(`
     mutation SellerUpdateOrderStatus($input: SellerUpdateOrderStatusInput!) {
   sellerUpdateOrderStatus(input: $input) {
@@ -1522,6 +1922,47 @@ export const SellerUpdateOrderStatusDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerUpdateOrderStatusMutation, SellerUpdateOrderStatusMutationVariables>;
+export const SellerCancelOrderDocument = new TypedDocumentString(`
+    mutation SellerCancelOrder($input: SellerCancelOrderInput!) {
+  sellerCancelOrder(input: $input) {
+    id
+    status
+  }
+}
+    `) as unknown as TypedDocumentString<SellerCancelOrderMutation, SellerCancelOrderMutationVariables>;
+export const SellerOrderPickupCalendarDocument = new TypedDocumentString(`
+    query SellerOrderPickupCalendar($orderId: ID!, $yearMonth: String!) {
+  sellerOrderPickupCalendar(orderId: $orderId, yearMonth: $yearMonth) {
+    days {
+      date
+      selectable
+      reason
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<SellerOrderPickupCalendarQuery, SellerOrderPickupCalendarQueryVariables>;
+export const SellerOrderPickupTimeSlotsDocument = new TypedDocumentString(`
+    query SellerOrderPickupTimeSlots($orderId: ID!, $date: String!) {
+  sellerOrderPickupTimeSlots(orderId: $orderId, date: $date) {
+    morning {
+      time
+      available
+    }
+    afternoon {
+      time
+      available
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<SellerOrderPickupTimeSlotsQuery, SellerOrderPickupTimeSlotsQueryVariables>;
+export const SellerRescheduleOrderPickupDocument = new TypedDocumentString(`
+    mutation SellerRescheduleOrderPickup($input: SellerRescheduleOrderPickupInput!) {
+  sellerRescheduleOrderPickup(input: $input) {
+    id
+    pickupAt
+  }
+}
+    `) as unknown as TypedDocumentString<SellerRescheduleOrderPickupMutation, SellerRescheduleOrderPickupMutationVariables>;
 export const SellerOrderConversationsDocument = new TypedDocumentString(`
     query SellerOrderConversations($input: CursorInput) {
   sellerConversations(input: $input) {
@@ -1538,12 +1979,15 @@ export const SellerOrderConversationsDocument = new TypedDocumentString(`
 export const SellerOrdersUpdatedDocument = new TypedDocumentString(`
     subscription SellerOrdersUpdated {
   sellerOrderUpdated {
+    kind
     orderId
     status
     pickupAt
     buyerName
     totalPrice
     productName
+    hasCustom
+    confirmDeadlineAt
     updatedAt
   }
 }
@@ -1603,13 +2047,22 @@ export const SellerProductDetailDocument = new TypedDocumentString(`
       minSelect
       maxSelect
       isActive
+      threeDCategory
       optionItems {
         id
       }
     }
+    customMode
+    customReadiness {
+      mode
+      issues {
+        code
+        message
+      }
+    }
     customTemplate {
       id
-      isActive
+      freeEditEnabled
       textTokens {
         id
       }
@@ -1724,6 +2177,7 @@ export const SellerProductManageDocument = new TypedDocumentString(`
     query SellerProductManage($productId: ID!) {
   sellerProduct(productId: $productId) {
     id
+    customMode
     optionGroups {
       id
       name
@@ -1738,15 +2192,17 @@ export const SellerProductManageDocument = new TypedDocumentString(`
         imageUrl
         priceDelta
         isActive
+        threeDKey
       }
     }
     customTemplate {
       id
       baseImageUrl
-      isActive
+      freeEditEnabled
       textTokens {
         id
         tokenKey
+        label
         defaultText
         maxLength
         isRequired
@@ -1754,6 +2210,8 @@ export const SellerProductManageDocument = new TypedDocumentString(`
         posY
         width
         height
+        textColor
+        textAlign
       }
     }
   }
@@ -1816,6 +2274,21 @@ export const SellerProductReorderOptionItemsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerProductReorderOptionItemsMutation, SellerProductReorderOptionItemsMutationVariables>;
+export const SellerProductSetCustomModeDocument = new TypedDocumentString(`
+    mutation SellerProductSetCustomMode($productId: ID!, $customMode: CustomModeType!) {
+  sellerSetProductCustomMode(productId: $productId, customMode: $customMode) {
+    id
+    customMode
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductSetCustomModeMutation, SellerProductSetCustomModeMutationVariables>;
+export const SellerProductApplyThreeDPresetDocument = new TypedDocumentString(`
+    mutation SellerProductApplyThreeDPreset($productId: ID!) {
+  sellerApplyThreeDOptionPreset(productId: $productId) {
+    id
+  }
+}
+    `) as unknown as TypedDocumentString<SellerProductApplyThreeDPresetMutation, SellerProductApplyThreeDPresetMutationVariables>;
 export const SellerProductUpsertTemplateDocument = new TypedDocumentString(`
     mutation SellerProductUpsertTemplate($input: SellerUpsertProductCustomTemplateInput!) {
   sellerUpsertProductCustomTemplate(input: $input) {
@@ -1823,13 +2296,6 @@ export const SellerProductUpsertTemplateDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerProductUpsertTemplateMutation, SellerProductUpsertTemplateMutationVariables>;
-export const SellerProductSetTemplateActiveDocument = new TypedDocumentString(`
-    mutation SellerProductSetTemplateActive($input: SellerSetProductCustomTemplateActiveInput!) {
-  sellerSetProductCustomTemplateActive(input: $input) {
-    id
-  }
-}
-    `) as unknown as TypedDocumentString<SellerProductSetTemplateActiveMutation, SellerProductSetTemplateActiveMutationVariables>;
 export const SellerProductUpsertTextTokenDocument = new TypedDocumentString(`
     mutation SellerProductUpsertTextToken($input: SellerUpsertProductCustomTextTokenInput!) {
   sellerUpsertProductCustomTextToken(input: $input) {
@@ -2270,6 +2736,94 @@ export const SellerStorePickupTimeSlotsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SellerStorePickupTimeSlotsQuery, SellerStorePickupTimeSlotsQueryVariables>;
+export const SellerStoreSettlementAccountDocument = new TypedDocumentString(`
+    query SellerStoreSettlementAccount {
+  sellerSettlementAccount {
+    bank {
+      code
+      name
+    }
+    accountHolder
+    accountNumberMasked
+    updatedByRole
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreSettlementAccountQuery, SellerStoreSettlementAccountQueryVariables>;
+export const SellerStorePaymentBanksDocument = new TypedDocumentString(`
+    query SellerStorePaymentBanks {
+  paymentBanks {
+    code
+    name
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStorePaymentBanksQuery, SellerStorePaymentBanksQueryVariables>;
+export const SellerStoreUpsertSettlementAccountDocument = new TypedDocumentString(`
+    mutation SellerStoreUpsertSettlementAccount($input: SellerUpsertSettlementAccountInput!) {
+  sellerUpsertSettlementAccount(input: $input) {
+    bank {
+      code
+      name
+    }
+    accountHolder
+    accountNumberMasked
+    updatedByRole
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreUpsertSettlementAccountMutation, SellerStoreUpsertSettlementAccountMutationVariables>;
+export const SellerStoreSettlementsDocument = new TypedDocumentString(`
+    query SellerStoreSettlements($input: SellerSettlementListInput) {
+  sellerSettlements(input: $input) {
+    items {
+      id
+      periodStart
+      periodEnd
+      orderCount
+      commissionAmount
+      payoutAmount
+      status
+      paidAt
+    }
+    totalCount
+    hasMore
+    nextCursor
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreSettlementsQuery, SellerStoreSettlementsQueryVariables>;
+export const SellerStoreSettlementDocument = new TypedDocumentString(`
+    query SellerStoreSettlement($settlementId: ID!) {
+  sellerSettlement(settlementId: $settlementId) {
+    id
+    periodStart
+    periodEnd
+    orderCount
+    settlementBaseAmount
+    commissionAmount
+    payoutAmount
+    status
+    paidAt
+    paidAccount {
+      bank {
+        name
+      }
+      accountHolder
+      accountNumberMasked
+    }
+    orders {
+      orderId
+      orderNumber
+      productName
+      status
+      commissionRateBps
+      settlementBaseAmount
+      commissionAmount
+      payoutAmount
+      settlementFinalizedAt
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<SellerStoreSettlementQuery, SellerStoreSettlementQueryVariables>;
 export const SellerUploadsCreateUploadUrlDocument = new TypedDocumentString(`
     mutation SellerUploadsCreateUploadUrl($input: SellerCreateUploadUrlInput!) {
   sellerCreateUploadUrl(input: $input) {

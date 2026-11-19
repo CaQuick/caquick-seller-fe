@@ -4,6 +4,7 @@
 
 - 필수 status check: `check` · `pr-title` · `coverage-report` · `Analyze (javascript-typescript)`
 - `develop`은 Repository Admin이 bypass 가능(릴리즈 뒤 main으로 fast-forward 동기화용). `main`은 bypass 없음.
+- `develop` 삭제 금지는 우회자 없는 별도 Ruleset(`develop-no-deletion`)에 둔다 — 같은 Ruleset에 두면 Admin 우회가 릴리즈 PR 머지 때의 `delete_branch_on_merge` 자동 삭제에도 적용돼 develop이 지워진다.
 - 라벨은 caquick-be 세트 11개(`github_issue_label`, for_each). GitHub 기본 라벨(bug·documentation 등)은 관리 밖이라 남아 있어도 plan에 뜨지 않는다.
 
 ```bash

@@ -6,6 +6,8 @@ const config: KnipConfig = {
   entry: ['scripts/*.{mjs,ts}', 'src/test/**/*.{ts,tsx}', 'src/shared/config/tokens.ts'],
   project: ['src/**/*.{ts,tsx}', 'app/**/*.tsx', 'scripts/**'],
   ignoreExportsUsedInFile: true,
+  // @jest-environment 경로는 jest가 rootDir 기준으로 풀지만 knip은 spec 파일 기준으로 푼다
+  ignoreUnresolved: ['./src/test/skia-environment.js'],
   // global.css는 metro(withNativeWind)가 처리한다 — knip이 따라갈 import가 없다
   ignoreDependencies: [
     // expo-router의 SplashScreen이 쓰는 네이티브 모듈 — 직접 import하지 않는다
@@ -14,6 +16,8 @@ const config: KnipConfig = {
     'pretendard',
     // babel.config.js의 preset — expo가 의존성으로 함께 설치한다
     'babel-preset-expo',
+    // Metro 해석기 — expo가 함께 설치하고, metro-config.spec이 앱 번들과 같은 해석으로 확인한다
+    'metro-resolver',
     // src/test/mocks의 jest.mock 대상(@native-html/render의 하위 의존성) — 직접 import하지 않는다
     'stringify-entities',
   ],

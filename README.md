@@ -10,6 +10,7 @@
 - TanStack Query · fetch 래퍼 · graphql-ws · graphql-codegen(client-preset)
 - NativeWind v4(Tailwind 3.4) · 디자인 토큰 1벌 · Pretendard
 - zustand · expo-secure-store · react-hook-form + zod
+- three · polygon-clipping · React Three Fiber(expo-gl) · React Native Skia(3D 케이크, 구매자 편집기와 같은 코드·버전)
 - Jest(jest-expo) · Testing Library(React Native) · MSW
 - EAS Build(맥미니 로컬) · EAS Submit · EAS Update(OTA)
 
@@ -55,10 +56,10 @@ iOS는 Apple 계정(APNs 자격 증명)이 생기기 전까지 푸시 토큰을 
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 인증 | 로그인 `/login` · 비밀번호 변경 `/change-password`(강제)·`/settings/change-password`                                                                                             |
 | 홈   | 판매자 홈 `/` — 오늘 현황·최근 주문·상품 등록 FAB                                                                                                                                |
-| 주문 | 목록 `/orders` · 상세 `/orders/[id]`(상태 변경·취소) · 새 주문 토스트(전역)                                                                                                      |
-| 상품 | 목록 `/products` · 상세 `/products/[id]` · 등록 3단계 `/products/new/{basic,options,preview}` · 수정 `edit` · 이미지 `images` · 옵션 `options` · 커스텀 템플릿 `custom-template` |
-| 채팅 | 목록 `/chats` · 채팅방 `/chats/[conversationId]`                                                                                                                                 |
-| 매장 | 매장 탭 `/store` · 기본 정보 · 영업시간 · 특별휴무 · 픽업 정책 · 일별 생산 수량 · 자동응답(FAQ) · 리뷰 · 구매자 화면 미리보기 · 조작 이력(`/store/*`)                            |
+| 주문 | 목록 `/orders` · 상세 `/orders/[id]`(상태 변경·거절·취소·노쇼·픽업 일시 변경·커스텀 표시) · 3D 디자인 `/orders/[id]/design` · 새 주문·취소·마감 임박 토스트(전역)                |
+| 상품 | 목록 `/products` · 상세 `/products/[id]` · 등록 `new/{basic,options,preview}` · 수정 `edit` · 이미지 `images` · 옵션 `options` · 커스텀 방식 `customization` → `custom-template` |
+| 채팅 | 목록 `/chats` · 채팅방 `/chats/[conversationId]`(사진 보내기·받기)                                                                                                               |
+| 매장 | 매장 탭 `/store` · 기본 정보 · 영업시간 · 특별휴무 · 픽업 정책 · 일별 생산 수량 · 자동응답(FAQ) · 리뷰 · 구매자 화면 미리보기 · 조작 이력 · 정산 계좌 · 정산 내역(`/store/*`)    |
 | 설정 | `/settings` — 계정·알림 권한·업데이트 확인·로그아웃                                                                                                                              |
 
 ## 명령어

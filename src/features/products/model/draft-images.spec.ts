@@ -6,7 +6,7 @@ import { mockFileSizes, mockUploads } from '@/test/mocks';
 import { graphqlError } from '@/test/msw/graphql';
 import { server } from '@/test/msw/server';
 
-import { pickImages, uploadDraftImage } from './draft-images';
+import { pickImages, pickSquareImage, squareCropRect, uploadDraftImage } from './draft-images';
 import { useDraftStore } from './draft-store';
 
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
@@ -76,6 +76,42 @@ describe('pickImages', () => {
   it('취소하면 빈 배열', async () => {
     jest.mocked(launchImageLibraryAsync).mockResolvedValueOnce({ canceled: true } as never);
     await expect(pickImages(1)).resolves.toEqual([]);
+  });
+});
+
+describe('squareCropRect', () => {
+  it.each<[number, number, ReturnType<typeof squareCropRect>]>([
+    [1000, 1000, { originX: 0, originY: 0, width: 1000, height: 1000 }],
+    [3000, 2000, { originX: 500, originY: 0, width: 2000, height: 2000 }],
+    [2000, 3000, { originX: 0, originY: 500, width: 2000, height: 2000 }],
+    [1001, 1000, { originX: 0, originY: 0, width: 1000, height: 1000 }],
+    [1000, 1003, { originX: 0, originY: 1, width: 1000, height: 1000 }],
+    [1, 4000, { originX: 0, originY: 1999, width: 1, height: 1 }],
+  ])('%d×%d는 가운데 정사각으로 자른다', (width, height, expected) => {
+    expect(squareCropRect({ width, height })).toEqual(expected);
+  });
+});
+
+describe('pickSquareImage', () => {
+  it('1:1 편집을 켜고 고른 사진에 가운데 정사각 자르기를 붙인다', async () => {
+    jest.mocked(launchImageLibraryAsync).mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file:///a.jpg', width: 1080, height: 1081 }],
+    } as never);
+    await expect(pickSquareImage()).resolves.toEqual({
+      uri: 'file:///a.jpg',
+      width: 1080,
+      height: 1081,
+      crop: { originX: 0, originY: 0, width: 1080, height: 1080 },
+    });
+    expect(launchImageLibraryAsync).toHaveBeenLastCalledWith(
+      expect.objectContaining({ allowsEditing: true, aspect: [1, 1] }),
+    );
+  });
+
+  it('취소하면 null', async () => {
+    jest.mocked(launchImageLibraryAsync).mockResolvedValueOnce({ canceled: true } as never);
+    await expect(pickSquareImage()).resolves.toBeNull();
   });
 });
 

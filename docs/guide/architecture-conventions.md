@@ -30,18 +30,18 @@ app/                       expo-router 파일 라우트. 얇게. spec 금지(typ
     (tabs)/                홈·주문·상품·채팅·매장 (탭 안에 Stack을 두지 않습니다)
     orders/·products/·chats/·store/·settings/   상세 화면은 루트 Stack에 둡니다
 src/
-  features/<area>/         auth·home·orders·products·chats·store·reviews·settings·push·uploads
+  features/<area>/         auth·home·orders·products·custom·chats·store·reviews·settings·push·uploads
     api/                   graphql() 문서 + 쿼리 키·queryOptions 팩토리
     model/                 zustand 스토어·zod 스키마·순수 로직
     ui/                    화면 조립 컴포넌트와 부품
     index.ts               밖에 내놓는 것만
   shared/
     api/                   config·errors·graphql-client·rest-client·session·ws-client
-    ui/                    Button·TextField·Sheet·Screen 같은 공용 부품
-    lib/                   kst·format·josa·zod-locale·upload·storage(SecureStore)·cn
+    ui/                    Button·TextField·Sheet·Screen·ImageViewer 같은 공용 부품
+    lib/                   kst·format·josa·zod-locale·upload·storage(SecureStore)·cn·enum-view·skia-text
     config/                env.ts(EXPO_PUBLIC_*)·tokens.ts(색·간격·반경·자간)
   graphql/generated/       codegen 산출물(커밋)
-  test/                    setup·mocks·msw·render·factories
+  test/                    setup·mocks·msw·render·factories·skia(CanvasKit 환경·글꼴)
 ```
 
 - **shared → features 금지.** 공용이 도메인을 알면 공용이 아닙니다.
@@ -61,7 +61,7 @@ src/
 - **쿼리 키**는 feature별 팩토리(`ordersKeys.list(filters)`, `ordersKeys.detail(id)`)로만 만듭니다. 문자열 리터럴 키는 쓰지 않습니다.
 - **mutation 뒤**에는 그 feature의 list·detail 키를 invalidate합니다. 낙관적 업데이트는 쓰지 않습니다. 서버 결과가 진실입니다.
   - 예외(D49): 노출 스위치처럼 즉시 피드백이 필요한 토글과 조작마다 바로 저장하는 옵션 편집기는 화면을 먼저 바꾸고, 실패하면 되돌린 뒤 토스트를 띄웁니다. 노출 스위치는 `onMutate`에서 관련 쿼리를 cancel하고 스냅샷을 잡아 캐시를 고치고, `onError`에서 스냅샷으로 되돌리며, `onSettled`에서 invalidate합니다. 옵션 편집기는 요청이 도는 동안 서버 값으로 덮지 않고, 실패하면 캐시의 서버 값으로 되돌립니다.
-  - 채팅 전송은 캐시를 미리 고치지 않고 화면 로컬의 '보내는 중' 버블로 보여 준 뒤 응답 메시지로 바꿉니다.
+  - 채팅 전송은 캐시를 미리 고치지 않고 화면 로컬의 '보내는 중' 버블로 보여 준 뒤 응답 메시지로 바꿉니다. 사진은 올리기 → 보내기 두 단계라, 올린 주소를 대기 버블에 남겨 재시도가 다시 올리지 않습니다.
 - **구독**은 `subscribe(Document, variables, sink)`(`@/shared/api`)를 feature 훅의 `useEffect`에서 부르고 해제 함수를 그대로 돌려줍니다. shared는 연결·4401 재인증만 맡고, 캐시 갱신과 워터마크 비교는 구독하는 feature의 `model/`에 순수 함수로 둡니다.
   - 주문: `orderId`별 `updatedAt`(`createOrderWatermark` — `orders/model/order-updates.ts`, `home/model/home.ts`).
   - 대화: `(lastMessageAt, sellerLastReadAt)` 사전식(`chats/model/conversation-merge.ts`). 로컬에서 읽음 처리한 뒤 도착한 이벤트의 `unreadCount`는 로컬 `sellerLastReadAt`이 더 크면 0으로 봅니다.
@@ -69,15 +69,21 @@ src/
 - **RN 배선**: `onlineManager`는 네트워크 상태, `focusManager`는 AppState, 화면 포커스 refetch는 `useFocusEffect`로 잇습니다.
 - **목록**은 커서 방식(`items · totalCount · hasMore · nextCursor`)이 기본이고 무한 스크롤로 이어 붙입니다. 필터는 화면 상태(zustand 또는 로컬 state)에 둡니다.
 - **ID**는 문자열 그대로 씁니다. `"0"`·빈 문자열을 truthy 검사로 버리지 않습니다.
+- **enum 표시**는 `enumView(table, fallback)`(`shared/lib/enum-view.ts`)로만 합니다(D58). BE가 앱보다 먼저 값을 늘려도 화면이 죽지 않게 모르는 값은 폴백으로 그립니다.
+  - 표는 호출 안에서 `satisfies Record<Enum, V>`로 적어 빠진 값을 컴파일에서 잡습니다. 판매자에게 일부만 보이는 enum은 `Partial<Record<…>>`로 둡니다.
+  - `src/test/enum-view-guard.spec.ts`가 `enumView(` 인자 밖의 `Record<생성 enum, …>`을 막습니다(TypeScript AST, 생성 enum 목록은 codegen 산출물에서 읽음). 매핑 타입(`{ [K in Enum]: V }`)이나 `as const` 표를 enum 값으로 직접 인덱싱하는 것은 가드가 보지 않으니 리뷰에서 막습니다.
 - **날짜**는 표시·입력 KST, 전송 ISO(UTC)입니다. `shared/lib/kst.ts`가 UTC+9 산술로 처리하고 `Intl`을 쓰지 않습니다(Hermes의 플랫폼별 편차 회피). 천단위 구분도 자체 `formatNumber`입니다.
 - **업로드**(`shared/lib/upload.ts`): manipulate(≤1600px, JPEG 0.85) → `new File(uri).size` → `sellerCreateUploadUrl` → `file.upload(PUT)` → `publicUrl`. presign이 Content-Length를 서명에 넣으므로 축소를 먼저 하고 그 결과의 크기로 presign합니다.
-  - shared는 GraphQL 문서를 갖지 않으므로 presign 함수는 feature가 넣습니다: 상품 이미지 `features/uploads`의 `presignUpload`, 매장 로고 store의 `presignStoreImage`. 용도(`purpose`)도 호출한 쪽이 정합니다.
-  - 실패는 `ApiError`입니다: 빈 파일·5MB 초과는 `BAD_USER_INPUT`, PUT 연결 실패는 `NETWORK`, PUT 비2xx는 그 status를 담은 `INTERNAL_SERVER_ERROR`.
+  - shared는 GraphQL 문서를 갖지 않으므로 presign 함수는 feature가 넣습니다: 상품 이미지·채팅 사진은 `features/uploads`의 `presignUpload`, 매장 로고 store의 `presignStoreImage`. 용도(`purpose`)도 호출한 쪽이 정합니다.
+  - 최대 크기는 용도별입니다(채팅 사진 `CONVERSATION_IMAGE` 10MB, 그 밖 5MB, BE presign과 같은 값).
+  - 실패는 `ApiError`입니다: 빈 파일·최대 크기 초과는 `BAD_USER_INPUT`, PUT 연결 실패는 `NETWORK`, PUT 비2xx는 그 status를 담은 `INTERNAL_SERVER_ERROR`.
   - 여러 장은 장마다 따로 올립니다. 실패한 장만 '다시 올리기'가 뜨고, 초안 이미지는 재시도용 원본(`source`)을 들고 있습니다. 올리는 사이 지운 이미지에는 결과를 반영하지 않습니다.
   - 상품 이미지 상한은 6장(`MAX_IMAGES`, BE `MAX_PRODUCT_IMAGES`와 같음, D46)입니다.
+  - 슬롯형 바탕은 `PickedImage.crop`(가운데 정사각)을 먼저 자르고 그 크기로 축소합니다(D62).
 - **여러 mutation을 잇는 저장**은 부분 실패를 전제로 합니다. 호출 하나가 성공할 때마다 진행을 기록하고, 다시 시도하면 끝난 호출을 건너뜁니다.
   - 상품 등록(`runCreateChain`): 숨김 상태로 생성 → 이미지 2장째부터 추가 → 카테고리 → 태그 → 옵션 그룹·아이템 → 노출. 진행(`SubmitProgress`)에 productId·추가한 이미지 수·그룹/아이템 key별 서버 id를 남깁니다. 마지막에 노출하므로 중간에 멈춘 상품은 구매자에게 보이지 않고, 포기하면 만든 상품을 지웁니다(`abandonCreate`).
   - 상품 수정(`pendingSteps`): 정보·카테고리·태그 단계마다 성공한 값을 기준값에 반영하고, 실패하면 남은 차이부터 다시 계산합니다. 토스트에 멈춘 단계를 함께 알립니다.
+- **계좌번호 원문**(정산 계좌)은 저장 mutation 변수로만 보냅니다. 캐시에는 응답(끝 4자리)만 `setQueryData`로 쓰고, 성공하면 폼을 비운 뒤 `mutation.reset()`으로 변수까지 지웁니다(`gcTime: 0`).
 - **기기 저장 키**는 `caquick.<이름>`입니다: SecureStore `caquick.refreshToken`, AsyncStorage `caquick.productDraft`.
   - 상품 임시저장 초안은 기기 1벌입니다(D30). 저장할 때 업로드가 끝난 이미지의 `publicUrl`만 남기고, 읽을 때 zod로 검증해 모양이 다르면(앱 버전이 바뀐 경우 포함) 버립니다.
   - 초안의 그룹·아이템·이미지 `key`는 `newKey(prefix)`로 만든 클라이언트 값이고, 등록 진행이 이 key로 서버 id를 기억합니다. 등록 중에는 key를 다시 만들지 않고, 초안을 복원하면 진행은 비웁니다. 서버 데이터를 고치는 화면(옵션 편집)은 서버 id를 key로 씁니다.
@@ -94,7 +100,8 @@ src/
 - **로그인 성공** 뒤 푸시 토큰을 등록합니다(`sellerRegisterPushToken`). **로그아웃**은 푸시 토큰 해제(best effort) → `/auth/seller/logout` → SecureStore 삭제 → ws dispose → queryClient clear 순서입니다.
 - **푸시 토큰**(`features/push`): 권한 팝업은 로그인 직후에만 띄우고, 앱 시작과 설정에서 권한을 켜고 돌아온 때는 묻지 않고 다시 등록합니다(`ensurePushToken`, 겹친 호출은 하나로). EAS `projectId`가 없으면 등록을 건너뛰고 경고 로그만 남깁니다(D48). 해제는 `onBeforeLogout` 콜백입니다.
 - **푸시·구독 중복 제거**: 앱이 열려 있으면 같은 사건이 구독과 포그라운드 푸시로 두 번 옵니다. 시스템 배너는 끄고(D39) 인앱 토스트 하나만 띄웁니다.
-  - 새 주문: `(app)` 레이아웃의 전역 구독(`useNewOrderNotices`)과 포그라운드 푸시가 모두 `notifyNewOrder(orderId)`를 부르고, 최근 orderId 50개를 기억해 먼저 온 쪽만 토스트를 띄웁니다. 구독이 끊겨 있으면 푸시가 대신 알립니다.
+  - 새 주문: `(app)` 레이아웃의 전역 구독(`useNewOrderNotices`, `kind` SUBMITTED만)과 포그라운드 푸시가 모두 `notifyNewOrder(orderId)`를 부르고 먼저 온 쪽만 토스트를 띄웁니다. 구독이 끊겨 있으면 푸시가 대신 알립니다.
+  - 주문 취소·확정 마감 임박: 포그라운드 푸시만 `notifyOrder(kind, orderId)`로 알립니다. 주문 알림 토스트는 최근 `${kind}:${orderId}` 50개를 기억해, 같은 주문이라도 종류가 다르면 막지 않습니다.
   - 문의: 채팅 탭과 그 대화방에서는 목록·방 구독이 화면을 갱신하므로 푸시 토스트를 띄우지 않습니다(`shouldToastMessage`, 경로 기준).
   - 캐시 무효화는 토스트 여부와 관계없이 푸시마다 합니다(`staleKeysFor`).
 - **비밀번호 변경 성공**은 BE가 기존 토큰을 무효화하므로 로그아웃과 같은 로컬 정리를 한 뒤 로그인 화면으로 보냅니다.
@@ -125,12 +132,27 @@ src/
 - **접근성 기본**: 터치 타깃 44pt(`size.touchTarget`), 아이콘 버튼에는 `accessibilityLabel`. 안전 영역은 `useSafeAreaInsets`.
 - **문구**는 한국어이며 feature별 상수 1곳에 둡니다. 조사는 `shared/lib/josa.ts`.
 - **원격 이미지는 `expo-image`**(D51)로 그립니다. S3 직접 URL이고 CDN이 없어 디스크 캐시가 필요하므로 공용 `RemoteImage`(`shared/ui`, `cachePolicy="memory-disk"`)를 거치고, RN `Image`는 번들 로고 PNG에만 씁니다.
+- **슬롯 문구 렌더**는 `products/model/slot-layout.ts`가 정본입니다(D61). 구매자 합성 이미지가 같은 규칙을 따르므로 글꼴·줄 높이·크기 탐색을 바꾸면 구매자 쪽과 함께 바꿉니다. 줄 폭 측정은 주입받아 글꼴 엔진과 떨어뜨립니다.
+  - 미리보기는 Skia 문단으로 재고 그립니다(`slot-preview.ts`, D81). 글꼴 공급자는 3D 데칼과 같은 `usePretendardFonts`(`shared/lib/skia-text`)이고, 읽는 동안은 비워 둡니다.
+- **전체 화면 이미지**는 공용 `ImageViewer`(`shared/ui`)로 엽니다(D80). 주문 캡처·합성 이미지·참고 사진이 같은 화면을 씁니다.
 - 월 달력은 자체 `MonthCalendar`(`shared/ui`), 시간 선택은 `@react-native-community/datetimepicker`(`TimeRow`), 드래그 정렬은 `react-native-sortables`입니다. `react-native-calendars`는 쓰지 않아 뺐습니다(D50).
+- **3D 케이크 형상**(`features/custom/model/three`)은 구매자 편집기(caquick-fe-v2 `src/screens/custom`)의 외곽선·둘레 투영·장식·데칼 지오메트리·회전 코드를 복사한 것입니다(D64). 두 앱이 같은 주문을 같은 모양으로 그려야 하므로 상수·수학을 여기서 바꾸지 않습니다.
+  - `golden.spec`이 구매자 코드로 뽑은 fixture(`__fixtures__/three-golden.json`)와 비교합니다. 정점·행렬 같은 큰 배열은 값마다 float32로 맞춘 비트 해시가 같아야 하고(정점 하나의 차이도 잡습니다), 집계값과 값 그대로 둔 배열(둘레 표본·투영·회전 프레임)은 1e-9 안이어야 합니다. 구매자 쪽이 바뀌면 같은 변경을 옮기고 `FT_DIR=<caquick-fe-v2> pnpm tsx scripts/three-golden.ts <ref>`로 fixture를 다시 만듭니다. 생성기는 구매자 레포가 있어야 해서 CI에서 돌지 않습니다.
+  - three·polygon-clipping·`@react-three/fiber`는 구매자 lock과 같은 정확한 버전으로 고정하고, Dependabot이 올리지 않게 막아 두었습니다. 구매자와 함께 손으로 올립니다. 설치본이 구매자 lock과 다르면 생성기가 멈추고 spec도 실패합니다. three는 ESM 전용이라 jest가 `three.module.js`를 직접 변환합니다.
+  - 주문의 `threeDDesign`은 `parseThreeDDesign`(`custom/model/design-json.ts`)으로만 읽습니다. v1이 아니거나 모르는 모양·디자인·효과·항목 종류면 `unsupported`, 깨진 값이면 `invalid`를 돌려주고 화면은 구매자 캡처로 대신합니다. 모르는 값을 비슷한 값으로 바꿔 그리지 않습니다.
+- **3D 렌더러**(`features/custom`, D75~D79)는 형상 코드 위에 그리기만 다시 쓴 것입니다.
+  - `resolveCakeRender`가 디자인을 카탈로그(시트 색·크기 배율·꾸미기 이미지)로 풀고, 못 찾거나(`catalogMiss`) 상한(항목 50·텍스처 40)을 넘으면 캡처로 대신할 이유를 돌려줍니다. 주문 화면은 `designView`로 3D·로딩·캡처를 고르고, `catalogMiss`면 묵은 캐시일 수 있어 카탈로그를 한 번 다시 받은 뒤에 판정합니다.
+  - 장면(`ui/three/cake-scene.tsx`)은 구매자 CakeCanvas·SheetDesign·ItemDecal의 카메라·조명·재질 값을 그대로 둔 R3F JSX입니다. 회전 입력은 RNGH Pan → `Spin`, 그리기는 `frameloop="demand"`입니다.
+  - 데칼 텍스처는 Skia 오프스크린(`model/texture/decal-raster.ts`)에 그리고 효과는 Skia 이미지 필터(`effect-filter.ts`)입니다. 효과 계수는 구매자 CSS 값을 그대로 쓰되 Chrome canvas와 픽셀로 맞춘 해석(blur = 표준편차)을 따릅니다(D76).
+  - three·expo-gl은 `CakeViewer`가 `React.lazy`로 불러 주문 3D 화면을 열 때 평가합니다. 캔버스 안 오류는 경계가 받아 캡처로 바꿉니다.
+  - Metro는 `three`를 require·import 모두 ESM 입구(`three.module.js`) 하나로 풉니다(`metro.config.js`). require 입구 `three.cjs`는 Node 전용 `process.emitWarning`을 불러 RN에서 죽는데, R3F 번들이 CommonJS라 그대로 두면 이 입구로 갑니다. `src/test/metro-config.spec.ts`가 Metro 해석기로 확인합니다.
 
 ## 7. 테스트
 
 - `*.spec.ts(x)`를 소스 옆에 둡니다. `app/` 안에는 두지 않습니다(§2). `it`은 한국어 평서형입니다.
 - **jest-expo** preset, 환경은 `react-native-env`(Node 기반)라 Node 24의 fetch가 MSW(`msw/node`)에 닿습니다. 앱 런타임에서는 MSW를 쓰지 않습니다.
+- **Skia**는 전역 mock(`src/test/mocks`)이 CanvasKit 위의 JS 구현을 줍니다. 실제 픽셀을 그려 보는 spec만 첫 주석 `@jest-environment ./src/test/skia-environment.js`로 CanvasKit(wasm)을 올립니다(초기화가 무거워 전역으로 두지 않습니다). 글꼴은 `src/test/skia.ts`의 `pretendardFonts()`로 앱이 번들하는 Pretendard 700을 씁니다. `Canvas`는 View로 그려지고 `useFonts`는 글꼴을 주지 않습니다.
+- **R3F 장면**은 `@react-three/test-renderer`로 장면 그래프(메시·재질·카메라·프레임 진행)를 봅니다. 네이티브 `Canvas`는 jest에서 GL 컨텍스트가 없어 장면을 그리지 않습니다.
 - **RNTL 14는 전부 async**입니다: `await render(...)`, `await fireEvent.press(...)`, `await screen.findByText(...)`. 공용 렌더는 `src/test/render.tsx`(새 QueryClient·retry false·쿼리와 뮤테이션 gcTime 0·GestureHandlerRoot·BottomSheetModalProvider), 라우팅 검증은 `expo-router/testing-library`의 `renderRouter`.
 - **네트워크는 MSW**로 계약 기반 mock(응답 모양은 codegen 타입을 따르고, 헬퍼는 `src/test/msw/graphql.ts`). fetch를 직접 stub하지 않습니다. `onUnhandledRequest: 'error'`.
 - **네이티브 모듈 페이크**는 `src/test/mocks/index.ts`에만 둡니다(SecureStore Map·notifications·updates·file-system `File`). jest-expo가 비워 두는 것만 채우고, `afterEach`가 비웁니다.

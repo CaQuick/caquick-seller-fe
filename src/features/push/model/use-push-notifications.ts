@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { onBeforeLogout, useSessionStore } from '@/features/auth';
-import { notifyNewOrder } from '@/features/orders';
+import { notifyNewOrder, notifyOrder } from '@/features/orders';
 import { showToast } from '@/shared/ui';
 
 import { PUSH_COPY } from './copy';
@@ -85,10 +85,13 @@ export function usePushNotifications(queryClient: QueryClient) {
       if (!target) return;
       for (const queryKey of staleKeysFor(target)) void queryClient.invalidateQueries({ queryKey });
       const { title, body } = request.content;
+      const text = PUSH_COPY.foreground(title ?? '', body ?? '');
+      if (target.kind === 'BUYER_MESSAGE') {
+        if (shouldToastMessage(target.conversationId, pathRef.current)) showToast.info(text);
+      }
       // 새 주문은 구독이 먼저 알렸으면 건너뛴다(구독이 끊겼을 때 푸시가 대신 알림)
-      if (target.kind === 'ORDER_SUBMITTED') notifyNewOrder(target.orderId, body ?? '');
-      else if (shouldToastMessage(target.conversationId, pathRef.current))
-        showToast.info(PUSH_COPY.foreground(title ?? '', body ?? ''));
+      else if (target.kind === 'ORDER_SUBMITTED') notifyNewOrder(target.orderId, body ?? '');
+      else notifyOrder(target.kind, target.orderId, text);
     });
     const response = Notifications.addNotificationResponseReceivedListener((r) => open(r));
     return () => {

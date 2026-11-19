@@ -1,4 +1,9 @@
-import { type AuditActionType, type AuditTargetType } from '@/graphql/generated/graphql';
+import {
+  type AuditActionType,
+  type AuditTargetType,
+  type OrderStatusType,
+} from '@/graphql/generated/graphql';
+import { enumView } from '@/shared/lib/enum-view';
 import { formatNumber } from '@/shared/lib/format';
 import { addDays, formatYmd, kstParts, todayKst, WEEKDAYS_KO } from '@/shared/lib/kst';
 import { type StatusTone } from '@/shared/ui';
@@ -16,14 +21,23 @@ export const AUDIT_FILTERS: readonly { value: AuditTargetType | null; label: str
   { value: 'ORDER', label: '주문' },
   { value: 'CONVERSATION', label: '대화' },
   { value: 'CHANGE_PASSWORD', label: '비밀번호' },
+  { value: 'SETTLEMENT_ACCOUNT', label: '정산 계좌' },
 ];
 
-export const ACTION_VIEW: Record<AuditActionType, { label: string; tone: StatusTone }> = {
-  CREATE: { label: '생성', tone: 'mint' },
-  UPDATE: { label: '수정', tone: 'purple' },
-  DELETE: { label: '삭제', tone: 'red' },
-  STATUS_CHANGE: { label: '상태 변경', tone: 'gray' },
-};
+interface ActionView {
+  label: string;
+  tone: StatusTone;
+}
+
+export const auditActionView = enumView<ActionView>(
+  {
+    CREATE: { label: '생성', tone: 'mint' },
+    UPDATE: { label: '수정', tone: 'purple' },
+    DELETE: { label: '삭제', tone: 'red' },
+    STATUS_CHANGE: { label: '상태 변경', tone: 'gray' },
+  } satisfies Record<AuditActionType, ActionView>,
+  { label: '변경', tone: 'gray' },
+);
 
 /** 어느 설정을 건드렸는지 — 기록에 남은 키로 고른다(앞이 우선) */
 const AREA: readonly [string, string][] = [
@@ -66,15 +80,23 @@ const KEY_LABEL: Record<string, { label: string; unit?: string }> = {
   dayOfWeek: { label: '요일' },
   isClosed: { label: '휴무' },
   tokenKey: { label: '문구 키' },
+  bank_code: { label: '은행 코드' },
+  account_holder: { label: '예금주' },
+  account_number_last4: { label: '계좌번호 끝 4자리' },
 };
 
-const ORDER_STATUS: Record<string, string> = {
-  SUBMITTED: '접수',
-  CONFIRMED: '확정',
-  MADE: '제작 완료',
-  PICKED_UP: '픽업 완료',
-  CANCELED: '취소',
-};
+const orderStatusLabel = enumView<string | null>(
+  {
+    PENDING_PAYMENT: '입금 대기',
+    SUBMITTED: '접수',
+    CONFIRMED: '확정',
+    MADE: '제작 완료',
+    PICKED_UP: '픽업 완료',
+    NO_SHOW: '노쇼',
+    CANCELED: '취소',
+  } satisfies Record<OrderStatusType, string>,
+  null,
+);
 
 /** 식별자는 판매자에게 의미가 없어 diff에서 뺀다(영역 판별에만 쓴다) */
 const isIdKey = (key: string) => /(^id|Ids?)$/.test(key.split('.').at(-1) ?? '');
@@ -117,7 +139,7 @@ export function formatValue(key: string, value: unknown): string {
     return `${formatNumber(value)}${KEY_LABEL[leaf]?.unit ?? ''}`;
   }
   if (typeof value === 'string') {
-    if (leaf === 'status') return ORDER_STATUS[value] ?? value;
+    if (leaf === 'status') return orderStatusLabel(value) ?? value;
     if (/^\d{4}-\d{2}-\d{2}(T00:00:00(\.000)?Z)?$/.test(value)) return value.slice(0, 10);
     if (/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(value)) {
       const k = kstParts(value);
@@ -160,13 +182,18 @@ export function diffText(lines: readonly DiffLine[], max = DIFF_MAX_LINES): stri
   return shown.join('\n');
 }
 
-const TARGET_LABEL: Partial<Record<AuditTargetType, string>> = {
-  STORE: '매장',
-  PRODUCT: '상품',
-  ORDER: '주문',
-  CONVERSATION: '대화',
-  CHANGE_PASSWORD: '비밀번호',
-};
+/** 판매자 감사 로그에 나오는 대상만 적고 나머지는 '기타' */
+export const auditTargetLabel = enumView<string>(
+  {
+    STORE: '매장',
+    PRODUCT: '상품',
+    ORDER: '주문',
+    CONVERSATION: '대화',
+    CHANGE_PASSWORD: '비밀번호',
+    SETTLEMENT_ACCOUNT: '정산 계좌',
+  } satisfies Partial<Record<AuditTargetType, string>>,
+  '기타',
+);
 
 export interface AuditLogLike {
   targetType: AuditTargetType;
@@ -177,15 +204,16 @@ export interface AuditLogLike {
 
 /** 행 제목과 펼침 diff. 비밀번호 변경은 값 없이 시각만 남긴다 */
 export function describeAudit(log: AuditLogLike): { title: string; diff: DiffLine[] } {
-  const label = TARGET_LABEL[log.targetType] ?? log.targetType;
+  const label = auditTargetLabel(log.targetType);
   if (log.targetType === 'CHANGE_PASSWORD') return { title: label, diff: [] };
   const before = parseJson(log.beforeJson);
   const after = parseJson(log.afterJson);
   const merged = { ...before, ...after };
   const area = AREA.find(([key]) => key in merged)?.[1];
   const name = typeof merged.name === 'string' && merged.name ? merged.name : null;
+  // 매장마다 하나뿐인 대상은 번호 없이 이름만
   const subject =
-    log.targetType === 'STORE'
+    log.targetType === 'STORE' || log.targetType === 'SETTLEMENT_ACCOUNT'
       ? label
       : log.targetType === 'PRODUCT' && name
         ? name

@@ -1,7 +1,7 @@
 import { type QueryClient } from '@tanstack/react-query';
 import { router as nav } from 'expo-router';
 import { act } from '@testing-library/react-native';
-import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
+import { fireEvent, renderRouter, screen, waitFor, within } from 'expo-router/testing-library';
 import { type ReactNode } from 'react';
 import { Text } from 'react-native';
 import { HttpResponse, graphql } from 'msw';
@@ -40,6 +40,7 @@ const dashboard = (over: Partial<Dashboard> = {}): Dashboard => ({
   pickupDay: { salesAmount: 165000 },
   createdDay: { orderCount: 2 },
   remainingCapacity: 12,
+  pendingPaymentQuantity: 0,
   activeProductCount: 18,
   unansweredConversationCount: 3,
   ...over,
@@ -52,6 +53,8 @@ const order = (id: string, status: Order['status'], name: string | null): Order 
   buyerName: '김다은',
   firstItemName: name,
   firstItemImageUrl: null,
+  firstItemCustomImageUrl: null,
+  hasCustom: false,
 });
 
 const ORDERS = [
@@ -153,6 +156,48 @@ describe('HomeScreen', () => {
     expect(screen.queryByText(/제작 가능/)).toBeNull();
     await fireEvent.press(screen.getByRole('link', { name: '생산 수량 설정하기' }));
     await waitFor(() => expect(router.getPathname()).toBe('/store/daily-capacities'));
+  });
+
+  it('입금 대기 주문이 차지한 수량이 있으면 남은 수량 아래 수량만 따로 적는다', async () => {
+    serve({ board: dashboard({ remainingCapacity: 9, pendingPaymentQuantity: 3 }) });
+    await open();
+    expect(await screen.findByText('9개')).toBeTruthy();
+    expect(screen.getByText('입금 대기 3개 포함')).toBeTruthy();
+  });
+
+  it.each([
+    ['입금 대기가 없으면', { remainingCapacity: 9, pendingPaymentQuantity: 0 }, '9개'],
+    [
+      '생산 수량 설정이 없으면',
+      { remainingCapacity: null, pendingPaymentQuantity: 3 },
+      '생산 수량 설정하기',
+    ],
+  ])('%s 입금 대기 수량을 적지 않는다', async (_, patch, shown) => {
+    serve({ board: dashboard(patch) });
+    await open();
+    expect(await screen.findByText(shown)).toBeTruthy();
+    expect(screen.queryByText(/입금 대기/)).toBeNull();
+  });
+
+  it('커스텀 주문은 커스텀 칩과 커스텀 대표 이미지를 쓴다', async () => {
+    serve({
+      orders: [
+        {
+          ...order('7', 'SUBMITTED', '레터링 케이크'),
+          hasCustom: true,
+          firstItemImageUrl: 'https://img/product.jpg',
+          firstItemCustomImageUrl: 'https://img/custom.jpg',
+        },
+      ],
+    });
+    await open();
+    const row = await screen.findByRole('button', { name: /^레터링 케이크, .+, 커스텀, 접수$/ });
+    expect(within(row).getByText('커스텀')).toBeTruthy();
+    const uris = row
+      .queryAll((n) => Array.isArray(n.props.source))
+      .flatMap((n) => (n.props.source as { uri: string }[]).map((src) => src.uri));
+    expect(uris).toContain('https://img/custom.jpg');
+    expect(uris).not.toContain('https://img/product.jpg');
   });
 
   it('남은 수량 0은 설정 없음(null)과 다르게 0개로 보여 준다', async () => {

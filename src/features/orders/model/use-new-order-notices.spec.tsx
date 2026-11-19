@@ -59,12 +59,14 @@ const emit = (patch: Record<string, unknown>) =>
       sink.next({
         data: {
           sellerOrderUpdated: {
+            kind: 'SUBMITTED',
             orderId: '9',
             status: 'SUBMITTED',
             pickupAt: '2026-10-12T02:00:00.000Z',
             buyerName: '김다은',
             totalPrice: 38000,
             productName: '딸기 타르트',
+            hasCustom: false,
             updatedAt: '2026-10-06T02:00:00.000Z',
             ...patch,
           },
@@ -116,9 +118,19 @@ describe('useNewOrderNotices', () => {
     async (status) => {
       const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
       await open('/');
-      await emit({ orderId: `31-${status}`, status });
+      await emit({ orderId: `31-${status}`, kind: 'STATUS_CHANGED', status });
       expect(toast).not.toHaveBeenCalled();
       expect(invalidate).not.toHaveBeenCalled();
+    },
+  );
+
+  // 반증: 상태로 거르면 접수 주문의 픽업 일시 변경이 새 주문으로 다시 뜬다
+  it.each(['PICKUP_RESCHEDULED', 'SOMETHING_NEW'])(
+    '접수 상태여도 %s 갱신은 새 주문으로 알리지 않는다',
+    async (kind) => {
+      await open('/');
+      await emit({ orderId: `41-${kind}`, kind, status: 'SUBMITTED' });
+      expect(toast).not.toHaveBeenCalled();
     },
   );
 

@@ -7,16 +7,27 @@ import {
   type Presign,
   type PresignInput,
   targetSize,
+  type UploadPurpose,
   uploadImage,
 } from './upload';
 
+const MB = 1024 * 1024;
+
 /** manipulate 체인 기록: resize 인자와 saveAsync 옵션 */
-const manip = { resize: [] as unknown[], save: [] as unknown[] };
+const manip = { crop: [] as unknown[], resize: [] as unknown[], save: [] as unknown[] };
 jest.mock('expo-image-manipulator', () => ({
   SaveFormat: { JPEG: 'jpeg', PNG: 'png' },
   ImageManipulator: {
     manipulate: jest.fn(() => {
-      const context: { resize: (size: unknown) => unknown; renderAsync: () => Promise<unknown> } = {
+      const context: {
+        crop: (rect: unknown) => unknown;
+        resize: (size: unknown) => unknown;
+        renderAsync: () => Promise<unknown>;
+      } = {
+        crop: (rect) => {
+          manip.crop.push(rect);
+          return context;
+        },
         resize: (size) => {
           manip.resize.push(size);
           return context;
@@ -58,6 +69,7 @@ describe('targetSize', () => {
 
 describe('uploadImage', () => {
   beforeEach(() => {
+    manip.crop = [];
     manip.resize = [];
     manip.save = [];
     jest.mocked(ImageManipulator.manipulate).mockClear();
@@ -90,9 +102,26 @@ describe('uploadImage', () => {
     ]);
   });
 
+  it('잘라 올릴 영역이 있으면 자른 뒤 그 크기로 축소를 정한다', async () => {
+    mockFileSizes.set('file:///cache/shrunk.jpg', 10);
+    const crop = { originX: 500, originY: 0, width: 2000, height: 2000 };
+    await uploadImage('PRODUCT_IMAGE', { ...image(3000, 2000), crop }, presignOk());
+    expect(manip.crop).toEqual([crop]);
+    expect(manip.resize).toEqual([{ width: 1600 }]);
+
+    manip.resize = [];
+    await uploadImage(
+      'PRODUCT_IMAGE',
+      { ...image(4000, 1500), crop: { ...crop, width: 1500, height: 1500 } },
+      presignOk(),
+    );
+    expect(manip.resize).toEqual([]);
+  });
+
   it('작은 이미지는 resize 없이 JPEG로만 다시 저장한다', async () => {
     mockFileSizes.set('file:///cache/shrunk.jpg', 10);
     await uploadImage('STORE_IMAGE', image(1000, 500), presignOk());
+    expect(manip.crop).toEqual([]);
     expect(manip.resize).toEqual([]);
     expect(manip.save).toHaveLength(1);
   });
@@ -105,18 +134,32 @@ describe('uploadImage', () => {
     expect(presign.mock.calls[0]![0]).toMatchObject({ contentLength: 777 });
   });
 
-  it.each([
-    ['빈 파일', 0, '빈 파일입니다.'],
-    ['5MB 초과', 5 * 1024 * 1024 + 1, '5MB 이하만 올릴 수 있습니다.'],
-  ])('%s은 presign 전에 BAD_USER_INPUT', async (_, size, message) => {
+  it.each<[string, UploadPurpose, number, string]>([
+    ['빈 파일', 'PRODUCT_IMAGE', 0, '빈 파일입니다.'],
+    ['상품 이미지 5MB 초과', 'PRODUCT_IMAGE', 5 * MB + 1, '5MB 이하만 올릴 수 있습니다.'],
+    ['매장 이미지 5MB 초과', 'STORE_IMAGE', 5 * MB + 1, '5MB 이하만 올릴 수 있습니다.'],
+    ['채팅 사진 10MB 초과', 'CONVERSATION_IMAGE', 10 * MB + 1, '10MB 이하만 올릴 수 있습니다.'],
+  ])('%s은 presign 전에 BAD_USER_INPUT', async (_, purpose, size, message) => {
     mockFileSizes.set('file:///cache/shrunk.jpg', size);
     const presign = presignOk();
-    await expect(uploadImage('PRODUCT_IMAGE', image(100, 100), presign)).rejects.toMatchObject({
+    await expect(uploadImage(purpose, image(100, 100), presign)).rejects.toMatchObject({
       classification: 'BAD_USER_INPUT',
       message,
     });
     expect(presign).not.toHaveBeenCalled();
     expect(mockUploads).toEqual([]);
+  });
+
+  it.each<[UploadPurpose, number]>([
+    ['PRODUCT_IMAGE', 5 * MB],
+    ['CONVERSATION_IMAGE', 10 * MB],
+  ])('%s는 %i바이트(최대 크기)까지 올린다', async (purpose, size) => {
+    mockFileSizes.set('file:///cache/shrunk.jpg', size);
+    const presign = presignOk();
+    await expect(uploadImage(purpose, image(100, 100), presign)).resolves.toBe(
+      'https://cdn.test/a.jpg',
+    );
+    expect(presign).toHaveBeenCalledWith(expect.objectContaining({ purpose, contentLength: size }));
   });
 
   it('PUT 실패·네트워크 오류는 ApiError', async () => {

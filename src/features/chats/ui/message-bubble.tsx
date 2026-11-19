@@ -1,15 +1,18 @@
+import { router } from 'expo-router';
 import { type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { colors } from '@/shared/config/tokens';
 import { formatTimeKst } from '@/shared/lib/kst';
 import { cn } from '@/shared/lib/cn';
-import { Icon } from '@/shared/ui';
+import { Icon, RemoteImage } from '@/shared/ui';
 
 import { type Message } from '../api/messages';
 import { CHATS_COPY } from '../model/copy';
+import { formatPickup } from '../model/format';
 import { type BubbleKind, bubbleKind, messageBody } from '../model/message-list';
 import { type PendingMessage } from '../model/use-chat-room';
+import { ChatImage } from './chat-image';
 import { HtmlBody } from './html-body';
 
 const BUBBLE: Record<Exclude<BubbleKind, 'system'>, string> = {
@@ -27,10 +30,13 @@ function Bubble({
   kind,
   children,
   aside,
+  bare = false,
 }: {
   kind: Exclude<BubbleKind, 'system'>;
   children: ReactNode;
   aside: ReactNode;
+  /** 사진처럼 말풍선 바탕 없이 그린다 */
+  bare?: boolean;
 }) {
   return (
     <View
@@ -39,14 +45,18 @@ function Bubble({
         kind === 'store' ? 'flex-row-reverse self-end' : 'flex-row self-start',
       )}
     >
-      <View className={cn('shrink rounded-xl px-3.5 py-2.5', BUBBLE[kind])}>
-        {kind === 'auto' ? (
-          <Text className="mb-1 font-sans text-2xs font-semibold text-purple-text">
-            {CHATS_COPY.autoReply}
-          </Text>
-        ) : null}
-        {children}
-      </View>
+      {bare ? (
+        children
+      ) : (
+        <View className={cn('shrink rounded-xl px-3.5 py-2.5', BUBBLE[kind])}>
+          {kind === 'auto' ? (
+            <Text className="mb-1 font-sans text-2xs font-semibold text-purple-text">
+              {CHATS_COPY.autoReply}
+            </Text>
+          ) : null}
+          {children}
+        </View>
+      )}
       {aside}
     </View>
   );
@@ -56,15 +66,74 @@ const Time = ({ iso }: { iso: string }) => (
   <Text className="font-sans text-2xs text-muted">{formatTimeKst(iso)}</Text>
 );
 
-/** 말풍선: 구매자 좌 흰 배경 · 판매자 우 primary · 자동응답 좌 연보라 + 라벨 · 시스템 가운데 */
+type OrderCard = NonNullable<Message['orderCard']>;
+
+/** 구매자가 보낸 주문 문의 카드. 누르면 그 주문 상세로 간다 */
+function OrderCardBody({ card }: { card: OrderCard }) {
+  const pickup = formatPickup(card.pickupAt);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${CHATS_COPY.orderCard}: ${card.productName}, ${card.orderNumber}, ${pickup}`}
+      onPress={() => router.push({ pathname: '/orders/[id]', params: { id: card.orderId } })}
+      className="w-56 gap-2"
+    >
+      <Text className="font-sans text-2xs font-semibold text-purple-text">
+        {CHATS_COPY.orderCard}
+      </Text>
+      <View className="flex-row items-center gap-2.5">
+        {card.thumbnailUrl ? (
+          <RemoteImage
+            uri={card.thumbnailUrl}
+            style={{ width: 48, height: 48 }}
+            className="rounded-md bg-gray-bg"
+          />
+        ) : (
+          <View className="h-12 w-12 items-center justify-center rounded-md bg-gray-bg">
+            <Icon name="orders" size={20} color={colors.placeholder} />
+          </View>
+        )}
+        <View className="flex-1">
+          <Text
+            numberOfLines={2}
+            className="font-sans text-md font-semibold tracking-tight text-text"
+          >
+            {card.productName}
+          </Text>
+          <Text numberOfLines={1} className="mt-0.5 font-sans text-xs text-muted">
+            {card.orderNumber}
+          </Text>
+          <Text className="font-sans text-xs text-muted">{pickup}</Text>
+        </View>
+      </View>
+      <Text className="font-sans text-xs font-medium text-primary-strong">
+        {CHATS_COPY.orderLink}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** 말풍선: 구매자 좌 흰 배경 · 판매자 우 primary · 자동응답 좌 연보라 + 라벨 · 시스템 가운데 · 주문 카드 */
 export function MessageBubble({ message }: { message: Message }) {
   const kind = bubbleKind(message);
   const body = messageBody(message);
+  if (kind !== 'system' && message.bodyFormat === 'ORDER_CARD' && message.orderCard)
+    return (
+      <Bubble kind={kind} aside={<Time iso={message.createdAt} />}>
+        <OrderCardBody card={message.orderCard} />
+      </Bubble>
+    );
   if (kind === 'system')
     return (
       <Text className="self-center rounded-sm bg-gray-bg px-2.5 py-[3px] font-sans text-xs text-muted">
         {body}
       </Text>
+    );
+  if (message.bodyFormat === 'IMAGE' && message.imageUrl)
+    return (
+      <Bubble kind={kind} bare aside={<Time iso={message.createdAt} />}>
+        <ChatImage uri={message.imageUrl} />
+      </Bubble>
     );
   return (
     <Bubble kind={kind} aside={<Time iso={message.createdAt} />}>
@@ -79,7 +148,7 @@ export function MessageBubble({ message }: { message: Message }) {
   );
 }
 
-/** 전송 중(흐리게)·실패(재시도) 버블 */
+/** 전송 중(흐리게)·실패(재시도) 버블. 사진은 고른 원본을 그린다 */
 export function PendingBubble({
   message,
   onRetry,
@@ -88,14 +157,16 @@ export function PendingBubble({
   onRetry: () => void;
 }) {
   const failed = message.status === 'failed';
+  const subject = message.kind === 'text' ? message.text : CHATS_COPY.photo;
   return (
     <Bubble
       kind="store"
+      bare={message.kind === 'image'}
       aside={
         failed ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${CHATS_COPY.retry}: ${message.text}`}
+            accessibilityLabel={`${CHATS_COPY.retry}: ${subject}`}
             onPress={onRetry}
             hitSlop={12}
             className="items-center gap-0.5"
@@ -106,14 +177,18 @@ export function PendingBubble({
         ) : null
       }
     >
-      <Text
-        className={cn(
-          'font-sans text-md leading-[21px] tracking-tight text-surface',
-          !failed && 'opacity-60',
-        )}
-      >
-        {message.text}
-      </Text>
+      {message.kind === 'image' ? (
+        <ChatImage uri={message.image.uri} sending={!failed} />
+      ) : (
+        <Text
+          className={cn(
+            'font-sans text-md leading-[21px] tracking-tight text-surface',
+            !failed && 'opacity-60',
+          )}
+        >
+          {message.text}
+        </Text>
+      )}
     </Bubble>
   );
 }

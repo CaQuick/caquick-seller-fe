@@ -8,7 +8,7 @@ import { HttpResponse, graphql } from 'msw';
 import { homeKeys } from '@/features/home';
 import { disposeWsClient } from '@/shared/api';
 import { showToast } from '@/shared/ui';
-import { gqlError, gqlOk } from '@/test/msw/graphql';
+import { gqlError } from '@/test/msw/graphql';
 import { server } from '@/test/msw/server';
 import { Providers, createTestQueryClient } from '@/test/render';
 
@@ -52,6 +52,8 @@ const msg = (id: string, over: Partial<Message> = {}): Message => ({
   bodyFormat: 'TEXT',
   bodyText: `메시지${id}`,
   bodyHtml: null,
+  imageUrl: null,
+  orderCard: null,
   createdAt: at(2),
   ...over,
 });
@@ -116,15 +118,21 @@ const markRead = graphql.mutation('SellerChatsMarkRead', () => {
   readCalls += 1;
   return HttpResponse.json({ data: { sellerMarkConversationRead: conversation } });
 });
-const buyerOrder = (items: { id: string; buyerName: string }[]) =>
-  gqlOk('SellerChatsBuyerOrder', {
-    sellerOrderList: {
-      items: items.map((o) => ({
-        ...o,
-        pickupAt: '2026-10-08T06:30:00.000Z',
-        firstItemName: '크리스마스 눈사람',
-      })),
-    },
+const buyerOrderCalls: unknown[] = [];
+const buyerOrder = (ids: string[]) =>
+  graphql.query('SellerChatsBuyerLatestOrder', ({ variables }) => {
+    buyerOrderCalls.push(variables);
+    return HttpResponse.json({
+      data: {
+        sellerOrderList: {
+          items: ids.map((id) => ({
+            id,
+            pickupAt: '2026-10-08T06:30:00.000Z',
+            firstItemName: '크리스마스 눈사람',
+          })),
+        },
+      },
+    });
   });
 
 /** RNTL 14의 act는 비동기다 — 동기 작업도 Promise로 감싸 기다린다 */
@@ -175,7 +183,8 @@ describe('ChatRoomScreen', () => {
     readCalls = 0;
     mockWs.sinks = [];
     mockWs.payloads = [];
-    server.use(messages(), markRead, buyerOrder([{ id: 'o9', buyerName: '김다은' }]));
+    buyerOrderCalls.length = 0;
+    server.use(messages(), markRead, buyerOrder(['o9']));
   });
   afterEach(() => {
     disposeWsClient();
@@ -420,11 +429,12 @@ describe('ChatRoomScreen', () => {
     expect(screen.queryByText('연결을 다시 시도하는 중…')).toBeNull();
   });
 
-  it('⋯ 메뉴의 자동응답 관리는 FAQ 화면으로, 주문 보기는 이 구매자의 최근 주문으로 간다', async () => {
+  it('⋯ 메뉴의 자동응답 관리는 FAQ 화면으로, 주문 보기는 이 구매자 계정의 최신 주문으로 간다', async () => {
     const r = open();
     await r;
     await fireEvent.press(await screen.findByRole('button', { name: '더보기' }));
     expect(await screen.findByText('크리스마스 눈사람 · 10월 8일 15:30 픽업')).toBeTruthy();
+    expect(buyerOrderCalls).toEqual([{ buyerAccountId: 'a1' }]);
     await fireEvent.press(screen.getByRole('button', { name: /^자동응답 관리/ }));
     expect(r.getPathname()).toBe('/store/faq');
 
@@ -435,12 +445,42 @@ describe('ChatRoomScreen', () => {
     expect(r.getPathname()).toBe('/orders/o9');
   });
 
-  it('반증: 이름이 부분일치만 하는 주문이면 주문 보기를 숨긴다', async () => {
-    server.use(buyerOrder([{ id: 'o1', buyerName: '김다은님' }]));
+  it('이 구매자 계정의 주문이 없으면 주문 보기를 숨긴다', async () => {
+    server.use(buyerOrder([]));
     await open();
     expect(await screen.findByRole('header', { name: '김다은' })).toBeTruthy();
-    await waitFor(() => expect(screen.queryByRole('link', { name: '주문 보기' })).toBeNull());
+    await waitFor(() => expect(buyerOrderCalls).toHaveLength(1));
+    expect(screen.queryByRole('link', { name: '주문 보기' })).toBeNull();
     expect(screen.queryByText(/픽업$/)).toBeNull();
+  });
+
+  it('구매자가 보낸 주문 카드는 상품·주문번호·픽업 일시를 그리고 누르면 그 주문 상세로 간다', async () => {
+    server.use(
+      messages([
+        msg('5', {
+          bodyFormat: 'ORDER_CARD',
+          bodyText: '주문 문의: 딸기 생크림 (ORD-20261005-K7MQ4P)',
+          orderCard: {
+            orderId: '0',
+            orderNumber: 'ORD-20261005-K7MQ4P',
+            productName: '딸기 생크림',
+            thumbnailUrl: null,
+            pickupAt: '2026-10-08T06:30:00.000Z',
+          },
+        }),
+        msg('6', { bodyFormat: 'ORDER_CARD', bodyText: '주문 문의: 카드 없음', orderCard: null }),
+      ]),
+    );
+    const r = open();
+    await r;
+    const card = await screen.findByRole('button', {
+      name: '주문 문의: 딸기 생크림, ORD-20261005-K7MQ4P, 10월 8일 15:30 픽업',
+    });
+    expect(screen.queryByText('주문 문의: 딸기 생크림 (ORD-20261005-K7MQ4P)')).toBeNull();
+    // 카드가 비어 오면 대체 문구로 그린다
+    expect(screen.getByText('주문 문의: 카드 없음')).toBeTruthy();
+    await fireEvent.press(card);
+    await waitFor(() => expect(r.getPathname()).toBe('/orders/0'));
   });
 
   it('위로 끝까지 올리면 이전 메시지를 커서로 더 불러온다', async () => {

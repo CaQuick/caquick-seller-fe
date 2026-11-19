@@ -14,4 +14,8 @@ describe('app.config', () => {
 
     expect(options?.ios?.enableSceneSupport).toBe(true);
   });
+
+  it('대상 플랫폼은 iOS·Android뿐이다(react-dom이 있어도 web 번들을 만들지 않는다)', () => {
+    expect(appConfig({ config: {} } as ConfigContext).platforms).toEqual(['ios', 'android']);
+  });
 });

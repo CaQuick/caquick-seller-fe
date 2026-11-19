@@ -15,18 +15,23 @@ const summary = (id: string, status: Page['items'][number]['status'] = 'SUBMITTE
   totalPrice: 38000,
   firstItemName: '케이크',
   firstItemImageUrl: null,
+  firstItemCustomImageUrl: null,
+  hasCustom: false,
 });
 const data = (...pages: Page['items'][]): InfiniteData<Page, string | null> => ({
   pages: pages.map((items) => ({ items, totalCount: 3, hasMore: false, nextCursor: null })),
   pageParams: pages.map((_, i) => (i === 0 ? null : `c${i}`)),
 });
 const update = (patch: Partial<OrderUpdate> = {}): OrderUpdate => ({
+  kind: 'STATUS_CHANGED',
   orderId: '2',
   status: 'CONFIRMED',
   pickupAt: '2026-10-08T06:30:00.000Z',
   buyerName: '김다은',
   totalPrice: 40000,
   productName: '케이크',
+  hasCustom: true,
+  confirmDeadlineAt: null,
   updatedAt: '2026-10-06T00:00:00.000Z',
   ...patch,
 });
@@ -56,6 +61,7 @@ describe('applyOrderUpdate', () => {
       id: '2',
       status: 'CONFIRMED',
       totalPrice: 40000,
+      hasCustom: true,
     });
     expect(next?.pageParams).toEqual([null, 'c1']);
   });

@@ -29,6 +29,7 @@ interface Props<T extends string> {
   tone?: 'danger' | 'primary';
   confirmDisabled?: boolean;
   loading?: boolean;
+  onDismiss?: () => void;
 }
 
 /** 확인 시트(.sheet.confirm). 닫기는 시트를 내리고, 확정은 호출자가 처리 뒤 내린다 */
@@ -46,9 +47,10 @@ export function ConfirmSheet<T extends string>({
   tone = 'danger',
   confirmDisabled = false,
   loading = false,
+  onDismiss,
 }: Props<T>) {
   return (
-    <AppBottomSheet ref={ref}>
+    <AppBottomSheet ref={ref} onDismiss={onDismiss}>
       <Text
         accessibilityRole="header"
         className="my-2 text-center font-sans text-2xl font-bold tracking-tighter text-ink"

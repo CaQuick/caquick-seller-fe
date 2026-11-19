@@ -20,6 +20,30 @@ export async function pickImages(limit: number): Promise<PickedImage[]> {
     .map((a) => ({ uri: a.uri, width: a.width, height: a.height }));
 }
 
+/** 가운데 정사각 영역. 편집기의 1:1 자르기는 플랫폼마다 1px씩 어긋날 수 있어 한 번 더 자른다 */
+export function squareCropRect({ width, height }: { width: number; height: number }) {
+  const side = Math.min(width, height);
+  return {
+    originX: Math.floor((width - side) / 2),
+    originY: Math.floor((height - side) / 2),
+    width: side,
+    height: side,
+  };
+}
+
+/** 슬롯형 바탕은 정사각만 받는다(서버가 가로·세로를 검사). 취소면 null */
+export async function pickSquareImage(): Promise<PickedImage | null> {
+  const result = await launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 1,
+  });
+  const asset = result.canceled ? undefined : result.assets[0];
+  if (!asset) return null;
+  return { uri: asset.uri, width: asset.width, height: asset.height, crop: squareCropRect(asset) };
+}
+
 export function uploadProductImage(image: PickedImage, deps?: UploadDeps): Promise<string> {
   return uploadImage('PRODUCT_IMAGE', image, presignUpload, deps);
 }

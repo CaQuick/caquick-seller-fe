@@ -24,13 +24,15 @@ export default function AppLayout() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="orders/[id]" options={{ title: '주문 상세' }} />
+      <Stack.Screen name="orders/[id]/index" options={{ title: '주문 상세' }} />
+      <Stack.Screen name="orders/[id]/design" options={{ title: '3D 디자인' }} />
       <Stack.Screen name="products/new" options={{ headerShown: false }} />
       <Stack.Screen name="products/[id]/index" options={{ title: '상품 상세' }} />
       <Stack.Screen name="products/[id]/edit" options={{ title: '상품 수정' }} />
       <Stack.Screen name="products/[id]/images" options={{ title: '상품 이미지' }} />
       <Stack.Screen name="products/[id]/options" options={{ title: '옵션 편집' }} />
-      <Stack.Screen name="products/[id]/custom-template" options={{ title: '커스텀 템플릿' }} />
+      <Stack.Screen name="products/[id]/customization" options={{ title: '커스텀 방식' }} />
+      <Stack.Screen name="products/[id]/custom-template" options={{ title: '슬롯형 설정' }} />
       <Stack.Screen name="chats/[conversationId]" options={{ title: '대화' }} />
       <Stack.Screen name="store/basic-info" options={{ title: '기본 정보' }} />
       <Stack.Screen name="store/business-hours" options={{ title: '영업시간' }} />
@@ -43,6 +45,9 @@ export default function AppLayout() {
       <Stack.Screen name="store/reviews/[id]" options={{ title: '리뷰 상세' }} />
       <Stack.Screen name="store/preview" options={{ title: '구매자 화면 미리보기' }} />
       <Stack.Screen name="store/audit-logs" options={{ title: '조작 이력' }} />
+      <Stack.Screen name="store/settlement-account" options={{ title: '정산 계좌' }} />
+      <Stack.Screen name="store/settlements/index" options={{ title: '정산 내역' }} />
+      <Stack.Screen name="store/settlements/[id]" options={{ title: '정산 상세' }} />
       <Stack.Screen name="settings/index" options={{ title: '설정' }} />
       <Stack.Screen name="settings/change-password" options={{ title: '비밀번호 변경' }} />
     </Stack>

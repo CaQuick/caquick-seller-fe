@@ -6,7 +6,8 @@ export const storeKeys = {
   specialClosures: () => [...storeKeys.all, 'specialClosures'] as const,
   dailyCapacities: (month: string) => [...storeKeys.all, 'dailyCapacities', month] as const,
   faqTopics: () => [...storeKeys.all, 'faqTopics'] as const,
-  auditLogs: (targetType?: string) => [...storeKeys.all, 'auditLogs', targetType ?? 'all'] as const,
+  auditLogsAll: () => [...storeKeys.all, 'auditLogs'] as const,
+  auditLogs: (targetType?: string) => [...storeKeys.auditLogsAll(), targetType ?? 'all'] as const,
   preview: (storeId: string) => [...storeKeys.all, 'preview', storeId] as const,
   previewProducts: (storeId: string, categoryId: string | null) =>
     [...storeKeys.preview(storeId), 'products', categoryId ?? 'all'] as const,
@@ -19,4 +20,8 @@ export const storeKeys = {
   regionGroups: () => [...storeKeys.all, 'regionGroups'] as const,
   regions: (parentId: string) => [...storeKeys.all, 'regions', parentId] as const,
   regionSearch: (keyword: string) => [...storeKeys.all, 'regionSearch', keyword] as const,
+  settlementAccount: () => [...storeKeys.all, 'settlementAccount'] as const,
+  paymentBanks: () => [...storeKeys.all, 'paymentBanks'] as const,
+  settlements: () => [...storeKeys.all, 'settlements'] as const,
+  settlement: (id: string) => [...storeKeys.settlements(), id] as const,
 };

@@ -1,9 +1,9 @@
-# 생성 파일 — 수정하지 않는다. caquick-be develop@1bc6527645d94ad8c8a9769694d0939598be7587 의 src/features/**/*.graphql 68개를 경로순으로 합쳤다.
+# 생성 파일 — 수정하지 않는다. caquick-be local@bc9118825bee19bb885a0e12074d17fefd93dbe5 의 src/features/**/*.graphql 77개를 경로순으로 합쳤다.
 # 갱신: pnpm schema:pull [ref]
 
 # ---- src/features/audit-log/audit-log.types.graphql ----
 """
-감사 로그가 가리키는 대상 종류. 판매자 화면(sellerAuditLogs)은 STORE·PRODUCT·ORDER·CONVERSATION·CHANGE_PASSWORD만 노출하고 필터 입력도 그 범위만 받는다.
+감사 로그가 가리키는 대상 종류. 판매자 화면(sellerAuditLogs)은 STORE·PRODUCT·ORDER·CONVERSATION·CHANGE_PASSWORD·SETTLEMENT_ACCOUNT만 노출하고 필터 입력도 그 범위만 받는다.
 """
 enum AuditTargetType {
   """
@@ -66,6 +66,26 @@ enum AuditTargetType {
   검색 진입 화면 키워드 바로가기 칩. 순서 변경은 순서가 바뀐 칩마다 1건씩 남는다.
   """
   SEARCH_KEYWORD_CHIP
+  """
+  플랫폼 결제 설정(수수료율·입금 계좌).
+  """
+  PAYMENT_SETTING
+  """
+  매장 정산 계좌(판매자 본인·관리자 대리 수정). 기록에는 계좌번호 끝 4자리만 남고, 판매자 감사 로그에도 보인다.
+  """
+  SETTLEMENT_ACCOUNT
+  """
+  주간 정산(송금 완료 처리).
+  """
+  SETTLEMENT
+  """
+  환불(완료 처리).
+  """
+  REFUND
+  """
+  입금 기록(반환 연결·주인 모를 입금 종결).
+  """
+  DEPOSIT_RECORD
 }
 
 """
@@ -178,7 +198,7 @@ type AdminAccountConnection {
 """
 input AdminCreateAdminInput {
   """
-  로그인 username. 4~80자, 소문자·숫자·`.`·`_`·`-`만 허용. 이미 쓰이고 있으면 BAD_USER_INPUT.
+  로그인 username. 4~80자, 영문 대소문자·숫자·`.`·`_`·`-`만 허용. 이미 쓰이고 있으면(대소문자만 달라도) BAD_USER_INPUT.
   """
   username: String!
   """
@@ -434,7 +454,8 @@ extend type Mutation {
   """
   updateMyProfileImage(input: UpdateMyProfileImageInput!): MePayload!
   """
-  회원 탈퇴(soft delete). 로그인 필수. 본인 데이터만 대상이 된다.
+  회원 탈퇴(soft delete). 진행 중인 주문(입금 대기~제작 완료)이나 송금이 끝나지 않은 환불(계좌 입력 대기·송금 대기)이 있으면
+  ACCOUNT_HAS_ACTIVE_ORDERS(CONFLICT, 메시지에 건수). 로그인 필수. 본인 데이터만 대상이 된다.
   """
   deleteMyAccount: Boolean!
   """
@@ -710,6 +731,7 @@ extend type Query {
   문의 채팅 진입 컨텍스트(구매자). 매장 프로필·상담시간·치환 완료 인사말·질문 칩을
   한 번에 내려준다. 아직 대화가 없어도 조회 가능하며 그 경우 conversationId는 null.
   로그인 필수.
+  숨김 매장은 그 매장에 진행 중인 주문이 있는 구매자만 조회할 수 있다(아니면 STORE_NOT_FOUND). 문의 전송도 같다.
   """
   storeInquiryContext(storeId: ID!): StoreInquiryContext!
 }
@@ -727,6 +749,29 @@ extend type Mutation {
   로그인 필수.
   """
   sendConversationFaqMessage(input: SendConversationFaqMessageInput!): ConversationMessagesPayload!
+  """
+  채팅 이미지 업로드용 Presigned URL 발급(구매자). uploadUrl로 PUT한 뒤 publicUrl을 sendConversationImageMessage에 넣는다.
+  JPEG·PNG·WebP, 1바이트 이상 10MB 이하(아니면 INVALID_CONTENT_TYPE·INVALID_CONTENT_LENGTH·FILE_TOO_LARGE).
+  로그인 필수.
+  """
+  createConversationImageUploadUrl(
+    """파일 MIME 타입(image/jpeg·image/png·image/webp)."""
+    contentType: String!
+    """파일 크기(바이트, 1 이상 10MB 이하)."""
+    contentLength: Int!
+  ): UploadUrl!
+  """
+  구매자 이미지 메시지 전송(메시지당 1장). 대화가 없으면 sendConversationMessage처럼 생성하고 인사말을 먼저 저장한다.
+  imageUrl이 이 계정에 createConversationImageUploadUrl로 발급된 URL이 아니면 INVALID_IMAGE_URL, 공백이면
+  IMAGE_URL_REQUIRED다. 로그인 필수.
+  """
+  sendConversationImageMessage(input: SendConversationImageMessageInput!): ConversationMessagesPayload!
+  """
+  주문 카드 전송(구매자). 주문의 매장과의 대화에 보낸 시점의 주문 스냅샷을 카드로 남긴다(대화가 없으면 생성).
+  본인 주문이 아니면 ORDER_NOT_FOUND, 입금 확인 전(판매자가 볼 수 없는) 주문이면 ORDER_INQUIRY_NOT_AVAILABLE,
+  매장이 숨김이고 그 매장에 진행 중인 주문이 없으면 STORE_NOT_FOUND다. 로그인 필수.
+  """
+  sendConversationOrderCard(orderId: ID!): ConversationMessagesPayload!
 }
 
 """문의 채팅 진입 컨텍스트"""
@@ -773,10 +818,14 @@ type ConversationMessage {
   senderType: ConversationSenderType!
   """본문 형식. 읽어야 할 본문 필드를 가리킨다."""
   bodyFormat: ConversationBodyFormat!
-  """평문 본문. bodyFormat이 TEXT면 이 값을 쓴다."""
+  """평문 본문. bodyFormat이 TEXT면 이 값을 쓴다. IMAGE·ORDER_CARD는 대체 문구가 들어 있다."""
   bodyText: String
   """서식 본문. bodyFormat이 HTML이면 이 값을 쓴다."""
   bodyHtml: String
+  """이미지 URL. bodyFormat이 IMAGE면 채워진다."""
+  imageUrl: String
+  """주문 카드. bodyFormat이 ORDER_CARD면 채워진다."""
+  orderCard: ConversationOrderCard
   """발송 시각. 메시지 스트림 정렬은 id 기준이다."""
   createdAt: DateTime!
 }
@@ -795,6 +844,14 @@ input SendConversationMessageInput {
   storeId: ID!
   """보낼 평문 메시지."""
   bodyText: String!
+}
+
+"""구매자 이미지 메시지 전송 입력"""
+input SendConversationImageMessageInput {
+  """문의할 매장 ID. 대화방이 없으면 이 호출에서 생성된다."""
+  storeId: ID!
+  """createConversationImageUploadUrl이 이 계정에 발급한 publicUrl."""
+  imageUrl: String!
 }
 
 """질문 칩(FAQ) 전송 입력"""
@@ -823,6 +880,7 @@ extend type Query {
 extend type Mutation {
   """
   판매자 메시지를 발송한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  bodyFormat은 TEXT·HTML·IMAGE이고 ORDER_CARD는 INVALID_BODY_FORMAT이다(주문 카드는 구매자만 보낸다).
   """
   sellerSendConversationMessage(
     input: SellerSendConversationMessageInput!
@@ -926,6 +984,14 @@ type SellerConversationMessage {
   """
   bodyHtml: String
   """
+  이미지 URL. bodyFormat이 IMAGE면 채워진다(bodyText에는 대체 문구 '사진을 보냈습니다.').
+  """
+  imageUrl: String
+  """
+  주문 카드. bodyFormat이 ORDER_CARD(구매자가 보낸 카드)면 채워진다. orderId로 주문 상세를 연다.
+  """
+  orderCard: ConversationOrderCard
+  """
   발송 시각.
   """
   createdAt: DateTime!
@@ -960,7 +1026,8 @@ type SellerConversationMessageConnection {
 input SellerSendConversationMessageInput {
   conversationId: ID!
   """
-  본문 형식. 이 값에 해당하는 본문 필드가 필수다(다른 쪽을 함께 넘기면 그대로 저장된다).
+  본문 형식. 이 값에 해당하는 본문 필드가 필수다(TEXT·HTML은 다른 쪽을 함께 넘기면 그대로 저장된다).
+  IMAGE는 imageUrl만 저장하고 본문은 대체 문구로 채운다. ORDER_CARD는 INVALID_BODY_FORMAT이다.
   """
   bodyFormat: ConversationBodyFormat!
   """
@@ -971,6 +1038,11 @@ input SellerSendConversationMessageInput {
   서식 본문(최대 100000자). bodyFormat이 HTML이면 필수.
   """
   bodyHtml: String
+  """
+  이미지 URL. bodyFormat이 IMAGE면 필수(없으면 IMAGE_URL_REQUIRED)이고 sellerCreateUploadUrl(CONVERSATION_IMAGE)로
+  이 계정에 발급된 publicUrl이어야 한다(아니면 INVALID_IMAGE_URL). 다른 형식에서는 무시한다.
+  """
+  imageUrl: String
 }
 
 # ---- src/features/conversation/conversation-subscription.graphql ----
@@ -1053,6 +1125,30 @@ enum ConversationBodyFormat {
   서버 측 sanitize는 아직 적용돼 있지 않다.
   """
   HTML
+  """
+  이미지 1장. imageUrl을 그리고, bodyText에는 대체 문구('사진을 보냈습니다.')가 있다.
+  """
+  IMAGE
+  """
+  주문 카드(구매자만 보낸다). orderCard를 그리고, bodyText에는 대체 문구('주문 문의: {상품명} ({주문번호})')가 있다.
+  """
+  ORDER_CARD
+}
+
+"""
+채팅 주문 카드. 구매자가 보낸 시점의 주문 스냅샷이라 이후 주문이 바뀌거나 지워져도 그대로 보인다.
+판매자 앱은 orderId로 주문 상세를 연다.
+"""
+type ConversationOrderCard {
+  orderId: ID!
+  """주문번호."""
+  orderNumber: String!
+  """상품명(주문 시점 스냅샷)."""
+  productName: String!
+  """썸네일. 커스텀 주문이면 커스텀 대표 이미지(3D 윗면·슬롯형 합성), 아니면 상품 대표 이미지. 둘 다 없으면 null."""
+  thumbnailUrl: String
+  """보낸 시점의 픽업 일시."""
+  pickupAt: DateTime!
 }
 
 # ---- src/features/core/pagination.graphql ----
@@ -1287,7 +1383,7 @@ type AdminDashboardSummary {
   """
   orderCounts: AdminOrderStatusCounts!
   """
-  기간 내 생성된 주문의 최종 결제 금액 합(원). 취소 주문은 제외.
+  기간 내 생성된 주문의 최종 결제 금액 합(원). 취소·입금 대기 주문은 제외.
   Int(32비트)를 넘을 수 있어 Float로 내리지만 값은 항상 정수다.
   """
   orderAmountSum: Float!
@@ -1310,6 +1406,10 @@ type AdminDashboardSummary {
 """
 type AdminOrderStatusCounts {
   """
+  입금 대기(PENDING_PAYMENT).
+  """
+  pendingPayment: Int!
+  """
   접수(SUBMITTED).
   """
   submitted: Int!
@@ -1325,6 +1425,10 @@ type AdminOrderStatusCounts {
   픽업 완료(PICKED_UP).
   """
   pickedUp: Int!
+  """
+  노쇼(NO_SHOW).
+  """
+  noShow: Int!
   """
   취소(CANCELED).
   """
@@ -1410,15 +1514,15 @@ type SellerDashboard {
   """
   asOf: DateTime!
   """
-  접수(SUBMITTED) 상태로 남아 있는 주문 수. 날짜와 무관하게 전체를 센다.
+  접수(SUBMITTED) 상태로 남아 있는 주문 수. 날짜와 무관하게 전체를 센다. 입금 대기 주문은 세지 않는다.
   """
   newOrderCount: Int!
   """
-  기준일에 픽업 예정인 주문의 건수·금액. 취소 주문은 제외. 시안의 '오늘 매출 / 정산예정'에 해당한다.
+  기준일에 픽업 예정인 주문의 건수·금액. 입금 대기·취소 주문은 제외. 시안의 '오늘 매출 / 정산예정'에 해당한다.
   """
   pickupDay: SellerDashboardOrderMetrics!
   """
-  기준일에 생성된 주문의 건수·금액. 취소 주문은 제외. 접수 추세 표기('+N')용.
+  기준일에 접수(입금 확인)된 주문의 건수·금액. 취소 주문은 제외. 접수 추세 표기('+N')용.
   """
   createdDay: SellerDashboardOrderMetrics!
   """
@@ -1431,9 +1535,13 @@ type SellerDashboard {
   """
   remainingCapacity: Int
   """
-  기준일 픽업 주문의 제작 수량 합(취소 제외). capacity 유무와 무관하게 센다.
+  기준일 픽업 주문의 제작 수량 합(취소 제외, 입금 대기 포함). capacity 유무와 무관하게 센다.
   """
   bookedQuantity: Int!
+  """
+  bookedQuantity 중 입금 대기 주문의 수량. 입금 대기 주문은 판매자에게 보이지 않지만 제작 수량을 차지한다('입금 대기 n개 포함' 표기용).
+  """
+  pendingPaymentQuantity: Int!
   """
   노출 중(is_active)인 내 상품 수. 매장 노출 여부와 무관하다.
   """
@@ -1499,7 +1607,7 @@ type MyPageCounts {
 }
 
 """
-진행중 주문 요약 카드. 픽업 완료·취소는 제외된다.
+진행중 주문 요약 카드. 입금 대기부터 제작 완료까지만 담고, 픽업 완료·노쇼·취소는 제외된다.
 """
 type OngoingOrderSummary {
   orderId: ID!
@@ -2412,7 +2520,7 @@ enum PushPlatform {
 """
 enum NotificationType {
   """
-  주문 상태 변경 알림. ORDER_CONFIRMED·ORDER_MADE·ORDER_PICKED_UP 이벤트가 여기 속한다.
+  주문 상태 변경 알림. 주문(ORDER_*)·환불(REFUND_*) 이벤트가 여기 속한다.
   """
   ORDER_STATUS
   """
@@ -2450,9 +2558,33 @@ enum NotificationEvent {
   """
   ORDER_PICKED_UP
   """
-  주문이 취소됐다(판매자 또는 운영자). type은 ORDER_STATUS.
+  주문이 취소됐다(판매자·운영자·자동 미확정). 본문 끝에 사유 라벨이 붙고, 구매자 본인 취소는 알림이 없다. type은 ORDER_STATUS.
   """
   ORDER_CANCELED
+  """
+  입금이 확인돼 주문이 접수됐다. type은 ORDER_STATUS.
+  """
+  ORDER_PAYMENT_CONFIRMED
+  """
+  입금이 확인되지 않아 주문이 취소됐다(입금 기한 만료 자동 취소 또는 운영자 미입금 취소). type은 ORDER_STATUS.
+  """
+  ORDER_PAYMENT_EXPIRED
+  """
+  픽업 시간에 방문하지 않아 노쇼로 처리됐다. type은 ORDER_STATUS.
+  """
+  ORDER_NO_SHOW
+  """
+  판매자가 픽업 일시를 바꿨다. type은 ORDER_STATUS.
+  """
+  ORDER_PICKUP_RESCHEDULED
+  """
+  돌려받을 돈이 생겨 환불 계좌 입력이 필요하다. type은 ORDER_STATUS.
+  """
+  REFUND_ACCOUNT_REQUESTED
+  """
+  환불 송금이 끝났다. type은 ORDER_STATUS.
+  """
+  REFUND_COMPLETED
 }
 
 # ---- src/features/order/order-admin.graphql ----
@@ -2465,15 +2597,35 @@ extend type Query {
   주문 상세를 전체 품목·구매자 요약·상태 이력과 함께 조회한다. 없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
   """
   adminOrder(orderId: ID!): AdminOrderDetail!
+  """
+  매장의 진행 중 주문(입금 대기·접수·확정·제작 완료) 건수를 상태별로 센다. 판매자 정지·매장 숨김 전 경고용이며
+  없는 매장이면 0건이다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminStoreInProgressOrderSummary(
+    storeId: ID!
+  ): AdminStoreInProgressOrderSummary!
 }
 
 extend type Mutation {
   """
-  주문을 강제 취소한다. 전이 규칙은 판매자 취소와 같다 — SUBMITTED·CONFIRMED·MADE에서만 가능하고
-  PICKED_UP·CANCELED면 BAD_USER_INPUT. 사유(note)는 필수이며 상태 이력에 '[관리자]' 접두로 기록된다.
-  구매자에게 ORDER_CANCELED 알림이 간다. 없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  주문을 강제 취소한다. 입금 대기·접수·확정·제작 완료 주문만 되고(그 밖은 ORDER_NOT_CANCELLABLE), 규칙은 adminOrder의
+  cancelOptions가 그대로 알려 준다. 입금 대기는 환불 없이(미입금이면 reason PAYMENT_NOT_RECEIVED), 접수는 결제액 전액,
+  확정·제작 완료는 fault(사정)에 따라 환불한다(판매자 사정 = 전액, 구매자 사정 = refundAmount, 남는 금액은 수수료를 뺀 뒤 정산에 포함).
+  고를 수 없는 사유면 CANCEL_REASON_NOT_ALLOWED, 사정이 없으면 CANCEL_FAULT_REQUIRED, 구매자 사정인데 금액이 없으면
+  REFUND_AMOUNT_REQUIRED, 금액이 0~결제액 밖이면 REFUND_AMOUNT_OUT_OF_RANGE(모두 BAD_USER_INPUT).
+  구매자에게 취소 알림(미입금이면 입금 기한 만료 알림)이, 입금 확인 뒤 주문이면 판매자에게 취소 푸시가 간다.
+  없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
   """
   adminCancelOrder(input: AdminCancelOrderInput!): AdminOrderSummary!
+  """
+  주문을 픽업 완료로 처리한다. 확정·제작 완료 주문만 되고(이미 픽업 완료면 ORDER_STATUS_UNCHANGED, 그 밖은
+  INVALID_ORDER_STATUS_TRANSITION, 모두 BAD_USER_INPUT), 매장이 숨김이어도 픽업 시각 전이어도 처리한다.
+  확인된 결제액으로 정산을 확정하고(결제 도입 전 주문은 건너뜀) 구매자에게 픽업 완료 알림이 간다.
+  없으면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminCompleteOrderPickup(
+    input: AdminCompleteOrderPickupInput!
+  ): AdminOrderSummary!
 }
 
 """
@@ -2529,6 +2681,14 @@ type AdminOrderSummary {
   첫 품목의 상품 대표 이미지 URL(주문 시점 스냅샷). 주문 당시 이미지가 없었거나 품목이 없으면 null.
   """
   firstItemImageUrl: String
+  """
+  커스텀 주문 여부(첫 품목의 커스텀 방식이 NONE이 아니면 true). 목록 '커스텀' 배지용이다.
+  """
+  hasCustom: Boolean!
+  """
+  첫 품목의 커스텀 대표 이미지 URL(3D 윗면 렌더 또는 슬롯형 합성). 없으면 null.
+  """
+  firstItemCustomImageUrl: String
 }
 
 """
@@ -2605,6 +2765,14 @@ type AdminOrderDetail {
   """
   buyerPhone: String!
   """
+  구매자가 남긴 요청 사항. 없으면 null.
+  """
+  requestNote: String
+  """
+  결제와 입금 확인 기록. 결제 도입 전 주문이면 null.
+  """
+  payment: AdminOrderPayment
+  """
   할인 전 품목 합계(원).
   """
   subtotalPrice: Int!
@@ -2646,6 +2814,111 @@ type AdminOrderDetail {
   상태 변경 이력. 최신순.
   """
   statusHistories: [OrderStatusHistory!]!
+  """
+  이 주문의 환불(취소 환불·입금 반환). 오래된 순, 없으면 빈 배열.
+  """
+  refunds: [OrderRefund!]!
+  """
+  취소 정보(주체·사유·사정·환불액·환불 진행). 취소되지 않은 주문이면 null.
+  """
+  cancellation: OrderCancellation
+  """
+  강제 취소 다이얼로그의 선택지. 지금 상태 기준이다.
+  """
+  cancelOptions: AdminOrderCancelOptions!
+  """
+  판매자 확정 마감 시각. 지나면 자동 취소·전액 환불된다. 접수(SUBMITTED) 상태가 아니거나 결제 도입 전 주문이면 null.
+  """
+  confirmDeadlineAt: DateTime
+  """
+  자동 픽업 완료 예정 시각(픽업 시각 + 24시간). 확정·제작 완료 상태에서만 있고 그 밖은 null.
+  매장이 숨김이면 자동으로 픽업 완료되지 않으므로 관리자가 건별로 픽업 완료(adminCompleteOrderPickup)하거나 취소(adminCancelOrder)한다.
+  """
+  autoPickupAt: DateTime
+  """
+  노쇼 처리 시각. 노쇼가 아니면 null.
+  """
+  noShowAt: DateTime
+  """
+  판매자 픽업 일시 변경 이력. 오래된 순, 없으면 빈 배열.
+  """
+  pickupChanges: [OrderPickupChange!]!
+  """
+  주문 생성 시점의 수수료율(bp, 1bp = 0.01%). 바뀐 설정은 그 뒤 주문부터 적용된다.
+  """
+  commissionRateBps: Int!
+  """
+  정산 예정 금액(원). 정산 확정 뒤에는 실제 지급액(기준액 − 수수료), 확정 전에는 결제 금액에서 수수료(원 미만 버림)를 뺀
+  예상값이다. 입금이 확인되지 않았거나 결제 도입 전 주문이면 null, 확정 없이 취소된 주문(전액 환불)은 0.
+  """
+  expectedPayoutAmount: Int
+  """
+  확정된 수수료 기준액(원). 픽업 완료·노쇼는 결제 금액, 구매자 사정 취소는 결제 금액 − 환불 금액. 확정 전이면 null.
+  """
+  settlementBaseAmount: Int
+  """
+  확정된 수수료(원). 기준액 × 수수료율, 원 미만 버림. 확정 전이면 null.
+  """
+  commissionAmount: Int
+  """
+  정산 확정 시각. 확정 전이면 null.
+  """
+  settlementFinalizedAt: DateTime
+  """
+  이 주문이 묶인 주간 정산(adminSettlement). 아직 묶이지 않았으면 null.
+  """
+  settlementId: ID
+}
+
+"""
+관리자 강제 취소 선택지. 화면은 이 값으로 다이얼로그를 그리고 규칙을 복제하지 않는다.
+"""
+type AdminOrderCancelOptions {
+  """
+  지금 취소할 수 있는지.
+  """
+  cancelable: Boolean!
+  """
+  고를 수 있는 취소 사유. 취소할 수 없으면 빈 배열.
+  """
+  reasons: [OrderCancelReasonType!]!
+  """
+  환불 규칙. BY_FAULT면 사정을 고르게 하고, 구매자 사정이면 환불 금액(0~paidAmount)을 입력받는다. 취소할 수 없으면 null.
+  """
+  refundRule: CancelRefundRuleType
+  """
+  확인된 결제액(원). 입금 전이거나 결제 도입 전 주문이면 0.
+  """
+  paidAmount: Int!
+}
+
+"""
+매장의 진행 중 주문 요약.
+"""
+type AdminStoreInProgressOrderSummary {
+  storeId: ID!
+  """
+  진행 중 주문 전체 건수.
+  """
+  totalCount: Int!
+  """
+  상태별 건수. 0건인 상태는 빠지고 흐름 순(입금 대기 → 제작 완료)으로 온다.
+  """
+  byStatus: [AdminStoreInProgressStatusCount!]!
+}
+
+"""
+상태 1개의 주문 건수.
+"""
+type AdminStoreInProgressStatusCount {
+  """
+  주문 상태.
+  """
+  status: OrderStatusType!
+  """
+  건수.
+  """
+  count: Int!
 }
 
 """
@@ -2669,6 +2942,10 @@ input AdminOrderListInput {
   """
   status: OrderStatusType
   """
+  true면 진행 중 주문(입금 대기·접수·확정·제작 완료)만. 기본 false, null도 false(전체)로 본다. status와 함께 오면 AND다.
+  """
+  inProgress: Boolean = false
+  """
   매장 ID 필터(품목 기준). 미지정 시 전체.
   """
   storeId: ID
@@ -2687,33 +2964,88 @@ input AdminOrderListInput {
 }
 
 """
-주문 강제 취소 입력.
+주문 강제 취소 입력. 허용 범위는 adminOrder.cancelOptions를 따른다.
 """
 input AdminCancelOrderInput {
   orderId: ID!
   """
-  취소 사유. 필수. 최대 494자('[관리자] ' 접두를 붙여 500자 이내로 이력에 남는다). 감사 로그에도 기록된다.
+  취소 사유. 필수. cancelOptions.reasons 중 하나여야 한다.
   """
-  note: String!
+  reason: OrderCancelReasonType!
+  """
+  취소 메모. 선택, 최대 500자. 상태 이력과 감사 로그에 남는다.
+  """
+  note: String
+  """
+  취소 사정. cancelOptions.refundRule이 BY_FAULT면 필수이고, 그 밖에는 무시한다.
+  """
+  fault: OrderCancelFaultType
+  """
+  돌려줄 금액(원, 0~cancelOptions.paidAmount). fault가 BUYER일 때 필수이고, 그 밖에는 무시한다.
+  """
+  refundAmount: Int
+}
+
+"""
+주문 픽업 완료 입력. 확정·제작 완료 주문만 처리할 수 있다.
+"""
+input AdminCompleteOrderPickupInput {
+  orderId: ID!
+  """
+  처리 메모. 선택, 최대 500자. 상태 이력과 감사 로그에 남는다.
+  """
+  note: String
 }
 
 # ---- src/features/order/order-checkout.graphql ----
 extend type Mutation {
-  """주문 생성(구매자). 옵션·픽업 일시를 서버가 재검증하고 가격을 스냅샷한다. 로그인 필수."""
+  """
+  주문 생성(구매자). 옵션·픽업 일시를 서버가 재검증하고 가격을 스냅샷한 뒤 입금 대기(PENDING_PAYMENT) 주문을 만든다.
+  결과의 payment로 입금을 안내하고, 1시간 안에 입금이 확인되지 않으면 자동 취소된다. 판매자에게는 입금 확인 뒤에 보인다.
+  입금 계좌가 설정되지 않았으면 PAYMENT_ACCOUNT_NOT_CONFIGURED(SERVICE_UNAVAILABLE), 입금 대기 주문이 이미 2건이면
+  PENDING_PAYMENT_LIMIT_EXCEEDED(CONFLICT), 같은 계정의 다른 주문 요청이 처리 중이라 3초 안에 차례가 오지 않으면
+  CONCURRENT_REQUEST(CONFLICT)다. 커스텀 상품이면 custom 입력을 검증해 주문 시점 스냅샷으로 저장하고 수량은 1이다
+  (CreateOrderCustomInput 참고). 로그인 필수.
+  """
   createOrder(input: CreateOrderInput!): CreateOrderOutput!
+  """
+  커스텀 이미지 업로드용 Presigned URL 발급(구매자). uploadUrl로 PUT한 뒤 publicUrl을 주문 생성의 커스텀 입력에 넣는다.
+  JPEG·PNG·WebP, 장당 1바이트 이상 10MB 이하(아니면 INVALID_CONTENT_TYPE·INVALID_CONTENT_LENGTH·FILE_TOO_LARGE).
+  주문에 쓰이지 않은 파일은 발급 하루 뒤 지워진다. 구매자 계정만 쓸 수 있고(아니면 USER_ONLY), 정지·탈퇴 등으로
+  이용할 수 없는 계정이면 BUYER_ACCOUNT_NOT_ACTIVE다. 로그인 필수.
+  """
+  createOrderCustomUploadUrl(
+    """이미지 용도. 주문 생성 때 이 용도의 자리에만 쓸 수 있다."""
+    purpose: OrderCustomUploadPurpose!
+    """파일 MIME 타입(image/jpeg·image/png·image/webp)."""
+    contentType: String!
+    """파일 크기(바이트, 1 이상 10MB 이하)."""
+    contentLength: Int!
+  ): UploadUrl!
 }
 
-"""주문 생성 입력. 커스텀 필드는 커스텀 스펙 확정 후 optional로 확장 예정."""
+"""구매자 커스텀 이미지 업로드 용도."""
+enum OrderCustomUploadPurpose {
+  """3D 렌더 이미지(윗면·옆면 앞·뒤·좌·우)."""
+  RENDER
+  """슬롯형 합성 이미지(바탕 + 문구, 구매자가 본 그대로)."""
+  COMPOSITE
+  """자유 편집 참고 사진."""
+  REFERENCE
+}
+
+"""주문 생성 입력."""
 input CreateOrderInput {
   """
   클라이언트 생성 멱등 키(8~64자). 체크아웃 진입 시 새로 만들고 재시도에는
   같은 키를 재사용한다. 같은 키의 재요청은 새 주문을 만들지 않고 기존 주문을 반환한다.
+  같은 키로 다른 입력을 보내면 IDEMPOTENCY_KEY_INPUT_MISMATCH로 거절한다.
   """
   idempotencyKey: String!
   productId: ID!
   """선택한 옵션 아이템 ID 목록. 그룹 규칙(필수/min/max)을 서버가 검증한다."""
   optionItemIds: [ID!]!
-  """픽업 일시. 매장 정책(영업시간·휴무·capacity·리드타임·슬롯 정렬) 재검증."""
+  """픽업 일시. 매장 정책(영업시간·휴무·capacity·리드타임과 상품 제작 시간 중 긴 쪽·슬롯 정렬) 재검증."""
   pickupAt: DateTime!
   """주문 수량. 기본 1."""
   quantity: Int = 1
@@ -2721,6 +3053,162 @@ input CreateOrderInput {
   buyerName: String
   """미입력 시 프로필 전화번호 사용. 둘 다 없으면 거절."""
   buyerPhone: String
+  """
+  입금자명(1~20자). 생략하거나 공백만 보내면 주문자 이름을 쓴다. 입력값이든 주문자 이름이든 20자를 넘으면
+  DEPOSITOR_NAME_INVALID로 거절한다(은행 입금자명과 대조하는 값이라 자르지 않는다).
+  """
+  depositorName: String
+  """
+  화면에 보여 준 최종 결제 금액(원). 서버가 다시 계산한 금액과 다르면 ORDER_PRICE_CHANGED로 거절한다.
+  """
+  expectedTotalPrice: Int!
+  """판매자에게 전할 요청 사항(최대 500자). 공백만 보내면 없음으로 저장한다."""
+  requestNote: String
+  """
+  커스텀 입력. 상품의 커스텀 방식(ProductDetail.customMode)이 SLOT이면 slot, THREE_D면 threeD 하나만 보낸다.
+  커스텀 상품인데 없으면 CUSTOM_INPUT_REQUIRED, 방식이 다르거나 커스텀 상품이 아닌데 보내면 CUSTOM_INPUT_MISMATCH,
+  수량이 1이 아니면 CUSTOM_QUANTITY_FIXED, 판매자 설정이 끝나지 않은 상품이면 CUSTOM_PRODUCT_NOT_READY다.
+  커스텀은 추가 금액이 없다(3D 모양·크기 등의 가격은 옵션 추가금으로만 들어온다).
+  """
+  custom: CreateOrderCustomInput
+}
+
+"""
+주문 커스텀 입력. 이미지 URL은 모두 createOrderCustomUploadUrl로 올린 본인 파일의 publicUrl이어야 하고(용도가 맞아야 한다),
+한 주문 안에서 같은 파일을 두 번 쓸 수 없다. 아니면 CUSTOM_UPLOAD_INVALID, 발급 뒤 오래돼 정리 중인 파일이면
+CUSTOM_UPLOAD_EXPIRED다. 다른 주문에 이미 쓴 파일도 CUSTOM_UPLOAD_INVALID다.
+"""
+input CreateOrderCustomInput {
+  """슬롯형(바탕 이미지 + 문구 자리) 입력. 슬롯형 상품에서만 보낸다."""
+  slot: CreateOrderSlotCustomInput
+  """3D 입력. 3D 상품에서만 보낸다."""
+  threeD: CreateOrderThreeDCustomInput
+}
+
+"""
+슬롯형 커스텀 입력. 좌표는 바탕 이미지 한 변을 10000으로 본 정수 비율이고 원점은 왼쪽 위다.
+"""
+input CreateOrderSlotCustomInput {
+  """
+  꾸미기를 시작할 때 본 ProductDetail.customTemplate.revision. 그 사이 판매자가 설정을 바꿨으면
+  CUSTOM_TEMPLATE_CHANGED(CONFLICT)이고 다시 꾸며야 한다.
+  """
+  templateRevision: Int!
+  """
+  문구 자리마다 1건(customTemplate.slots 전부, 중복 없이). 빠지거나 남는 자리가 있으면 CUSTOM_SLOT_TEXTS_MISMATCH다.
+  """
+  texts: [CreateOrderSlotTextInput!]!
+  """구매자가 본 그대로의 합성 이미지 URL(바탕 + 문구, 용도 COMPOSITE). 대표 이미지로 저장된다."""
+  compositeImageUrl: String!
+  """
+  자유 편집 요청(customTemplate.freeEditEnabled일 때만, 최대 5건). 규칙을 벗어나면 CUSTOM_FREE_EDIT_INVALID다.
+  """
+  freeEdits: [CreateOrderFreeEditInput!] = []
+}
+
+"""문구 자리 1개의 입력."""
+input CreateOrderSlotTextInput {
+  tokenId: ID!
+  """
+  넣을 문구. 손대지 않았으면 기본 문구를 그대로 보낸다. 줄바꿈(CRLF는 LF로 바꾼다)·이모지를 쓸 수 있고 앞뒤 공백은 지운다.
+  지운 뒤 비었거나 null이면 '문구 없음'이다(필수 자리면 CUSTOM_SLOT_TEXT_REQUIRED). 자리의 maxLength(코드 포인트)를
+  넘으면 CUSTOM_SLOT_TEXT_TOO_LONG이다.
+  """
+  valueText: String
+}
+
+"""자유 편집 요청 1건. 바탕 이미지 위 영역과 설명, 참고 사진이다."""
+input CreateOrderFreeEditInput {
+  """영역 왼쪽 위 x(0~10000)."""
+  posX: Int!
+  """영역 왼쪽 위 y(0~10000)."""
+  posY: Int!
+  """영역 너비(1 이상, posX + width ≤ 10000)."""
+  width: Int!
+  """영역 높이(1 이상, posY + height ≤ 10000)."""
+  height: Int!
+  """요청 설명(앞뒤 공백을 지운 뒤 1~2000자, 줄바꿈 허용)."""
+  descriptionText: String!
+  """참고 사진 URL(용도 REFERENCE, 최대 3장)."""
+  referenceImageUrls: [String!] = []
+}
+
+"""3D 커스텀 입력."""
+input CreateOrderThreeDCustomInput {
+  """
+  3D 디자인(JSON v1). 모양·크기·디자인·맛은 고른 옵션의 threeDKey와 같아야 한다(아니면 CUSTOM_3D_OPTIONS_CHANGED).
+  카탈로그·한도 검증은 customThreeDCatalog를 따른다.
+  """
+  design: ThreeDDesignInput!
+  """
+  렌더 이미지(용도 RENDER). THREE_D_TOP·FRONT·BACK·LEFT·RIGHT 정확히 1장씩이고, 아니면 CUSTOM_RENDER_IMAGES_INVALID다.
+  윗면이 대표 이미지로 저장된다.
+  """
+  renderImages: [CreateOrderRenderImageInput!]!
+}
+
+"""3D 렌더 이미지 1장."""
+input CreateOrderRenderImageInput {
+  """렌더 자세."""
+  kind: CustomImageKindType!
+  """이미지 URL."""
+  imageUrl: String!
+}
+
+"""
+3D 디자인 입력(JSON v1). 저장 형태는 ThreeDDesign이고 같은 좌표계·규칙을 쓴다. 배열 순서가 그리는 순서다.
+"""
+input ThreeDDesignInput {
+  """디자인 JSON 버전. 지금은 1만 받는다(아니면 CUSTOM_3D_SCHEMA_UNSUPPORTED)."""
+  schemaVersion: Int!
+  """모양·크기·디자인·맛·시트 색."""
+  basic: ThreeDDesignBasicInput!
+  """윗면 항목(글자·꾸미기 각 10개까지)."""
+  top: [ThreeDDesignItemInput!]!
+  """옆면 항목(글자·꾸미기 각 10개까지)."""
+  side: [ThreeDDesignItemInput!]!
+}
+
+"""3D 디자인의 케이크 기본값."""
+input ThreeDDesignBasicInput {
+  """모양 선택지 value(고른 모양 옵션의 값)."""
+  shape: String!
+  """크기 선택지 value(고른 크기 옵션의 값)."""
+  size: String!
+  """디자인 선택지 value. 디자인 옵션을 고르지 않았으면 null(장식 없는 시트)."""
+  design: String
+  """맛 선택지 value. 맛 옵션을 고르지 않았으면 null."""
+  flavor: String
+  """시트 색 key(카탈로그 sheetColors)."""
+  sheetColor: String!
+}
+
+"""3D 디자인 항목(글자 또는 꾸미기) 1개."""
+input ThreeDDesignItemInput {
+  """항목 종류."""
+  kind: ThreeDItemKindType!
+  """가로 위치(0~1, ThreeDDesign.top·side 좌표계)."""
+  x: Float!
+  """세로 위치(0~1, ThreeDDesign.top·side 좌표계)."""
+  y: Float!
+  """크기(cqw). 글자 4~30, 꾸미기 8~50."""
+  size: Float!
+  """효과."""
+  effect: ThreeDDesignEffectInput!
+  """글자 내용(TEXT만, 1~30 코드 포인트, 줄바꿈·이모지 허용). DECO는 null."""
+  text: String
+  """글자색(TEXT만, #RRGGBB). DECO는 null."""
+  color: String
+  """꾸미기 key(DECO만, 카탈로그 decos). TEXT는 null."""
+  decoId: String
+}
+
+"""3D 디자인 항목에 건 효과."""
+input ThreeDDesignEffectInput {
+  """효과 key(카탈로그 effects)."""
+  type: String!
+  """효과 강도(0~100 정수)."""
+  intensity: Int!
 }
 
 """주문 생성 결과 요약. 상세는 myOrder로 재조회."""
@@ -2729,14 +3217,238 @@ type CreateOrderOutput {
   """주문번호. 화면·문의에 쓰는 식별자."""
   orderNumber: String!
   """
-  주문 상태. 새로 생성된 경우 SUBMITTED다. 같은 idempotencyKey로 재시도하면 기존
-  주문을 그대로 돌려주므로 그 사이 진행된 상태(CONFIRMED·MADE·PICKED_UP 등)일 수 있다.
+  주문 상태. 새로 생성된 경우 PENDING_PAYMENT다. 같은 idempotencyKey로 재시도하면 기존
+  주문을 그대로 돌려주므로 그 사이 진행된 상태(SUBMITTED·CONFIRMED·CANCELED 등)일 수 있다.
   """
   status: OrderStatusType!
   """확정된 픽업 일시. 서버가 매장 정책으로 재검증한 값이다."""
   pickupAt: DateTime!
   """서버가 스냅샷한 최종 결제 금액(원). 클라이언트 계산값이 아니다."""
   totalPrice: Int!
+  """입금 안내(계좌·금액·입금자명·기한). 결제 도입 전 주문을 replay한 경우만 null."""
+  payment: OrderPayment
+}
+
+# ---- src/features/order/order-deposit-admin.graphql ----
+extend type Query {
+  """
+  입금 확인을 기다리는 주문(입금 대기 + 결제 대기) 목록. claimedOnly면 '입금했어요'를 누른 시각, 아니면 주문 생성 순으로
+  오래된 것부터 온다. 기한이 지났지만 아직 자동 취소되지 않은 주문도 포함한다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminPendingPayments(
+    input: AdminPendingPaymentListInput
+  ): AdminPendingPaymentConnection!
+  """
+  처리 대기 건수(배지용). 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminTaskCounts: AdminTaskCounts!
+}
+
+extend type Mutation {
+  """
+  은행 앱에서 확인한 입금으로 주문을 접수(SUBMITTED)로 넘긴다. 이때부터 판매자에게 주문이 보이고 '새 주문' 푸시가 가며,
+  판매자 확정 마감은 min(지금 + 24시간, 픽업 일시)이다. 구매자에게 ORDER_PAYMENT_CONFIRMED 알림이 간다.
+  입금 대기가 아니면(이미 확인·취소) PAYMENT_NOT_PENDING(CONFLICT), 픽업 일시가 지났으면 PAYMENT_PICKUP_PASSED(CONFLICT),
+  입금액이 1 미만이면 DEPOSIT_AMOUNT_INVALID, 결제 금액과 다르면 DEPOSIT_AMOUNT_MISMATCH(BAD_USER_INPUT)다.
+  거절된 입금은 미입금 취소·반환 대상 연결로 처리한다. 메모가 500자를 넘으면 TEXT_TOO_LONG. 없는 주문이면 NOT_FOUND.
+  감사 로그에 입금액이 남는다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminConfirmPayment(input: AdminConfirmPaymentInput!): AdminOrderSummary!
+}
+
+"""
+입금 확인 대기 목록 조회 조건. 모든 필터는 AND로 결합된다.
+"""
+input AdminPendingPaymentListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다. claimedOnly를 바꾸면 커서를 버리고 첫 페이지부터 다시 조회한다.
+  """
+  cursor: String
+  """
+  true면 구매자가 '입금했어요'를 누른 주문만. 기본 false, null도 false(전체)로 본다.
+  """
+  claimedOnly: Boolean = false
+  """
+  결제 금액(원) 일치 필터. 은행 앱에서 본 입금액으로 주문을 찾는다. null이면 전체.
+  """
+  amount: Int
+  """
+  입금자명 부분일치 필터(최대 50자). 공백만 보내거나 null이면 전체.
+  """
+  depositorName: String
+}
+
+"""
+입금 확인 대기 주문 1건.
+"""
+type AdminPendingPayment {
+  orderId: ID!
+  """
+  주문번호.
+  """
+  orderNumber: String!
+  """
+  매장명(주문 시점 스냅샷). 품목이 없으면 null.
+  """
+  storeName: String
+  """
+  상품명(주문 시점 스냅샷). 품목이 없으면 null.
+  """
+  productName: String
+  """
+  입금할 금액(원).
+  """
+  amount: Int!
+  """
+  입금자명.
+  """
+  depositorName: String!
+  """
+  주문자 이름.
+  """
+  buyerName: String!
+  """
+  주문자 연락처.
+  """
+  buyerPhone: String!
+  createdAt: DateTime!
+  """
+  입금 기한.
+  """
+  expiresAt: DateTime!
+  """
+  구매자가 '입금했어요'를 누른 시각. 누르지 않았으면 null.
+  """
+  buyerClaimedAt: DateTime
+  """
+  픽업 예정 일시. 지난 주문은 입금 확인할 수 없다.
+  """
+  pickupAt: DateTime!
+}
+
+"""
+입금 확인 대기 목록 페이지.
+"""
+type AdminPendingPaymentConnection {
+  """
+  입금 확인 대기 주문. 오래된 것부터 온다.
+  """
+  items: [AdminPendingPayment!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+처리 대기 건수. 진실은 각 목록이고 이 값은 배지용이다.
+"""
+type AdminTaskCounts {
+  """
+  '입금했어요'를 눌렀고 아직 확인하지 않은 주문 수(adminPendingPayments claimedOnly=true의 totalCount).
+  """
+  claimedPayments: Int!
+  """
+  입금 확인을 기다리는 전체 주문 수(adminPendingPayments의 totalCount, '입금했어요' 포함).
+  """
+  pendingPayments: Int!
+  """
+  구매자의 환불 계좌 입력을 기다리는 환불 수(adminRefunds status=AWAITING_ACCOUNT의 totalCount).
+  """
+  refundsAwaitingAccount: Int!
+  """
+  계좌가 들어와 송금을 기다리는 환불 수(adminRefunds status=AWAITING_TRANSFER의 totalCount).
+  """
+  refundsAwaitingTransfer: Int!
+  """
+  송금을 기다리는 주간 정산 수(adminSettlements status=PENDING의 totalCount).
+  """
+  pendingSettlements: Int!
+}
+
+"""
+입금 확인 입력.
+"""
+input AdminConfirmPaymentInput {
+  orderId: ID!
+  """
+  은행 앱에서 본 입금액(원, 0 이상 정수). 결제 금액과 같아야 확인된다(0원 주문은 0).
+  """
+  depositedAmount: Int!
+  """
+  처리 메모(선택, 500자 이하). 결제 기록에 남는다.
+  """
+  note: String
+}
+
+"""
+주문 결제(관리자 시점). 처리자 표시가 더해진다.
+"""
+type AdminOrderPayment {
+  """
+  결제 수단.
+  """
+  method: PaymentMethodType!
+  """
+  결제 상태.
+  """
+  status: PaymentStatusType!
+  """
+  결제 금액(원).
+  """
+  amount: Int!
+  """
+  입금자명.
+  """
+  depositorName: String!
+  """
+  안내한 케이퀵 계좌의 은행(주문 시점 스냅샷).
+  """
+  depositBank: Bank!
+  """
+  안내한 케이퀵 계좌번호(주문 시점 스냅샷).
+  """
+  depositAccountNumber: String!
+  """
+  안내한 케이퀵 계좌 예금주(주문 시점 스냅샷).
+  """
+  depositAccountHolder: String!
+  """
+  입금 기한.
+  """
+  expiresAt: DateTime!
+  """
+  구매자가 '입금했어요'를 누른 시각. 누르지 않았으면 null.
+  """
+  buyerClaimedAt: DateTime
+  """
+  입금이 확인된 시각. 확인 전이면 null.
+  """
+  confirmedAt: DateTime
+  """
+  입금 확인 경로. 확인 전이면 null.
+  """
+  confirmSource: PaymentConfirmSourceType
+  """
+  입금을 확인한 관리자 표시 이름(확인 시점 스냅샷). 확인 전이거나 이름이 없으면 null.
+  """
+  confirmedByLabel: String
+  """
+  입금 확인 메모. 없으면 null.
+  """
+  confirmNote: String
 }
 
 # ---- src/features/order/order-my.graphql ----
@@ -2749,6 +3461,83 @@ extend type Query {
   내 주문 상세 조회. 로그인 필수. 본인 데이터만 대상이 된다.
   """
   myOrder(orderId: ID!): MyOrderDetail!
+}
+
+extend type Mutation {
+  """
+  '입금했어요'. 입금 기한 전에 누르면 미입금 자동 취소에서 빠지고 관리자에게 확인 요청이 간다(입금이 없으면 관리자가 취소한다).
+  이미 눌렀으면 아무것도 바꾸지 않고 그대로 돌려준다. 입금 대기가 아니면(확인·취소됨) PAYMENT_NOT_PENDING(CONFLICT),
+  기한이 지났으면 PAYMENT_DEADLINE_PASSED(BAD_USER_INPUT). 로그인 필수. 본인 주문이 아니면 NOT_FOUND.
+  """
+  markMyOrderDepositSent(orderId: ID!): MyOrderDetail!
+  """
+  내 주문을 취소한다. 판매자 확정 전(입금 대기·접수)까지만 되고 사유는 구매자 요청으로 기록된다.
+  입금 대기는 환불 없이, 접수는 결제액 전액 환불로 취소되고 환불이 생기면 환불 계좌 입력 요청 알림이 간다.
+  refundAccount를 함께 보내면 환불이 바로 송금 대기가 되고 계좌 요청 알림은 가지 않는다(환불이 없으면 계좌는 버린다).
+  '입금했어요'를 누른 주문도 취소할 수 있다. 그 밖의 상태면 ORDER_NOT_CANCELLABLE(BAD_USER_INPUT).
+  계좌 형식 오류는 submitMyRefundAccount와 같은 코드다. 로그인 필수. 본인 주문이 아니면 NOT_FOUND.
+  """
+  cancelMyOrder(input: CancelMyOrderInput!): MyOrderDetail!
+  """
+  돌려받을 환불 계좌를 입력한다(MyOrderDetail.refunds의 id). 송금 완료 전이면 다시 보내 덮어쓸 수 있고, 입력하면 송금 대기가 된다.
+  계좌번호는 암호화해 저장하고 응답에는 끝 4자리만 나간다. 은행 코드가 paymentBanks에 없으면 INVALID_BANK_CODE,
+  계좌번호가 하이픈을 뺀 숫자 8~20자리가 아니면 INVALID_ACCOUNT_NUMBER, 예금주가 비었거나 50자를 넘으면
+  TEXT_REQUIRED·TEXT_TOO_LONG(모두 BAD_USER_INPUT), 송금이 끝났으면 REFUND_ALREADY_COMPLETED(CONFLICT).
+  로그인 필수. 본인 환불이 아니면 REFUND_NOT_FOUND(NOT_FOUND).
+  """
+  submitMyRefundAccount(input: SubmitMyRefundAccountInput!): MyOrderDetail!
+}
+
+"""
+내 주문 취소 입력.
+"""
+input CancelMyOrderInput {
+  orderId: ID!
+  """
+  취소 메모. 선택, 최대 500자. 상태 이력에 남고 판매자도 본다.
+  """
+  note: String
+  """
+  환불받을 계좌. 선택. 접수 주문처럼 환불이 생기는 취소에서 계좌 입력을 한 번에 끝낸다.
+  """
+  refundAccount: RefundAccountInput
+}
+
+"""
+환불받을 계좌.
+"""
+input RefundAccountInput {
+  """
+  은행 코드(paymentBanks의 code).
+  """
+  bankCode: String!
+  """
+  예금주(1~50자).
+  """
+  accountHolder: String!
+  """
+  계좌번호. 하이픈을 빼고 숫자 8~20자리여야 하며 숫자만 저장한다.
+  """
+  accountNumber: String!
+}
+
+"""
+환불 계좌 입력.
+"""
+input SubmitMyRefundAccountInput {
+  refundId: ID!
+  """
+  은행 코드(paymentBanks의 code).
+  """
+  bankCode: String!
+  """
+  예금주(1~50자).
+  """
+  accountHolder: String!
+  """
+  계좌번호. 하이픈을 빼고 숫자 8~20자리여야 하며 숫자만 저장한다.
+  """
+  accountNumber: String!
 }
 
 """
@@ -2821,6 +3610,11 @@ type MyOrderSummary {
   """
   additionalItemCount: Int!
   """
+  주문 할인율(0~100, 반올림) = 할인 금액 ÷ 할인 전 합계. 할인이 없으면 0.
+  옵션 추가금은 할인 대상이 아니라서, 옵션이 붙은 주문은 상품 카드의 할인율보다 낮을 수 있다.
+  """
+  discountRate: Int!
+  """
   총 가격
   """
   totalPrice: Int!
@@ -2829,9 +3623,17 @@ type MyOrderSummary {
   """
   storeName: String!
   """
+  매장 위치 표기(예: 인천 청라동). 주문 시점 스냅샷이며, 그때 매장 주소·지역이 없었으면 null.
+  """
+  regionLabel: String
+  """
   주문 내 OrderItem 중 리뷰 작성 가능한 것이 1건이라도 있는지 (PICKED_UP + 활성 리뷰 미존재)
   """
   hasReviewableItem: Boolean!
+  """
+  입금 기한. 입금을 기다리는 주문(결제 대기)만 값이 있고 그 밖은 null.
+  """
+  paymentExpiresAt: DateTime
 }
 
 """
@@ -2864,6 +3666,14 @@ type MyOrderDetail {
   주문자 연락처.
   """
   buyerPhone: String!
+  """
+  구매자가 남긴 요청 사항. 없으면 null.
+  """
+  requestNote: String
+  """
+  결제(입금 안내·진행 상태). 결제 도입 전 주문이면 null.
+  """
+  payment: OrderPayment
 
   """
   할인 전 품목 합계(원).
@@ -2898,6 +3708,23 @@ type MyOrderDetail {
   CANCELED 도달 시각. 취소되지 않았으면 null.
   """
   canceledAt: DateTime
+  """
+  취소 정보(주체·사유·환불액·환불 진행). 취소되지 않은 주문이면 null.
+  """
+  cancellation: OrderCancellation
+  """
+  지금 cancelMyOrder로 취소할 수 있는지. 입금 대기·접수 상태일 때 true.
+  """
+  canCancel: Boolean!
+  """
+  이 주문에서 돌려받을 돈(취소 환불·입금 반환). 오래된 순, 없으면 빈 배열.
+  status가 AWAITING_ACCOUNT면 submitMyRefundAccount로 계좌를 입력받는다.
+  """
+  refunds: [OrderRefund!]!
+  """
+  판매자가 바꾼 픽업 일시 이력. 오래된 순, 없으면 빈 배열. pickupAt은 마지막 변경 뒤 값이다.
+  """
+  pickupChanges: [OrderPickupChange!]!
 
   """
   상태 변경 이력. 오래된 순이다(판매자 주문 상세는 최신순 — 방향이 반대다).
@@ -2983,25 +3810,691 @@ type MyOrderStoreInfo {
   websiteUrl: String
 }
 
+# ---- src/features/order/order-payment-admin.graphql ----
+extend type Query {
+  """
+  플랫폼 결제 설정(판매 수수료율·케이퀵 입금 계좌)을 조회한다. 설정한 적이 없으면 수수료 0, 입금 계좌 없음이다.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminPaymentSetting: AdminPaymentSetting!
+  """
+  매장 정산 계좌를 계좌번호 원문과 함께 조회한다. 등록 전이면 null, 없는 매장이면 NOT_FOUND.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminStoreSettlementAccount(storeId: ID!): AdminStoreSettlementAccount
+}
+
+extend type Mutation {
+  """
+  플랫폼 결제 설정을 바꾼다. 보낸 필드만 바꾸고 생략·null인 필드는 그대로 둔다. 수수료율은 바꾼 뒤 생성되는 주문부터 적용된다.
+  수수료율이 0~10000bp 밖이면 INVALID_COMMISSION_RATE, 은행 코드가 paymentBanks에 없으면 INVALID_BANK_CODE,
+  계좌번호가 하이픈을 뺀 숫자 8~20자리가 아니면 INVALID_ACCOUNT_NUMBER, 예금주가 비었거나 50자를 넘으면 TEXT_REQUIRED·TEXT_TOO_LONG,
+  사유가 비면 TEXT_REQUIRED, 500자를 넘으면 VALIDATION_FAILED(모두 BAD_USER_INPUT). 감사 로그(PAYMENT_SETTING)를 남긴다.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminUpdatePaymentSetting(
+    input: AdminUpdatePaymentSettingInput!
+  ): AdminPaymentSetting!
+  """
+  매장 정산 계좌를 등록하거나 바꾼다(관리자 대리 수정). 계좌번호는 암호화해 저장하고, 감사 로그(SETTLEMENT_ACCOUNT)에는
+  끝 4자리만 남는다. 이 기록은 판매자 감사 로그에도 보인다. 없는 매장이면 NOT_FOUND, 은행·계좌번호·예금주·사유 오류는
+  adminUpdatePaymentSetting과 같은 코드(BAD_USER_INPUT). 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminUpsertStoreSettlementAccount(
+    input: AdminUpsertStoreSettlementAccountInput!
+  ): AdminStoreSettlementAccount!
+}
+
+"""
+플랫폼 결제 설정. 플랫폼 전체에 하나뿐이다.
+"""
+type AdminPaymentSetting {
+  """
+  판매 수수료율(bp, 1bp = 0.01%). 0~10000. 주문 생성 시점의 값이 주문에 저장된다.
+  """
+  commissionRateBps: Int!
+  """
+  구매자가 입금할 케이퀵 계좌의 은행. 설정 전이면 null.
+  """
+  depositBank: Bank
+  """
+  케이퀵 입금 계좌번호(숫자만). 설정 전이면 null.
+  """
+  depositAccountNumber: String
+  """
+  케이퀵 입금 계좌 예금주. 설정 전이면 null.
+  """
+  depositAccountHolder: String
+  """
+  마지막 변경 시각. 설정한 적이 없으면 null.
+  """
+  updatedAt: DateTime
+}
+
+"""
+매장 정산 계좌(관리자 시점). 계좌번호 원문이 들어 있으니 화면 밖(로그·분석 이벤트)에 남기지 않는다.
+"""
+type AdminStoreSettlementAccount {
+  storeId: ID!
+  """
+  은행.
+  """
+  bank: Bank!
+  """
+  예금주.
+  """
+  accountHolder: String!
+  """
+  계좌번호 원문(숫자만). 정산 송금에 쓴다.
+  """
+  accountNumber: String!
+  """
+  끝 4자리만 남긴 계좌번호(예: ****1234). 목록 표시용.
+  """
+  accountNumberMasked: String!
+  """
+  마지막으로 바꾼 주체. SELLER는 판매자 본인, ADMIN은 관리자 대리 수정이다.
+  """
+  updatedByRole: OrderActorType!
+  """
+  마지막 변경 시각.
+  """
+  updatedAt: DateTime!
+}
+
+"""
+결제 설정 변경 입력. 보낸 필드만 바꾼다.
+"""
+input AdminUpdatePaymentSettingInput {
+  """
+  판매 수수료율(bp). 0~10000 정수. 생략·null이면 그대로 둔다.
+  """
+  commissionRateBps: Int
+  """
+  케이퀵 입금 계좌 은행 코드(paymentBanks의 code). 생략·null이면 그대로 둔다.
+  """
+  depositBankCode: String
+  """
+  케이퀵 입금 계좌번호. 하이픈을 빼고 숫자 8~20자리여야 하며 숫자만 저장한다. 생략·null이면 그대로 둔다.
+  """
+  depositAccountNumber: String
+  """
+  케이퀵 입금 계좌 예금주(1~50자). 생략·null이면 그대로 둔다.
+  """
+  depositAccountHolder: String
+  """
+  변경 사유(필수, 500자 이하). 감사 로그에 남는다.
+  """
+  reason: String!
+}
+
+"""
+매장 정산 계좌 등록·변경 입력(관리자 대리 수정).
+"""
+input AdminUpsertStoreSettlementAccountInput {
+  storeId: ID!
+  """
+  은행 코드(paymentBanks의 code).
+  """
+  bankCode: String!
+  """
+  예금주(1~50자).
+  """
+  accountHolder: String!
+  """
+  계좌번호. 하이픈을 빼고 숫자 8~20자리여야 하며 숫자만 저장한다.
+  """
+  accountNumber: String!
+  """
+  변경 사유(필수, 500자 이하). 감사 로그에 남는다.
+  """
+  reason: String!
+}
+
+# ---- src/features/order/order-payment.graphql ----
+extend type Query {
+  """
+  계좌 입력 화면의 은행 목록(금융결제원 3자리 코드). 환불 계좌·정산 계좌·케이퀵 입금 계좌가 같은 목록을 쓰고,
+  배열 순서가 표시 순서다. 로그인 없이 조회할 수 있다.
+  """
+  paymentBanks: [Bank!]!
+}
+
+"""
+은행.
+"""
+type Bank {
+  """
+  금융결제원 3자리 은행 코드(예: 004). 계좌 입력 mutation의 bankCode로 그대로 보낸다.
+  """
+  code: String!
+  """
+  은행 이름(예: KB국민은행). 목록에서 빠진 옛 코드면 코드를 그대로 준다.
+  """
+  name: String!
+}
+
+"""
+결제 수단. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다.
+"""
+enum PaymentMethodType {
+  """계좌이체(케이퀵 계좌로 입금)."""
+  BANK_TRANSFER
+  """토스 결제. 아직 쓰지 않는다."""
+  TOSS
+}
+
+"""
+결제 상태. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다.
+"""
+enum PaymentStatusType {
+  """입금 대기."""
+  PENDING
+  """입금 확인됨. 주문이 나중에 취소돼도 이 값으로 남고 돌려줄 돈은 환불이 맡는다."""
+  CONFIRMED
+  """입금 전에 주문이 취소됨."""
+  CANCELED
+}
+
+"""
+입금을 확인한 경로.
+"""
+enum PaymentConfirmSourceType {
+  """입금 알림 자동 매칭. 아직 쓰지 않는다."""
+  AUTO
+  """관리자가 은행 앱에서 확인."""
+  ADMIN
+}
+
+"""
+주문 결제(계좌이체 입금 안내와 진행 상태). 구매자 주문 화면이 그대로 입금 안내에 쓴다.
+"""
+type OrderPayment {
+  """
+  결제 수단.
+  """
+  method: PaymentMethodType!
+  """
+  결제 상태.
+  """
+  status: PaymentStatusType!
+  """
+  입금할 금액(원). 주문 최종 결제 금액과 같다.
+  """
+  amount: Int!
+  """
+  입금자명. 은행 입금자명이 이 값과 같아야 확인이 빠르다.
+  """
+  depositorName: String!
+  """
+  입금할 케이퀵 계좌의 은행(주문 시점 스냅샷).
+  """
+  depositBank: Bank!
+  """
+  입금할 케이퀵 계좌번호(숫자만, 주문 시점 스냅샷).
+  """
+  depositAccountNumber: String!
+  """
+  입금할 케이퀵 계좌 예금주(주문 시점 스냅샷).
+  """
+  depositAccountHolder: String!
+  """
+  입금 기한(주문 후 1시간). 이때까지 입금이 확인되지 않고 '입금했어요'도 누르지 않았으면 주문이 자동 취소된다.
+  """
+  expiresAt: DateTime!
+  """
+  구매자가 '입금했어요'를 누른 시각. 누르지 않았으면 null.
+  """
+  buyerClaimedAt: DateTime
+  """
+  입금이 확인된 시각. 확인 전이면 null.
+  """
+  confirmedAt: DateTime
+  """
+  입금 확인 경로. 확인 전이면 null.
+  """
+  confirmSource: PaymentConfirmSourceType
+}
+
+# ---- src/features/order/order-refund-admin.graphql ----
+extend type Query {
+  """
+  환불(취소 환불·입금 반환) 목록. 처리 순서대로 오래된 환불부터 온다. 계좌번호는 끝 4자리만 나간다.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminRefunds(input: AdminRefundListInput): AdminRefundConnection!
+  """
+  환불 상세. 송금에 쓸 계좌번호 원문과 입금 반환이면 그 입금 기록이 함께 온다. 없으면 REFUND_NOT_FOUND(NOT_FOUND).
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminRefund(refundId: ID!): AdminRefundDetail!
+  """
+  결제로 확인하지 않은 입금 기록(반환·종결) 목록. 최근 기록부터 온다.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminDepositRecords(
+    input: AdminDepositRecordListInput
+  ): AdminDepositRecordConnection!
+}
+
+extend type Mutation {
+  """
+  환불 송금을 마쳤다고 기록한다. 계좌가 들어온(송금 대기) 환불만 되고, 계좌 입력 전이면 REFUND_NOT_READY(BAD_USER_INPUT),
+  이미 끝났으면 REFUND_ALREADY_COMPLETED(CONFLICT), 없으면 REFUND_NOT_FOUND(NOT_FOUND). 메모가 500자를 넘으면 TEXT_TOO_LONG.
+  구매자에게 REFUND_COMPLETED 알림이 가고 감사 로그(REFUND)를 남긴다. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminCompleteRefund(input: AdminCompleteRefundInput!): AdminRefund!
+  """
+  은행 앱에서 본 입금을 주문의 반환 대상으로 연결한다. 입금 기록(RETURN)과 입금액 전액의 환불(계좌 입력 대기)이 생기고
+  구매자에게 환불 계좌 입력 요청 알림이 간다. 주문 상태·결제·정산은 바꾸지 않으며 주문 상태와 관계없이 연결할 수 있다
+  (미입금 취소 뒤 늦은 입금, 취소 뒤 입금, 금액이 틀린 입금, 이중 입금). 입금액이 1 미만이면 DEPOSIT_AMOUNT_INVALID,
+  입금자명이 비었거나 50자를 넘으면 TEXT_REQUIRED·TEXT_TOO_LONG, 메모가 500자를 넘으면 TEXT_TOO_LONG(모두 BAD_USER_INPUT),
+  없는 주문이면 ORDER_NOT_FOUND(NOT_FOUND). 감사 로그(DEPOSIT_RECORD)를 남긴다.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminCreateDepositReturn(
+    input: AdminCreateDepositReturnInput!
+  ): AdminDepositRecord!
+  """
+  주인을 알 수 없는 입금을 메모와 함께 종결 기록(UNIDENTIFIED)으로 남긴다. 메모가 비면 DEPOSIT_NOTE_REQUIRED,
+  입금액·입금자명·메모 길이 오류는 adminCreateDepositReturn과 같다(모두 BAD_USER_INPUT). 감사 로그(DEPOSIT_RECORD)를 남긴다.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminRecordUnidentifiedDeposit(
+    input: AdminRecordUnidentifiedDepositInput!
+  ): AdminDepositRecord!
+  """
+  종결 기록한 입금의 주인을 찾았을 때 그 기록을 주문의 반환 대상으로 바꾼다. 같은 입금을 새로 기록하지 않고 기록 종류가
+  RETURN으로 바뀌며, 입금액 전액의 환불이 생겨 구매자에게 계좌 입력 요청 알림이 간다(주문 상태·결제·정산은 그대로).
+  이미 반환으로 연결된 기록이면 DEPOSIT_RECORD_ALREADY_LINKED(CONFLICT), 없는 기록이면 DEPOSIT_RECORD_NOT_FOUND,
+  없는 주문이면 ORDER_NOT_FOUND(모두 NOT_FOUND). 감사 로그(DEPOSIT_RECORD)를 남긴다.
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminLinkUnidentifiedDeposit(
+    input: AdminLinkUnidentifiedDepositInput!
+  ): AdminDepositRecord!
+}
+
+"""
+입금 기록 종류. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다.
+"""
+enum DepositRecordKindType {
+  """주문에 연결해 돌려주는 입금. 같은 금액의 입금 반환 환불이 함께 있다."""
+  RETURN
+  """주인을 알 수 없어 메모로 종결한 입금."""
+  UNIDENTIFIED
+}
+
+"""
+환불 목록 조회 조건. 모든 필터는 AND로 결합된다.
+"""
+input AdminRefundListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  진행 상태 필터. null이면 전체.
+  """
+  status: RefundStatusType
+  """
+  종류 필터. null이면 전체.
+  """
+  kind: RefundKindType
+}
+
+"""
+환불(관리자 시점). 계좌번호는 끝 4자리만 담는다.
+"""
+type AdminRefund {
+  id: ID!
+  """
+  환불 종류.
+  """
+  kind: RefundKindType!
+  """
+  돌려줄 금액(원).
+  """
+  amount: Int!
+  """
+  진행 상태.
+  """
+  status: RefundStatusType!
+  """
+  환불받을 은행. 계좌 입력 전이면 null.
+  """
+  bank: Bank
+  """
+  환불 계좌 예금주. 계좌 입력 전이면 null.
+  """
+  accountHolder: String
+  """
+  환불 계좌번호 끝 4자리만 보이는 값(예: ****1234). 계좌 입력 전이면 null.
+  """
+  accountNumberMasked: String
+  """
+  환불이 생긴 시각.
+  """
+  requestedAt: DateTime!
+  """
+  구매자가 계좌를 입력한 시각(덮어쓰면 마지막 입력). 입력 전이면 null.
+  """
+  accountSubmittedAt: DateTime
+  """
+  송금 완료 시각. 완료 전이면 null.
+  """
+  completedAt: DateTime
+  orderId: ID!
+  """
+  주문번호.
+  """
+  orderNumber: String!
+  """
+  주문자 이름. 계좌 입력을 기다릴 때 연락에 쓴다.
+  """
+  buyerName: String!
+  """
+  주문자 연락처.
+  """
+  buyerPhone: String!
+  """
+  매장명(주문 시점 스냅샷). 품목이 없으면 null.
+  """
+  storeName: String
+  """
+  상품명(주문 시점 스냅샷). 품목이 없으면 null.
+  """
+  productName: String
+  """
+  송금 완료를 기록한 관리자 표시 이름(처리 시점 스냅샷). 완료 전이거나 이름이 없으면 null.
+  """
+  completedByLabel: String
+  """
+  송금 완료 메모. 없으면 null.
+  """
+  completeNote: String
+}
+
+"""
+환불 상세. 계좌번호 원문이 들어 있으니 화면 밖(로그·분석 이벤트)에 남기지 않는다.
+"""
+type AdminRefundDetail {
+  """
+  환불.
+  """
+  refund: AdminRefund!
+  """
+  환불 계좌번호 원문(숫자만). 송금에 쓴다. 계좌 입력 전이면 null.
+  """
+  accountNumber: String
+  """
+  입금 반환이면 그 입금 기록, 취소 환불이면 null.
+  """
+  depositRecord: AdminDepositRecord
+}
+
+"""
+환불 목록 페이지.
+"""
+type AdminRefundConnection {
+  """
+  환불. 오래된 것부터 온다.
+  """
+  items: [AdminRefund!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+입금 기록 목록 조회 조건.
+"""
+input AdminDepositRecordListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+  """
+  종류 필터. null이면 전체.
+  """
+  kind: DepositRecordKindType
+}
+
+"""
+결제로 확인하지 않은 입금 기록 1건.
+"""
+type AdminDepositRecord {
+  id: ID!
+  """
+  기록 종류.
+  """
+  kind: DepositRecordKindType!
+  """
+  연결한 주문 ID. 반환(RETURN)만 있고 종결이면 null.
+  """
+  orderId: ID
+  """
+  연결한 주문번호. 반환(RETURN)만 있고 종결이면 null.
+  """
+  orderNumber: String
+  """
+  입금액(원).
+  """
+  amount: Int!
+  """
+  은행 앱에 보인 입금자명.
+  """
+  depositorName: String!
+  """
+  은행 앱에 보인 입금 일시. 입력하지 않았으면 null.
+  """
+  depositedAt: DateTime
+  """
+  처리 메모. 없으면 null(종결 기록은 항상 있다).
+  """
+  note: String
+  """
+  기록한 관리자 표시 이름(기록 시점 스냅샷). 이름이 없으면 null.
+  """
+  recordedByLabel: String
+  """
+  반환으로 생긴 환불 ID(adminRefund로 연다). 종결이면 null.
+  """
+  refundId: ID
+  """
+  반환으로 생긴 환불의 진행 상태. 종결이면 null.
+  """
+  refundStatus: RefundStatusType
+  createdAt: DateTime!
+}
+
+"""
+입금 기록 목록 페이지.
+"""
+type AdminDepositRecordConnection {
+  """
+  입금 기록. 최근 것부터 온다.
+  """
+  items: [AdminDepositRecord!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+환불 송금 완료 입력.
+"""
+input AdminCompleteRefundInput {
+  refundId: ID!
+  """
+  처리 메모(선택, 500자 이하). 환불 기록에 남는다.
+  """
+  note: String
+}
+
+"""
+입금 반환 연결 입력.
+"""
+input AdminCreateDepositReturnInput {
+  orderId: ID!
+  """
+  은행 앱에서 본 입금액(원, 1 이상). 이 금액 전액을 돌려준다.
+  """
+  amount: Int!
+  """
+  은행 앱에 보인 입금자명(1~50자).
+  """
+  depositorName: String!
+  """
+  은행 앱에 보인 입금 일시(선택).
+  """
+  depositedAt: DateTime
+  """
+  처리 메모(선택, 500자 이하).
+  """
+  note: String
+}
+
+"""
+주인 모를 입금 종결 기록 입력.
+"""
+input AdminRecordUnidentifiedDepositInput {
+  """
+  은행 앱에서 본 입금액(원, 1 이상).
+  """
+  amount: Int!
+  """
+  은행 앱에 보인 입금자명(1~50자).
+  """
+  depositorName: String!
+  """
+  은행 앱에 보인 입금 일시(선택).
+  """
+  depositedAt: DateTime
+  """
+  종결 사유 메모(필수, 500자 이하).
+  """
+  note: String!
+}
+
+"""
+종결 기록을 반환 대상으로 바꾸는 입력.
+"""
+input AdminLinkUnidentifiedDepositInput {
+  depositRecordId: ID!
+  orderId: ID!
+}
+
+# ---- src/features/order/order-seller-pickup.graphql ----
+extend type Query {
+  """
+  픽업 일시 변경 시트의 월 달력. 영업일·특별휴무·예약 가능 기간·일일 제작 수량을 보고, 리드타임·상품 제작 시간은 보지 않는다
+  (지난 시각만 막는다). 이 주문이 지금 점유한 수량은 빼고 세며, 숨긴 매장도 계산한다. 접수·확정·제작 완료가 아니면
+  PICKUP_RESCHEDULE_NOT_ALLOWED, yearMonth 형식이 어긋나면 BAD_USER_INPUT(INVALID_YEAR_MONTH). 입금 확인 전·다른 매장 주문은 NOT_FOUND.
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerOrderPickupCalendar(
+    orderId: ID!
+    """대상 연월. "YYYY-MM" 형식(KST 기준)."""
+    yearMonth: String!
+  ): PickupCalendar!
+  """
+  픽업 일시 변경 시트의 그날 슬롯. 규칙은 sellerOrderPickupCalendar와 같다. date 형식이 어긋나면 BAD_USER_INPUT(INVALID_DATE).
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerOrderPickupTimeSlots(
+    orderId: ID!
+    """대상 날짜. "YYYY-MM-DD" 형식(KST 기준)."""
+    date: String!
+  ): PickupTimeSlots!
+}
+
+extend type Mutation {
+  """
+  주문 픽업 일시를 바꾼다(접수·확정·제작 완료만, 그 밖은 PICKUP_RESCHEDULE_NOT_ALLOWED). 지금과 같은 일시면 PICKUP_UNCHANGED,
+  영업일·특별휴무·슬롯 시각·지난 시각·예약 가능 기간·일일 제작 수량(이 주문 수량은 빼고 센다)에 맞지 않으면 PICKUP_NOT_AVAILABLE
+  (모두 BAD_USER_INPUT). 리드타임·상품 제작 시간은 보지 않고, 숨긴 매장의 주문도 바꿀 수 있다. 접수 상태면 확정 마감을
+  min(접수 + 24시간, 새 픽업 시각)으로 다시 잰다. 변경 이력(pickupChanges)이 남고 구매자에게 알림이 간다. 커스텀 내용은 바뀌지 않는다.
+  입금 확인 전·다른 매장 주문은 NOT_FOUND. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerRescheduleOrderPickup(
+    input: SellerRescheduleOrderPickupInput!
+  ): SellerOrderSummary!
+}
+
+"""
+판매자 픽업 일시 변경 입력.
+"""
+input SellerRescheduleOrderPickupInput {
+  orderId: ID!
+  """
+  새 픽업 일시. sellerOrderPickupTimeSlots의 슬롯 시각이어야 한다(초 이하는 0).
+  """
+  pickupAt: DateTime!
+  """
+  변경 메모. 선택, 최대 500자. 변경 이력에 남고 구매자도 본다.
+  """
+  note: String
+}
+
 # ---- src/features/order/order-seller.graphql ----
 extend type Query {
   """
-  내 매장 주문 목록을 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  내 매장 주문 목록을 조회한다. 입금이 확인된(접수된) 주문만 보인다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
   """
   sellerOrderList(input: SellerOrderListInput): SellerOrderConnection!
   """
-  내 매장 주문 상세를 조회한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  내 매장 주문 상세를 조회한다. 입금 확인 전 주문은 없는 주문과 같이 NOT_FOUND다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
   """
   sellerOrder(orderId: ID!): SellerOrderDetail!
 }
 
 extend type Mutation {
   """
-  주문 상태를 변경한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  주문 상태를 변경한다. 접수 → 확정, 확정 → 제작 완료, 확정·제작 완료 → 픽업 완료·노쇼만 된다(그 밖은
+  INVALID_ORDER_STATUS_TRANSITION, 같은 상태면 ORDER_STATUS_UNCHANGED). 노쇼는 픽업 시각부터 24시간(자동 픽업 완료 전)
+  안에서만 되고 벗어나면 NO_SHOW_NOT_ALLOWED(BAD_USER_INPUT)다. 픽업 완료·노쇼는 정산 금액을 확정하고, 노쇼는 환불이 없다.
+  취소(CANCELED)는 받지 않으므로 sellerCancelOrder를 쓴다(INVALID_ORDER_STATUS_TRANSITION).
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
   """
   sellerUpdateOrderStatus(
     input: SellerUpdateOrderStatusInput!
   ): SellerOrderSummary!
+  """
+  주문을 거절·취소한다. 접수(SUBMITTED) 단계 거절은 결제액 전액 환불이고, 확정·제작 완료(CONFIRMED·MADE) 뒤 취소는
+  fault(사정)가 필수다(판매자 사정 = 전액 환불, 구매자 사정 = refundAmount 환불, 남는 금액은 수수료를 뺀 뒤 정산에 포함).
+  환불 송금은 케이퀵이 한다. 그 밖의 상태면 ORDER_NOT_CANCELLABLE, 판매자가 고를 수 없는 사유면 CANCEL_REASON_NOT_ALLOWED,
+  사정이 없으면 CANCEL_FAULT_REQUIRED, 구매자 사정인데 금액이 없으면 REFUND_AMOUNT_REQUIRED,
+  금액이 0~결제액 밖이면 REFUND_AMOUNT_OUT_OF_RANGE(모두 BAD_USER_INPUT). 입금 확인 전·다른 매장 주문은 NOT_FOUND.
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerCancelOrder(input: SellerCancelOrderInput!): SellerOrderSummary!
 }
 
 """
@@ -3045,6 +4538,19 @@ type SellerOrderSummary {
   내 매장 첫 품목의 상품 대표 이미지 URL(주문 시점 스냅샷). 주문 당시 이미지가 없었으면 null.
   """
   firstItemImageUrl: String
+  """
+  커스텀 주문 여부(내 매장 첫 품목의 커스텀 방식이 NONE이 아니면 true). 목록 '커스텀' 배지용이다.
+  """
+  hasCustom: Boolean!
+  """
+  내 매장 첫 품목의 커스텀 대표 이미지 URL(3D 윗면 렌더 또는 슬롯형 합성). 없으면 null.
+  """
+  firstItemCustomImageUrl: String
+  """
+  확정 마감 시각. 이때까지 확정하지 않으면 자동 취소되고 결제액 전액이 환불된다. 접수(SUBMITTED) 상태가 아니거나
+  결제 도입 전 주문이면 null.
+  """
+  confirmDeadlineAt: DateTime
 }
 
 """
@@ -3085,6 +4591,10 @@ input SellerOrderListInput {
   주문 상태 필터. 미지정 시 전체 상태.
   """
   status: OrderStatusType
+  """
+  구매자 계정 ID 필터. 채팅 상대의 주문만 볼 때 쓴다. 미지정 시 전체.
+  """
+  buyerAccountId: ID
   """
   주문 생성 시각 하한(이상).
   """
@@ -3137,6 +4647,14 @@ type SellerOrderDetail {
   """
   buyerPhone: String!
   """
+  구매자가 남긴 요청 사항. 없으면 null.
+  """
+  requestNote: String
+  """
+  결제 수단. 결제 도입 전 주문이면 null. 값은 늘어날 수 있으니 모르는 값은 '기타'로 보여 준다.
+  """
+  paymentMethod: PaymentMethodType
+  """
   할인 전 품목 합계(원).
   """
   subtotalPrice: Int!
@@ -3175,9 +4693,52 @@ type SellerOrderDetail {
   """
   items: [OrderItemDetail!]!
   """
-  상태 변경 이력. 최신순.
+  상태 변경 이력. 최신순. 입금 대기 이력은 빠지고, 접수 이력은 fromStatus가 null(최초)로 온다.
   """
   statusHistories: [OrderStatusHistory!]!
+  """
+  취소 정보(주체·사유·사정·환불액·환불 진행). 취소되지 않은 주문이면 null.
+  """
+  cancellation: OrderCancellation
+  """
+  확정 마감 시각. 이때까지 확정하지 않으면 자동 취소되고 결제액 전액이 환불된다. 접수(SUBMITTED) 상태가 아니거나
+  결제 도입 전 주문이면 null.
+  """
+  confirmDeadlineAt: DateTime
+  """
+  자동 픽업 완료 예정 시각(픽업 시각 + 24시간). 확정·제작 완료 상태에서만 있고 그 밖은 null.
+  매장이 숨김이면 자동으로 픽업 완료되지 않는다.
+  """
+  autoPickupAt: DateTime
+  """
+  지금 노쇼로 처리할 수 있는지. 확정·제작 완료 상태이고 픽업 시각 ≤ 지금 < autoPickupAt일 때 true.
+  """
+  canMarkNoShow: Boolean!
+  """
+  노쇼 처리 시각. 노쇼가 아니면 null.
+  """
+  noShowAt: DateTime
+  """
+  픽업 일시 변경 이력. 오래된 순, 없으면 빈 배열.
+  """
+  pickupChanges: [OrderPickupChange!]!
+  """
+  주문 생성 시점의 수수료율(bp, 1bp = 0.01%). 바뀐 설정은 그 뒤 주문부터 적용된다.
+  """
+  commissionRateBps: Int!
+  """
+  정산 예정 금액(원). 정산 확정 뒤에는 실제 지급액(기준액 − 수수료), 확정 전에는 결제 금액에서 수수료(원 미만 버림)를 뺀
+  예상값이다. 입금이 확인되지 않았거나 결제 도입 전 주문이면 null, 확정 없이 취소된 주문(전액 환불)은 0.
+  """
+  expectedPayoutAmount: Int
+  """
+  확정된 수수료 기준액(원). 픽업 완료·노쇼는 결제 금액, 구매자 사정 취소는 결제 금액 − 환불 금액. 확정 전이면 null.
+  """
+  settlementBaseAmount: Int
+  """
+  확정된 수수료(원). 기준액 × 수수료율, 원 미만 버림. 확정 전이면 null.
+  """
+  commissionAmount: Int
 }
 
 """
@@ -3187,13 +4748,503 @@ BAD_USER_INPUT으로 거절된다.
 input SellerUpdateOrderStatusInput {
   orderId: ID!
   """
-  변경할 상태. 현재 상태에서 진입 가능한 값이어야 한다.
+  변경할 상태. CONFIRMED·MADE·PICKED_UP·NO_SHOW 중 현재 상태에서 진입 가능한 값이어야 한다.
   """
   toStatus: OrderStatusType!
   """
-  변경 사유 메모. toStatus가 CANCELED면 필수이고, 없으면 BAD_USER_INPUT.
+  변경 메모. 선택, 최대 500자. 상태 이력에 남는다.
   """
   note: String
+}
+
+"""
+판매자 주문 거절·취소 입력. 허용 범위는 sellerCancelOrder 설명을 따른다.
+"""
+input SellerCancelOrderInput {
+  orderId: ID!
+  """
+  취소 사유. DESIGN_NOT_FEASIBLE·OUT_OF_MATERIALS·SCHEDULE_UNAVAILABLE·INAPPROPRIATE_REQUEST·BUYER_REQUEST·OTHER 중 하나.
+  """
+  reason: OrderCancelReasonType!
+  """
+  취소 메모. 선택, 최대 500자. 상태 이력에 남고 구매자도 본다.
+  """
+  note: String
+  """
+  취소 사정. 확정·제작 완료 주문이면 필수이고, 접수 단계 거절에서는 무시한다.
+  """
+  fault: OrderCancelFaultType
+  """
+  돌려줄 금액(원, 0~결제액). fault가 BUYER일 때 필수이고, 그 밖에는 무시한다.
+  """
+  refundAmount: Int
+}
+
+# ---- src/features/order/order-settlement-admin.graphql ----
+extend type Query {
+  """
+  주간 정산 목록. 최근 생성 순. 매주 월요일 05:00(KST)에 지난주(월~일)까지 정산이 확정된 주문을 매장별로 묶어 만든다.
+  날짜 형식이 어긋나면 INVALID_DATE(BAD_USER_INPUT). 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminSettlements(input: AdminSettlementListInput): AdminSettlementConnection!
+  """
+  주간 정산 1건과 포함 주문·현재 매장 정산 계좌(원문). 없으면 NOT_FOUND(SETTLEMENT_NOT_FOUND).
+  관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminSettlement(settlementId: ID!): AdminSettlementDetail!
+  """
+  월 수수료 집계. 정산 확정 시각의 KST 월로 매장별 주문 수·기준액·수수료를 묶는다(주간 정산 여부와 무관).
+  월 형식이 어긋나면 INVALID_YEAR_MONTH(BAD_USER_INPUT). 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminMonthlyCommissions(
+    input: AdminMonthlyCommissionInput!
+  ): AdminMonthlyCommissionReport!
+}
+
+extend type Mutation {
+  """
+  은행 앱에서 매장 정산 계좌로 송금한 뒤 송금 완료로 처리한다. 그 시점 매장 정산 계좌를 송금 계좌로 남기고 감사 로그(SETTLEMENT)를 쓴다.
+  이미 송금 완료면 SETTLEMENT_ALREADY_PAID(CONFLICT), 매장 정산 계좌가 없으면 SETTLEMENT_ACCOUNT_REQUIRED(BAD_USER_INPUT),
+  메모가 500자를 넘으면 TEXT_TOO_LONG, 없는 정산이면 NOT_FOUND. 관리자 로그인 필수. ADMIN 계정이 아니면 FORBIDDEN.
+  """
+  adminMarkSettlementPaid(
+    input: AdminMarkSettlementPaidInput!
+  ): AdminSettlementDetail!
+}
+
+"""
+주간 정산 목록 조회 조건. 모든 필터는 AND로 결합된다.
+"""
+input AdminSettlementListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다. 필터를 바꾸면 커서를 버리고 첫 페이지부터 다시 조회한다.
+  """
+  cursor: String
+  """
+  송금 상태 필터. null이면 전체.
+  """
+  status: SettlementStatusType
+  """
+  매장 필터. null이면 전체.
+  """
+  storeId: ID
+  """
+  정산 기간 시작일(월요일, KST, YYYY-MM-DD) 필터. 관리자 알림 링크의 periodStart와 같다. null이면 전체.
+  """
+  periodStart: String
+}
+
+"""
+주간 정산 1건(관리자 시점).
+"""
+type AdminSettlementSummary {
+  id: ID!
+  storeId: ID!
+  """
+  매장명(정산에 묶인 가장 최근 주문의 스냅샷).
+  """
+  storeName: String!
+  """
+  정산 기간 시작일(월요일, KST). YYYY-MM-DD.
+  """
+  periodStart: String!
+  """
+  정산 기간 마지막 날(일요일, KST). YYYY-MM-DD.
+  """
+  periodEnd: String!
+  """
+  포함 주문 수. 앞 정산에서 빠진 주문(늦게 확정된 주문)도 함께 묶인다.
+  """
+  orderCount: Int!
+  """
+  수수료 기준액 합계(원).
+  """
+  settlementBaseAmount: Int!
+  """
+  수수료 합계(원).
+  """
+  commissionAmount: Int!
+  """
+  송금할 금액(원) = 기준액 합계 − 수수료 합계.
+  """
+  payoutAmount: Int!
+  """
+  송금 상태.
+  """
+  status: SettlementStatusType!
+  """
+  송금 완료 시각. 송금 전이면 null.
+  """
+  paidAt: DateTime
+  """
+  지금 매장 정산 계좌가 등록돼 있는지. false면 송금 완료로 처리할 수 없다.
+  """
+  accountRegistered: Boolean!
+  createdAt: DateTime!
+}
+
+"""
+주간 정산 목록 페이지.
+"""
+type AdminSettlementConnection {
+  """
+  주간 정산. 최근 생성 순.
+  """
+  items: [AdminSettlementSummary!]!
+  """
+  조건에 맞는 전체 건수(현재 페이지와 무관). 커서 필터는 제외하고 센다.
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+주간 정산 상세(관리자 시점). 현재 계좌 원문이 들어 있으니 화면 밖(로그·분석 이벤트)에 남기지 않는다.
+"""
+type AdminSettlementDetail {
+  id: ID!
+  storeId: ID!
+  """
+  매장명(정산에 묶인 가장 최근 주문의 스냅샷).
+  """
+  storeName: String!
+  """
+  정산 기간 시작일(월요일, KST). YYYY-MM-DD.
+  """
+  periodStart: String!
+  """
+  정산 기간 마지막 날(일요일, KST). YYYY-MM-DD.
+  """
+  periodEnd: String!
+  """
+  포함 주문 수.
+  """
+  orderCount: Int!
+  """
+  수수료 기준액 합계(원).
+  """
+  settlementBaseAmount: Int!
+  """
+  수수료 합계(원).
+  """
+  commissionAmount: Int!
+  """
+  송금할 금액(원) = 기준액 합계 − 수수료 합계.
+  """
+  payoutAmount: Int!
+  """
+  송금 상태.
+  """
+  status: SettlementStatusType!
+  """
+  송금 완료 시각. 송금 전이면 null.
+  """
+  paidAt: DateTime
+  """
+  지금 매장 정산 계좌가 등록돼 있는지(currentAccount가 있는지).
+  """
+  accountRegistered: Boolean!
+  createdAt: DateTime!
+  """
+  송금 완료로 처리한 관리자 표시 이름(처리 시점 스냅샷). 송금 전이거나 이름이 없으면 null.
+  """
+  paidByLabel: String
+  """
+  송금 메모. 없으면 null.
+  """
+  paidNote: String
+  """
+  송금한 계좌(송금 시점 스냅샷, 끝 4자리만). 송금 전이면 null.
+  """
+  paidAccount: SettlementPaidAccount
+  """
+  지금 매장 정산 계좌(계좌번호 원문 포함). 송금할 때 쓴다. 등록 전이면 null.
+  """
+  currentAccount: AdminStoreSettlementAccount
+  """
+  포함 주문. 주문 id 순.
+  """
+  orders: [SettlementOrder!]!
+}
+
+"""
+송금 완료 입력.
+"""
+input AdminMarkSettlementPaidInput {
+  settlementId: ID!
+  """
+  송금 메모(선택, 500자 이하). 정산과 감사 로그에 남는다.
+  """
+  note: String
+}
+
+"""
+월 수수료 집계 조건.
+"""
+input AdminMonthlyCommissionInput {
+  """
+  집계 월(KST). "YYYY-MM" 형식. 예: "2026-11".
+  """
+  month: String!
+}
+
+"""
+월 수수료 집계.
+"""
+type AdminMonthlyCommissionReport {
+  """
+  집계 월. "YYYY-MM".
+  """
+  month: String!
+  """
+  정산이 확정된 주문 수 합계.
+  """
+  orderCount: Int!
+  """
+  수수료 기준액 합계(원).
+  """
+  settlementBaseAmount: Int!
+  """
+  수수료 합계(원).
+  """
+  commissionAmount: Int!
+  """
+  매장별 집계. 매장 id 순, 확정 주문이 없는 매장은 빠진다.
+  """
+  stores: [AdminMonthlyCommissionStore!]!
+}
+
+"""
+매장 1곳의 월 수수료.
+"""
+type AdminMonthlyCommissionStore {
+  storeId: ID!
+  """
+  매장명(그 달 가장 최근 확정 주문의 스냅샷).
+  """
+  storeName: String!
+  """
+  정산이 확정된 주문 수.
+  """
+  orderCount: Int!
+  """
+  수수료 기준액 합계(원).
+  """
+  settlementBaseAmount: Int!
+  """
+  수수료 합계(원).
+  """
+  commissionAmount: Int!
+}
+
+# ---- src/features/order/order-settlement-seller.graphql ----
+extend type Query {
+  """
+  내 매장 정산 계좌를 조회한다. 계좌번호는 끝 4자리만 내려준다. 등록 전이면 null.
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerSettlementAccount: SellerSettlementAccount
+  """
+  내 매장 주간 정산 내역. 최근 생성 순(매주 월요일에 지난주분이 생긴다).
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerSettlements(input: SellerSettlementListInput): SellerSettlementConnection!
+  """
+  내 매장 주간 정산 1건과 포함 주문. 다른 매장 정산이거나 없으면 NOT_FOUND(SETTLEMENT_NOT_FOUND).
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerSettlement(settlementId: ID!): SellerSettlementDetail!
+}
+
+"""
+주간 정산 목록 조회 조건.
+"""
+input SellerSettlementListInput {
+  """
+  한 번에 가져올 개수. 기본 20, 1~100만 허용하며 벗어나면 BAD_USER_INPUT.
+  """
+  limit: Int = 20
+  """
+  이전 응답의 nextCursor. 첫 페이지는 생략한다.
+  """
+  cursor: String
+}
+
+"""
+주간 정산 1건(판매자 시점). 월~일(KST) 동안 정산이 확정된 주문(그 전에 빠진 주문 포함)을 묶는다.
+"""
+type SellerSettlementSummary {
+  id: ID!
+  """
+  정산 기간 시작일(월요일, KST). YYYY-MM-DD.
+  """
+  periodStart: String!
+  """
+  정산 기간 마지막 날(일요일, KST). YYYY-MM-DD.
+  """
+  periodEnd: String!
+  """
+  포함 주문 수.
+  """
+  orderCount: Int!
+  """
+  수수료 기준액 합계(원).
+  """
+  settlementBaseAmount: Int!
+  """
+  수수료 합계(원).
+  """
+  commissionAmount: Int!
+  """
+  정산 금액(원) = 기준액 합계 − 수수료 합계. 케이퀵이 매장 정산 계좌로 보내는 금액이다.
+  """
+  payoutAmount: Int!
+  """
+  송금 여부. PENDING이면 송금 대기, PAID면 송금 완료.
+  """
+  status: SettlementStatusType!
+  """
+  송금 완료 시각. 송금 전이면 null.
+  """
+  paidAt: DateTime
+  createdAt: DateTime!
+}
+
+"""
+주간 정산 목록 페이지.
+"""
+type SellerSettlementConnection {
+  """
+  주간 정산. 최근 생성 순.
+  """
+  items: [SellerSettlementSummary!]!
+  """
+  전체 건수(현재 페이지와 무관).
+  """
+  totalCount: Int!
+  """
+  다음 페이지 존재 여부.
+  """
+  hasMore: Boolean!
+  """
+  다음 페이지 커서. null이면 마지막 페이지다.
+  """
+  nextCursor: String
+}
+
+"""
+주간 정산 상세(판매자 시점).
+"""
+type SellerSettlementDetail {
+  id: ID!
+  """
+  정산 기간 시작일(월요일, KST). YYYY-MM-DD.
+  """
+  periodStart: String!
+  """
+  정산 기간 마지막 날(일요일, KST). YYYY-MM-DD.
+  """
+  periodEnd: String!
+  """
+  포함 주문 수.
+  """
+  orderCount: Int!
+  """
+  수수료 기준액 합계(원).
+  """
+  settlementBaseAmount: Int!
+  """
+  수수료 합계(원).
+  """
+  commissionAmount: Int!
+  """
+  정산 금액(원) = 기준액 합계 − 수수료 합계.
+  """
+  payoutAmount: Int!
+  """
+  송금 여부.
+  """
+  status: SettlementStatusType!
+  """
+  송금 완료 시각. 송금 전이면 null.
+  """
+  paidAt: DateTime
+  createdAt: DateTime!
+  """
+  송금한 계좌(송금 시점 스냅샷, 끝 4자리만). 송금 전이면 null.
+  """
+  paidAccount: SettlementPaidAccount
+  """
+  포함 주문. 주문 id 순.
+  """
+  orders: [SettlementOrder!]!
+}
+
+extend type Mutation {
+  """
+  내 매장 정산 계좌를 등록하거나 바꾼다. 계좌번호는 암호화해 저장하고, 응답과 감사 로그(SETTLEMENT_ACCOUNT)에는 끝 4자리만 남는다.
+  은행 코드가 paymentBanks에 없으면 INVALID_BANK_CODE, 계좌번호가 하이픈을 뺀 숫자 8~20자리가 아니면 INVALID_ACCOUNT_NUMBER,
+  예금주가 비었거나 50자를 넘으면 TEXT_REQUIRED·TEXT_TOO_LONG(모두 BAD_USER_INPUT).
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  """
+  sellerUpsertSettlementAccount(
+    input: SellerUpsertSettlementAccountInput!
+  ): SellerSettlementAccount!
+}
+
+"""
+내 매장 정산 계좌(판매자 시점). 계좌번호 원문은 내려주지 않는다.
+"""
+type SellerSettlementAccount {
+  """
+  은행.
+  """
+  bank: Bank!
+  """
+  예금주.
+  """
+  accountHolder: String!
+  """
+  끝 4자리만 남긴 계좌번호(예: ****1234).
+  """
+  accountNumberMasked: String!
+  """
+  마지막으로 바꾼 주체. SELLER는 본인, ADMIN은 관리자가 대신 바꾼 경우다.
+  """
+  updatedByRole: OrderActorType!
+  """
+  마지막 변경 시각.
+  """
+  updatedAt: DateTime!
+}
+
+"""
+정산 계좌 등록·변경 입력.
+"""
+input SellerUpsertSettlementAccountInput {
+  """
+  은행 코드(paymentBanks의 code).
+  """
+  bankCode: String!
+  """
+  예금주(1~50자).
+  """
+  accountHolder: String!
+  """
+  계좌번호. 하이픈을 빼고 숫자 8~20자리여야 하며 숫자만 저장한다.
+  """
+  accountNumber: String!
 }
 
 # ---- src/features/order/order-subscription.graphql ----
@@ -3202,7 +5253,7 @@ extend type Subscription {
   내 매장 주문 생성·상태 변경 이벤트. 판매자 로그인 필수(SELLER 아니면 FORBIDDEN).
   삭제되지 않은 매장을 보유한 판매자만 구독할 수 있다 — 매장이 없거나 삭제됐으면 NOT_FOUND.
   비활성(is_active=false) 매장도 구독은 유지된다. 인증은 graphql-ws connectionParams.authorization.
-  구매자 주문 생성(SUBMITTED)·판매자 상태 변경·관리자 강제 취소가 모두 여기로 온다.
+  입금 확인(새 주문)·판매자 상태 변경·관리자 강제 취소가 모두 여기로 온다. 입금 확인 전 주문(생성·취소)은 오지 않는다.
   """
   sellerOrderUpdated: SellerOrderUpdate!
 }
@@ -3213,6 +5264,10 @@ extend type Subscription {
 전달 누락 가능(Redis 장애 시 발행 생략)하므로 폴백은 sellerOrderList 재조회다.
 """
 type SellerOrderUpdate {
+  """
+  갱신 종류. 새 주문 알림은 SUBMITTED일 때만 띄운다.
+  """
+  kind: SellerOrderUpdateKind!
   orderId: ID!
   """주문번호."""
   orderNumber: String!
@@ -3226,20 +5281,43 @@ type SellerOrderUpdate {
   totalPrice: Int!
   """첫 품목의 상품명(주문 시점 스냅샷). 주문은 단일 상품 구조다."""
   productName: String!
+  """커스텀 주문 여부(첫 품목의 커스텀 방식이 NONE이 아니면 true)."""
+  hasCustom: Boolean!
+  """
+  확정 마감 시각. 이때까지 확정하지 않으면 자동 취소된다. 접수(SUBMITTED) 상태가 아니거나 결제 도입 전 주문이면 null.
+  """
+  confirmDeadlineAt: DateTime
   """주문 행의 updated_at. 폐기 규칙의 비교 키다."""
   updatedAt: DateTime!
 }
 
+"""
+판매자 주문 갱신 종류. 값은 늘어날 수 있으니 모르는 값은 목록 재조회로 처리한다.
+"""
+enum SellerOrderUpdateKind {
+  """입금이 확인돼 새 주문이 접수됐다."""
+  SUBMITTED
+  """주문 상태가 바뀌었다(확정·제작 완료·픽업 완료·취소 등)."""
+  STATUS_CHANGED
+  """픽업 일시가 바뀌었다."""
+  PICKUP_RESCHEDULED
+}
+
 # ---- src/features/order/order.types.graphql ----
 """
-주문 상태. 구매자·판매자 API가 공용으로 쓴다.
+주문 상태. 구매자·판매자·관리자 API가 공용으로 쓴다. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다.
 
-전이는 `SUBMITTED → CONFIRMED → MADE → PICKED_UP` 한 방향이며 각 단계는 직전
-상태에서만 진입할 수 있다. `CANCELED`는 `PICKED_UP` 이전 세 상태에서만 가능하고,
-어떤 상태에서도 `SUBMITTED`로 되돌아갈 수 없다.
+흐름은 `PENDING_PAYMENT → SUBMITTED → CONFIRMED → MADE → PICKED_UP`이며 어떤 상태에서도
+앞 단계로 되돌아갈 수 없다. 판매자가 sellerUpdateOrderStatus로 바꿀 수 있는 전이는 `SUBMITTED → CONFIRMED`,
+`CONFIRMED → MADE`, `CONFIRMED·MADE → PICKED_UP·NO_SHOW`뿐이고, 취소는 주체별 취소 mutation(cancelMyOrder·sellerCancelOrder·adminCancelOrder)으로만 한다.
+관리자도 adminCompleteOrderPickup으로 확정·제작 완료 주문을 픽업 완료할 수 있다.
+시스템은 입금 기한(1시간)이 지난 입금 대기를 취소하고, 확정 마감이 지난 접수를 취소(전액 환불)하며,
+픽업 시각 + 24시간이 지난 확정·제작 완료를 픽업 완료로 바꾼다. 판매자에게는 입금이 확인된(접수된) 주문만 보인다.
 """
 enum OrderStatusType {
-  """구매자가 주문을 넣은 직후의 초기 상태. 판매자 확인 대기."""
+  """입금 대기. 주문 직후 계좌이체 입금을 기다리는 상태이고, 판매자에게 보이지 않는다."""
+  PENDING_PAYMENT
+  """입금이 확인돼 접수된 상태. 판매자 확인 대기."""
   SUBMITTED
   """판매자가 주문을 확인·수락한 상태. 제작 대기."""
   CONFIRMED
@@ -3247,8 +5325,24 @@ enum OrderStatusType {
   MADE
   """구매자가 수령을 마친 종료 상태. 이후 상태 변경 불가."""
   PICKED_UP
-  """취소된 종료 상태. 취소 처리에는 사유(note)가 필수다."""
+  """노쇼. 구매자가 픽업 시간에 오지 않아 판매자가 처리한 종료 상태. 환불 없음, 리뷰 불가."""
+  NO_SHOW
+  """취소된 종료 상태. 주체·사유·사정·환불은 주문 상세의 cancellation에 있다."""
   CANCELED
+}
+
+"""
+주문·결제·정산 기록을 남긴 주체. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다.
+"""
+enum OrderActorType {
+  """구매자."""
+  BUYER
+  """판매자."""
+  SELLER
+  """관리자."""
+  ADMIN
+  """시스템 자동 처리."""
+  SYSTEM
 }
 
 """주문 상태 변경 이력 1건. 구매자·판매자·관리자 주문 상세가 공용으로 쓴다."""
@@ -3260,8 +5354,199 @@ type OrderStatusHistory {
   toStatus: OrderStatusType!
   """변경 시각."""
   changedAt: DateTime!
-  """변경 사유 메모. 취소(CANCELED) 전이에는 필수로 기록된다(관리자 취소는 '[관리자]' 접두)."""
+  """변경할 때 남긴 메모. 없으면 null. 예전 관리자 취소 이력은 '[관리자] ' 접두가 붙어 있다."""
   note: String
+  """변경한 주체."""
+  actorType: OrderActorType!
+  """취소 사유. 취소(CANCELED) 이력에만 있고 그 밖은 null."""
+  cancelReason: OrderCancelReasonType
+  """취소 사정. 확정·제작 완료 뒤 취소 이력에만 있고 그 밖은 null."""
+  cancelFault: OrderCancelFaultType
+  """취소로 돌려줄 금액(원). 취소 이력에만 있고(환불이 없으면 0) 그 밖은 null."""
+  refundAmount: Int
+}
+
+"""
+취소 사유. 값은 늘어날 수 있으니 모르는 값은 reasonLabel(또는 '기타')로 보여 준다.
+판매자는 앞의 여섯 값, 관리자는 여기에 입금 대기 주문의 PAYMENT_NOT_RECEIVED, 구매자는 BUYER_REQUEST(서버가 정한다)를 쓴다.
+"""
+enum OrderCancelReasonType {
+  """제작할 수 없는 디자인."""
+  DESIGN_NOT_FEASIBLE
+  """재료 소진."""
+  OUT_OF_MATERIALS
+  """일정 불가."""
+  SCHEDULE_UNAVAILABLE
+  """부적절한 요청."""
+  INAPPROPRIATE_REQUEST
+  """구매자 요청."""
+  BUYER_REQUEST
+  """기타. 결제 도입 전 취소 기록도 이 값이다."""
+  OTHER
+  """미입금. 입금 기한이 지났거나 관리자가 입금이 없다고 판단한 입금 대기 주문."""
+  PAYMENT_NOT_RECEIVED
+  """판매자가 확정 마감까지 확정하지 않아 자동 취소."""
+  CONFIRM_TIMEOUT
+}
+
+"""
+확정·제작 완료 뒤 취소의 사정. 환불액이 갈린다(판매자 사정 = 전액, 구매자 사정 = 취소자가 정한 금액).
+"""
+enum OrderCancelFaultType {
+  """판매자 사정."""
+  SELLER
+  """구매자 사정."""
+  BUYER
+}
+
+"""
+지금 상태에서 취소할 때의 환불 규칙.
+"""
+enum CancelRefundRuleType {
+  """환불 없음(입금 대기)."""
+  NO_REFUND
+  """결제액 전액 환불(접수)."""
+  FULL_REFUND
+  """사정에 따라: 판매자 사정은 전액, 구매자 사정은 0~결제액 중 입력한 금액(확정·제작 완료)."""
+  BY_FAULT
+}
+
+"""
+환불 종류.
+"""
+enum RefundKindType {
+  """주문 취소 환불."""
+  CANCEL
+  """주문과 별개로 들어온 입금을 돌려주는 반환."""
+  DEPOSIT_RETURN
+}
+
+"""
+환불 진행 상태. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다.
+"""
+enum RefundStatusType {
+  """구매자의 환불 계좌 입력 대기."""
+  AWAITING_ACCOUNT
+  """계좌가 입력돼 케이퀵 송금 대기."""
+  AWAITING_TRANSFER
+  """송금 완료."""
+  COMPLETED
+}
+
+"""
+주간 정산 상태. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다.
+"""
+enum SettlementStatusType {
+  """케이퀵의 매장 송금 대기."""
+  PENDING
+  """송금 완료."""
+  PAID
+}
+
+"""
+정산을 송금한 계좌(송금 시점 스냅샷). 계좌번호는 끝 4자리만 내려준다.
+"""
+type SettlementPaidAccount {
+  """
+  은행.
+  """
+  bank: Bank!
+  """
+  예금주.
+  """
+  accountHolder: String!
+  """
+  끝 4자리만 남긴 계좌번호(예: ****1234).
+  """
+  accountNumberMasked: String!
+}
+
+"""
+주간 정산에 묶인 주문 1건.
+"""
+type SettlementOrder {
+  orderId: ID!
+  """
+  주문번호.
+  """
+  orderNumber: String!
+  """
+  상품명(주문 시점 스냅샷). 품목이 없으면 null.
+  """
+  productName: String
+  """
+  주문 상태(픽업 완료·노쇼, 구매자 사정 취소의 남은 금액이면 취소).
+  """
+  status: OrderStatusType!
+  """
+  주문 생성 시점의 수수료율(bp, 1bp = 0.01%).
+  """
+  commissionRateBps: Int!
+  """
+  수수료 기준액(원). 결제 금액, 구매자 사정 취소면 결제 금액 − 환불 금액.
+  """
+  settlementBaseAmount: Int!
+  """
+  수수료(원). 기준액 × 수수료율, 원 미만 버림.
+  """
+  commissionAmount: Int!
+  """
+  매장 지급액(원) = 기준액 − 수수료.
+  """
+  payoutAmount: Int!
+  """
+  정산 확정 시각(픽업 완료·노쇼·구매자 사정 취소 시각). 이 시각이 속한 주(월~일, KST)가 끝난 뒤 첫 주간 정산에 묶인다.
+  """
+  settlementFinalizedAt: DateTime!
+}
+
+"""
+주문 취소 정보. 취소된 주문에만 있다.
+"""
+type OrderCancellation {
+  """취소한 주체."""
+  actorType: OrderActorType!
+  """취소 사유."""
+  reason: OrderCancelReasonType!
+  """취소 사유 표시 라벨(예: 재료 소진). 모르는 reason 값의 표시에 쓴다."""
+  reasonLabel: String!
+  """취소하며 남긴 메모. 없으면 null."""
+  note: String
+  """취소 사정. 확정·제작 완료 뒤 취소에만 있고 그 밖은 null."""
+  fault: OrderCancelFaultType
+  """돌려줄 금액(원). 환불이 없으면 0."""
+  refundAmount: Int!
+  """환불 진행 상태. 환불이 없으면 null."""
+  refundStatus: RefundStatusType
+  """환불 송금 완료 시각. 완료 전이거나 환불이 없으면 null."""
+  refundCompletedAt: DateTime
+  """취소 시각."""
+  canceledAt: DateTime!
+}
+
+"""
+구매자에게 돌려줄 돈 1건(취소 환불 또는 입금 반환).
+"""
+type OrderRefund {
+  id: ID!
+  """환불 종류."""
+  kind: RefundKindType!
+  """돌려줄 금액(원)."""
+  amount: Int!
+  """진행 상태."""
+  status: RefundStatusType!
+  """환불받을 은행. 계좌 입력 전이면 null."""
+  bank: Bank
+  """환불 계좌 예금주. 계좌 입력 전이면 null."""
+  accountHolder: String
+  """환불 계좌번호 끝 4자리만 보이는 값(예: ****1234). 계좌 입력 전이면 null."""
+  accountNumberMasked: String
+  """환불이 생긴 시각."""
+  requestedAt: DateTime!
+  """구매자가 계좌를 입력한 시각. 입력 전이면 null."""
+  accountSubmittedAt: DateTime
+  """송금 완료 시각. 완료 전이면 null."""
+  completedAt: DateTime
 }
 
 """
@@ -3284,10 +5569,117 @@ type OrderItemDetail {
   itemSubtotalPrice: Int!
   """선택한 옵션(주문 시점 스냅샷)."""
   optionItems: [OrderItemOption!]!
+  """커스텀 방식(주문 시점 스냅샷). 커스텀이 없는 품목은 NONE."""
+  customMode: CustomModeType!
+  """
+  커스텀 대표 이미지 URL. 3D는 윗면 렌더, 슬롯형은 합성 이미지이고 목록 썸네일·리뷰 Before에 쓰인다. 없으면 null.
+  """
+  customPreviewImageUrl: String
+  """
+  슬롯형 바탕 이미지 URL(주문 시점 스냅샷, 정사각). 문구 자리·자유 편집 영역 좌표의 기준이다. 슬롯형이 아니거나 바탕을 저장하기 전 주문이면 null.
+  """
+  customBaseImageUrl: String
+  """커스텀 이미지(3D 렌더 5장 또는 슬롯형 합성 1장). kind 선언 순서다. 없으면 빈 배열."""
+  customImages: [OrderItemCustomImage!]!
+  """3D 디자인(JSON v1). 3D가 아니거나 저장된 값을 읽을 수 없으면 null."""
+  threeDDesign: ThreeDDesign
   """입력한 커스텀 문구(주문 시점 스냅샷)."""
   customTexts: [OrderItemCustomText!]!
   """자유 편집 요청(주문 시점 스냅샷)."""
   freeEdits: [OrderItemFreeEdit!]!
+}
+
+"""
+주문 커스텀 이미지 종류. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다.
+3D 옆면은 옆면 고도 asin(0.4) 정사영이고 좌·우는 정면을 보는 사람 기준이다.
+"""
+enum CustomImageKindType {
+  """3D 윗면(위에서 내려다본 정사각). 대표 이미지다."""
+  THREE_D_TOP
+  """3D 옆면 정면(yaw 0)."""
+  THREE_D_FRONT
+  """3D 옆면 뒤(정면 반대)."""
+  THREE_D_BACK
+  """3D 옆면 왼쪽."""
+  THREE_D_LEFT
+  """3D 옆면 오른쪽."""
+  THREE_D_RIGHT
+  """슬롯형 합성 이미지(바탕 + 문구, 구매자가 본 그대로). 대표 이미지다."""
+  SLOT_COMPOSITE
+}
+
+"""주문 커스텀 이미지 1장."""
+type OrderItemCustomImage {
+  id: ID!
+  """이미지 종류. 품목마다 종류당 1장이다."""
+  kind: CustomImageKindType!
+  """이미지 URL."""
+  imageUrl: String!
+}
+
+"""
+주문에 저장된 3D 디자인(JSON v1). 배열 순서가 그리는 순서다. 그리는 규칙은 판매자 앱 렌더러와 구매자 편집기가 공유한다.
+선택지·시트 색·효과·꾸미기 키는 customThreeDCatalog의 key이고, 퇴역한 항목도 과거 주문을 그릴 수 있게 카탈로그에 남는다.
+"""
+type ThreeDDesign {
+  """디자인 JSON 버전. 지금은 1."""
+  schemaVersion: Int!
+  """모양·크기·디자인·맛·시트 색."""
+  basic: ThreeDDesignBasic!
+  """윗면 항목. x·y는 케이크 판 정사각 기준 중심 0~1(왼쪽 위 원점)."""
+  top: [ThreeDDesignItem!]!
+  """옆면 항목. x는 정면(yaw 0)에서 잰 둘레 비율 0~1, y는 윗면 0~바닥 1."""
+  side: [ThreeDDesignItem!]!
+}
+
+"""3D 디자인의 케이크 기본값."""
+type ThreeDDesignBasic {
+  """모양 선택지 key."""
+  shape: String!
+  """크기 선택지 key."""
+  size: String!
+  """디자인 선택지 key. 고르지 않았으면 null(장식 없는 시트)."""
+  design: String
+  """맛 선택지 key. 고르지 않았으면 null."""
+  flavor: String
+  """시트 색 key."""
+  sheetColor: String!
+}
+
+"""3D 디자인 항목 종류. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다."""
+enum ThreeDItemKindType {
+  """글자."""
+  TEXT
+  """꾸미기 이미지."""
+  DECO
+}
+
+"""3D 디자인 항목(글자 또는 꾸미기) 1개."""
+type ThreeDDesignItem {
+  """항목 종류."""
+  kind: ThreeDItemKindType!
+  """가로 위치(면별 좌표계, ThreeDDesign.top·side 참고)."""
+  x: Float!
+  """세로 위치(면별 좌표계, ThreeDDesign.top·side 참고)."""
+  y: Float!
+  """크기(케이크 판 너비 대비 cqw)."""
+  size: Float!
+  """효과."""
+  effect: ThreeDDesignEffect!
+  """글자 내용(줄바꿈·이모지 포함). TEXT만 값이 있다."""
+  text: String
+  """글자색(#RRGGBB 대문자). TEXT만 값이 있다."""
+  color: String
+  """꾸미기 key. DECO만 값이 있다."""
+  decoId: String
+}
+
+"""3D 디자인 항목에 건 효과."""
+type ThreeDDesignEffect {
+  """효과 key(카탈로그 effects)."""
+  type: String!
+  """효과 강도(0~100 정수)."""
+  intensity: Int!
 }
 
 """주문 시점의 옵션 스냅샷. 판매자가 이후 옵션을 수정·삭제해도 주문 내용은 변하지 않는다."""
@@ -3301,24 +5693,52 @@ type OrderItemOption {
   priceDelta: Int!
 }
 
-"""주문 시점의 커스텀 문구 스냅샷."""
+"""
+주문 시점의 커스텀 문구 스냅샷. 좌표는 바탕 이미지 한 변을 10000으로 본 정수 비율이고 원점은 왼쪽 위다.
+글꼴은 플랫폼 공통 1종(Pretendard Bold)이고 크기는 영역에 맞춰 자동이다.
+"""
 type OrderItemCustomText {
   id: ID!
-  """문구 슬롯 식별 키(주문 시점)."""
+  """원본 문구 자리 ID. 자리가 이후 바뀌거나 지워져도 스냅샷은 그대로다. 문구 자리를 지정하기 전 주문이면 null."""
+  tokenId: ID
+  """문구 자리 식별 키(주문 시점)."""
   tokenKey: String!
-  """슬롯의 기본 문구(주문 시점)."""
+  """문구 자리 표시 이름(주문 시점)."""
+  label: String!
+  """문구 자리의 기본 문구(주문 시점)."""
   defaultText: String!
-  """구매자가 실제로 입력한 문구."""
-  valueText: String!
+  """구매자가 넣은 문구(줄바꿈·이모지 포함). 선택 자리를 지웠으면 null('문구 없음')."""
+  valueText: String
+  """영역 왼쪽 위 x(0~10000)."""
+  posX: Int!
+  """영역 왼쪽 위 y(0~10000)."""
+  posY: Int!
+  """영역 너비(posX + width ≤ 10000)."""
+  width: Int!
+  """영역 높이(posY + height ≤ 10000)."""
+  height: Int!
+  """글자색(#RRGGBB 대문자)."""
+  textColor: String!
+  """영역 안 글자 정렬."""
+  textAlign: CustomTextAlignType!
   """입력 화면 노출 순서. 오름차순."""
   sortOrder: Int!
 }
 
-"""주문 시점의 자유 편집 요청 스냅샷. 구매자가 이미지 위에 영역을 지정해 남긴 요청이다."""
+"""
+주문 시점의 자유 편집 요청 스냅샷. 구매자가 슬롯형 바탕 이미지 위에 영역을 지정해 남긴 요청이다.
+좌표계는 OrderItemCustomText와 같다(바탕 한 변 10000, 왼쪽 위 원점).
+"""
 type OrderItemFreeEdit {
   id: ID!
-  """지정한 편집 영역을 잘라낸 이미지 URL."""
-  cropImageUrl: String!
+  """영역 왼쪽 위 x(0~10000)."""
+  posX: Int!
+  """영역 왼쪽 위 y(0~10000)."""
+  posY: Int!
+  """영역 너비(posX + width ≤ 10000)."""
+  width: Int!
+  """영역 높이(posY + height ≤ 10000)."""
+  height: Int!
   """해당 영역에 대한 요청 문구."""
   descriptionText: String!
   """요청 순서. 오름차순."""
@@ -3334,6 +5754,21 @@ type OrderItemFreeEditAttachment {
   imageUrl: String!
   """첨부 순서. 오름차순."""
   sortOrder: Int!
+}
+
+"""
+판매자 픽업 일시 변경 이력 1건. 구매자·판매자·관리자 주문 상세가 공용으로 쓴다.
+"""
+type OrderPickupChange {
+  id: ID!
+  """변경 전 픽업 일시."""
+  fromPickupAt: DateTime!
+  """변경 후 픽업 일시."""
+  toPickupAt: DateTime!
+  """변경 시각."""
+  changedAt: DateTime!
+  """판매자가 남긴 변경 메모. 없으면 null."""
+  note: String
 }
 
 # ---- src/features/product/product-admin-banner.graphql ----
@@ -3882,9 +6317,13 @@ type AdminProduct {
   """
   currency: String!
   """
-  기본 디자인 이미지 URL. 미등록 시 null.
+  대표 이미지 URL(삭제 제외 첫 장). 이미지가 없으면 null.
   """
-  baseDesignImageUrl: String
+  thumbnailUrl: String
+  """
+  커스텀 방식.
+  """
+  customMode: CustomModeType!
   """
   노출 여부. false면 구매자 화면에 나오지 않는다.
   """
@@ -4004,14 +6443,6 @@ type AdminProductOptionGroup {
   """
   maxSelect: Int!
   """
-  선택지에 구매자 커스텀 입력(설명)이 필요한 그룹인지. 현재는 true인 그룹의 옵션을 고르면 주문이 거절된다(잠정 가드).
-  """
-  optionRequiresDescription: Boolean!
-  """
-  선택지에 구매자 커스텀 입력(이미지)이 필요한 그룹인지. 현재는 true인 그룹의 옵션을 고르면 주문이 거절된다(잠정 가드).
-  """
-  optionRequiresImage: Boolean!
-  """
   상품 안에서의 그룹 노출 순서. 오름차순.
   """
   sortOrder: Int!
@@ -4054,6 +6485,10 @@ type AdminProductOptionItem {
   노출 여부. false면 구매자가 고를 수 없다.
   """
   isActive: Boolean!
+  """
+  이어진 3D 카탈로그 선택지 키(customThreeDCatalog.optionChoices.key). 없으면 null.
+  """
+  threeDKey: String
 }
 
 """
@@ -4066,9 +6501,9 @@ type AdminProductCustomTemplate {
   """
   baseImageUrl: String!
   """
-  활성 여부. false면 구매자 화면에 커스텀 입력이 열리지 않는다.
+  자유 편집(바탕 위 영역 지정 + 요청 문구·참고 사진) 허용 여부.
   """
-  isActive: Boolean!
+  freeEditEnabled: Boolean!
   """
   문구 슬롯. sortOrder 오름차순. 삭제된 슬롯은 뺀다.
   """
@@ -4085,6 +6520,10 @@ type AdminProductCustomTextToken {
   """
   tokenKey: String!
   """
+  표시 이름(구매자 입력 화면 라벨).
+  """
+  label: String!
+  """
   구매자가 입력하지 않았을 때 쓸 기본 문구.
   """
   defaultText: String!
@@ -4100,6 +6539,14 @@ type AdminProductCustomTextToken {
   필수 입력 여부.
   """
   isRequired: Boolean!
+  """
+  글자색(#RRGGBB 대문자).
+  """
+  textColor: String!
+  """
+  자리 안 글자 정렬.
+  """
+  textAlign: CustomTextAlignType!
 }
 
 """
@@ -4188,6 +6635,225 @@ type CategoryItem {
   sortOrder: Int!
 }
 
+# ---- src/features/product/product-custom-catalog.graphql ----
+extend type Query {
+  """
+  3D 케이크 카탈로그. 모양·크기·디자인·맛 선택지, 시트 색, 글자색, 효과, 꾸미기, 서버가 강제하는 한도를 담는다. 비로그인 접근 가능.
+  항목은 지우지 않고 selectable=false로 퇴역시켜 과거 주문의 디자인도 이 목록으로 그릴 수 있다. revision이 같으면 내용도 같다.
+  """
+  customThreeDCatalog: CustomThreeDCatalog!
+}
+
+"""
+3D 케이크 카탈로그.
+"""
+type CustomThreeDCatalog {
+  """
+  카탈로그 버전. 항목을 더하거나 퇴역시키면 오른다. 클라이언트 캐시 무효화 기준이다.
+  """
+  revision: Int!
+  """
+  주문에 저장하는 3D 디자인 JSON 버전. 주문 생성의 design.schemaVersion은 이 값이어야 한다.
+  """
+  designSchemaVersion: Int!
+  """
+  서버가 강제하는 개수·길이·크기 한도.
+  """
+  limits: CustomThreeDLimits!
+  """
+  상품 옵션 항목이 threeDKey로 이어지는 선택지(크기·맛·모양·디자인).
+  """
+  optionChoices: [CustomThreeDOptionChoice!]!
+  """
+  시트 색(디자인 basic.sheetColor 값).
+  """
+  sheetColors: [CustomThreeDSheetColor!]!
+  """
+  글자색 팔레트(#RRGGBB 대문자, 편집기 표시 순서). 이 밖의 #RRGGBB도 쓸 수 있다.
+  """
+  textColorPresets: [String!]!
+  """
+  새 글자의 기본 색(#RRGGBB).
+  """
+  defaultTextColor: String!
+  """
+  글자·꾸미기에 거는 효과.
+  """
+  effects: [CustomThreeDEffect!]!
+  """
+  꾸미기 분류(편집기 탭).
+  """
+  decoCategories: [CustomThreeDDecoCategory!]!
+  """
+  꾸미기 이미지.
+  """
+  decos: [CustomThreeDDeco!]!
+}
+
+"""
+3D 디자인 한도. 크기 단위는 케이크 판 너비 대비 cqw다.
+"""
+type CustomThreeDLimits {
+  """
+  면(윗면·옆면)당 글자 최대 개수.
+  """
+  maxTextsPerFace: Int!
+  """
+  면(윗면·옆면)당 꾸미기 최대 개수.
+  """
+  maxDecosPerFace: Int!
+  """
+  글자 하나의 최대 길이(코드 포인트, 줄바꿈·이모지 포함).
+  """
+  maxTextLength: Int!
+  """
+  글자 크기 최솟값(cqw).
+  """
+  textSizeMin: Float!
+  """
+  글자 크기 최댓값(cqw).
+  """
+  textSizeMax: Float!
+  """
+  꾸미기 크기 최솟값(cqw).
+  """
+  decoSizeMin: Float!
+  """
+  꾸미기 크기 최댓값(cqw).
+  """
+  decoSizeMax: Float!
+  """
+  효과 강도 최솟값(정수).
+  """
+  effectIntensityMin: Int!
+  """
+  효과 강도 최댓값(정수).
+  """
+  effectIntensityMax: Int!
+  """
+  새 글자·꾸미기의 기본 효과 강도.
+  """
+  effectIntensityDefault: Int!
+}
+
+"""
+옵션 항목에 이을 수 있는 3D 선택지.
+"""
+type CustomThreeDOptionChoice {
+  """
+  옵션 항목 threeDKey로 저장하는 키(예: shape.heart).
+  """
+  key: String!
+  """
+  선택지 카테고리.
+  """
+  category: ThreeDOptionCategoryType!
+  """
+  디자인 JSON basic에 들어가는 값(예: heart).
+  """
+  value: String!
+  """
+  표시 이름. 기본 세트로 만든 옵션 항목의 이름이 된다.
+  """
+  label: String!
+  """
+  기본 추가 금액(원). 기본 세트로 만든 옵션 항목의 priceDelta가 되고, 매장이 바꿀 수 있다.
+  """
+  defaultPriceDelta: Int!
+  """
+  선택지 이미지 URL(디자인만). 없으면 null.
+  """
+  imageUrl: String
+  """
+  위에서 본 케이크 판·옆모습 배율(크기만). 없으면 null.
+  """
+  renderScale: Float
+  """
+  새로 고를 수 있는지. false면 퇴역한 값으로, 과거 주문을 그릴 때만 쓴다.
+  """
+  selectable: Boolean!
+}
+
+"""
+3D 시트 색.
+"""
+type CustomThreeDSheetColor {
+  """
+  디자인 JSON basic.sheetColor 값.
+  """
+  key: String!
+  """
+  표시 이름.
+  """
+  label: String!
+  """
+  렌더 색(#RRGGBB 대문자).
+  """
+  hex: String!
+  """
+  새로 고를 수 있는지. false면 과거 주문을 그릴 때만 쓴다.
+  """
+  selectable: Boolean!
+}
+
+"""
+글자·꾸미기 효과.
+"""
+type CustomThreeDEffect {
+  """
+  디자인 JSON effect.type 값.
+  """
+  key: String!
+  """
+  표시 이름.
+  """
+  label: String!
+  """
+  새로 고를 수 있는지. false면 과거 주문을 그릴 때만 쓴다.
+  """
+  selectable: Boolean!
+}
+
+"""
+꾸미기 분류.
+"""
+type CustomThreeDDecoCategory {
+  """
+  분류 키. CustomThreeDDeco.category가 가리킨다.
+  """
+  key: String!
+  """
+  표시 이름(편집기 탭).
+  """
+  label: String!
+}
+
+"""
+꾸미기 이미지 1개.
+"""
+type CustomThreeDDeco {
+  """
+  디자인 JSON 꾸미기 항목의 decoId 값.
+  """
+  key: String!
+  """
+  분류 키(CustomThreeDDecoCategory.key).
+  """
+  category: String!
+  """
+  표시 이름.
+  """
+  label: String!
+  """
+  이미지 URL(PNG, 투명 배경).
+  """
+  imageUrl: String!
+  """
+  새로 고를 수 있는지. false면 과거 주문을 그릴 때만 쓴다.
+  """
+  selectable: Boolean!
+}
+
 # ---- src/features/product/product-detail.graphql ----
 extend type Query {
   """상품 상세. 없거나 비활성/삭제 상품(또는 매장)이면 NOT_FOUND. 비로그인 접근 가능."""
@@ -4221,6 +6887,53 @@ type ProductDetail {
   isWishlisted: Boolean!
   """옵션 섹션(케이크 사이즈/맛 등, sort_order asc). 활성 그룹만."""
   optionGroups: [ProductDetailOptionGroup!]!
+  """커스텀 방식. NONE이 아니면 꾸민 내용과 함께 주문해야 한다."""
+  customMode: CustomModeType!
+  """슬롯형 꾸미기 설정. customMode가 SLOT일 때만 오고 그 밖에는 null."""
+  customTemplate: ProductDetailCustomTemplate
+}
+
+"""
+슬롯형 꾸미기 설정. 바탕 이미지는 정사각(1:1)이고 문구 자리 좌표는 한 변을 10000으로 본 정수 비율이다(원점 왼쪽 위).
+"""
+type ProductDetailCustomTemplate {
+  """설정 버전. 주문할 때 그대로 보내고, 그사이 판매자가 설정을 바꿨으면 주문이 거절되어 다시 꾸며야 한다."""
+  revision: Int!
+  """바탕 이미지 URL(정사각)."""
+  baseImageUrl: String!
+  """자유 편집(바탕 위 영역 지정 + 요청 문구·참고 사진) 허용 여부."""
+  freeEditEnabled: Boolean!
+  """문구 자리. sortOrder 오름차순."""
+  slots: [ProductDetailCustomSlot!]!
+}
+
+"""
+슬롯형 문구 자리 1개. 구매자는 기본 문구로 시작해 바꾸거나 지운다(필수 자리는 지울 수 없다).
+"""
+type ProductDetailCustomSlot {
+  id: ID!
+  """자리 이름(예: 받는 사람). 입력 화면 라벨로 쓴다."""
+  label: String!
+  """기본 문구. 바꾸지 않으면 이 문구로 주문된다."""
+  defaultText: String!
+  """입력 가능한 최대 글자 수(코드 포인트, 1~50)."""
+  maxLength: Int!
+  """필수 자리 여부. true면 문구를 비울 수 없다."""
+  isRequired: Boolean!
+  """자리 왼쪽 위 가로 위치(0~10000)."""
+  posX: Int!
+  """자리 왼쪽 위 세로 위치(0~10000)."""
+  posY: Int!
+  """자리 너비(1~10000, posX + width ≤ 10000)."""
+  width: Int!
+  """자리 높이(1~10000, posY + height ≤ 10000)."""
+  height: Int!
+  """글자색(#RRGGBB 대문자)."""
+  textColor: String!
+  """자리 안 글자 정렬."""
+  textAlign: CustomTextAlignType!
+  """입력 화면 노출 순서. 오름차순."""
+  sortOrder: Int!
 }
 
 """상품 상세 옵션 섹션(그룹)."""
@@ -4238,6 +6951,10 @@ type ProductDetailOptionGroup {
   maxSelect: Int!
   """섹션 노출 순서. 오름차순."""
   sortOrder: Int!
+  """
+  3D 상품에서 이 그룹이 정하는 3D 값의 종류. 선택지가 3D 항목과 이어지지 않았거나 종류가 섞였으면 null.
+  """
+  threeDCategory: ThreeDOptionCategoryType
   """이 그룹의 선택지. 활성 항목만 온다."""
   items: [ProductDetailOptionItem!]!
 }
@@ -4255,6 +6972,10 @@ type ProductDetailOptionItem {
   priceDelta: Int!
   """그룹 안에서의 노출 순서. 오름차순."""
   sortOrder: Int!
+  """
+  이어진 3D 카탈로그 선택지 키(customThreeDCatalog.optionChoices.key). 3D 편집기는 이 키의 value로 모양·크기 등을 그린다. 없으면 null.
+  """
+  threeDKey: String
 }
 
 # ---- src/features/product/product-home.graphql ----
@@ -4535,7 +7256,7 @@ type SearchPriceBucket {
 # ---- src/features/product/product-seller-upload.graphql ----
 extend type Mutation {
   """
-  이미지 업로드용 Presigned URL을 발급한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND. 상품·옵션·커스텀 템플릿·매장 로고의 URL 필드는 여기서 발급된 publicUrl만 받는다.
+  이미지 업로드용 Presigned URL을 발급한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND. 상품·옵션·커스텀 템플릿·매장 로고·채팅 이미지의 URL 필드는 여기서 발급된 publicUrl만 받는다.
   """
   sellerCreateUploadUrl(input: SellerCreateUploadUrlInput!): UploadUrl!
 }
@@ -4553,7 +7274,7 @@ input SellerCreateUploadUrlInput {
   """
   contentType: String!
   """
-  파일 크기(바이트). 1 이상 5MB 이하, 아니면 BAD_USER_INPUT.
+  파일 크기(바이트). 1 이상, 용도별 최대 크기(CONVERSATION_IMAGE 10MB, 그 밖 5MB) 이하. 아니면 BAD_USER_INPUT.
   """
   contentLength: Int!
 }
@@ -4674,19 +7395,40 @@ extend type Mutation {
   ): [SellerOptionItem!]!
 
   """
-  상품 커스텀 템플릿을 등록 또는 수정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  상품 커스텀 방식을 바꾼다. 바꿀 방식의 준비가 끝나지 않았으면(SellerProduct.customReadiness의 issues가 있으면)
+  CUSTOM_PRODUCT_NOT_READY. 지금과 같은 방식이면 아무것도 바꾸지 않고 그대로 돌려준다.
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않거나 내 상품이 아니면 NOT_FOUND.
+  """
+  sellerSetProductCustomMode(
+    productId: ID!
+    """
+    바꿀 커스텀 방식.
+    """
+    customMode: CustomModeType!
+  ): SellerProduct!
+  """
+  3D 기본 세트를 불러온다. 3D 항목 그룹이 없는 카테고리(크기·맛·모양·디자인)마다 단일 선택 그룹을 만들고
+  선택 가능한 카탈로그 선택지 전부를 기본 가격으로 넣는다. 크기·맛·모양은 필수, 디자인은 고르지 않아도 되는 그룹이다.
+  이미 그룹이 있는 카테고리는 건드리지 않아 여러 번 불러도 결과가 같다(새로 만든 그룹이 없으면 감사 기록도 없다).
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않거나 내 상품이 아니면 NOT_FOUND.
+  """
+  sellerApplyThreeDOptionPreset(productId: ID!): SellerProduct!
+  """
+  상품 커스텀 템플릿(슬롯형 바탕)을 등록 또는 수정한다. 수정하면 revision이 1 오른다.
+  바탕 이미지가 바뀔 때만 서버가 이미지를 읽어 정사각(가로·세로 차이 1px 이하)인지 확인한다:
+  아니면 CUSTOM_BASE_IMAGE_NOT_SQUARE, 이미지로 읽을 수 없으면 CUSTOM_BASE_IMAGE_UNREADABLE, 저장소를 읽지 못하면 S3_READ_FAILED(503).
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
   """
   sellerUpsertProductCustomTemplate(
     input: SellerUpsertProductCustomTemplateInput!
   ): SellerCustomTemplate!
   """
-  상품 커스텀 템플릿 활성 상태를 변경한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
-  """
-  sellerSetProductCustomTemplateActive(
-    input: SellerSetProductCustomTemplateActiveInput!
-  ): SellerCustomTemplate!
-  """
-  커스텀 텍스트 토큰을 등록 또는 수정한다. 판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
+  커스텀 텍스트 토큰(문구 자리)을 등록 또는 수정한다. 등록·수정·삭제·순서 변경마다 템플릿 revision이 1 오른다.
+  등록 시 같은 템플릿에 같은 tokenKey의 삭제된 슬롯이 있으면 그 슬롯(같은 id)을 복구해 입력값으로 갱신한다.
+  활성 슬롯과 tokenKey가 겹치면(수정으로 삭제된 슬롯의 키로 바꾸는 경우 포함) CUSTOM_TEXT_TOKEN_KEY_TAKEN.
+  검증: tokenKey 형식 CUSTOM_TOKEN_KEY_INVALID, maxLength 1~50 FIELD_OUT_OF_RANGE, 기본 문구가 maxLength 초과면 CUSTOM_TEXT_DEFAULT_TOO_LONG,
+  좌표가 바탕 밖이면 CUSTOM_AREA_OUT_OF_BOUNDS, 글자색 형식 INVALID_COLOR_FORMAT.
+  판매자 로그인 필수. SELLER 계정이 아니면 FORBIDDEN, 매장을 보유하지 않으면 NOT_FOUND.
   """
   sellerUpsertProductCustomTextToken(
     input: SellerUpsertProductCustomTextTokenInput!
@@ -4789,6 +7531,10 @@ type SellerOptionItem {
   노출 여부. false면 구매자가 고를 수 없다.
   """
   isActive: Boolean!
+  """
+  이어진 3D 카탈로그 선택지 키(customThreeDCatalog.optionChoices.key). 없으면 null.
+  """
+  threeDKey: String
 }
 
 """
@@ -4819,17 +7565,6 @@ type SellerOptionGroup {
   """
   maxSelect: Int!
   """
-  선택지에 구매자 커스텀 입력(설명)이 필요한 그룹인지.
-  현재는 커스텀 체크아웃이 확장되기 전이라, 이 값이 true인 그룹의 옵션을 고르면
-  주문이 거절된다(잠정 가드). 켜기 전에 주문 가능 여부를 확인해야 한다.
-  """
-  optionRequiresDescription: Boolean!
-  """
-  선택지에 구매자 커스텀 입력(이미지)이 필요한 그룹인지.
-  optionRequiresDescription과 마찬가지로 현재는 true인 그룹의 옵션 선택이 거절된다.
-  """
-  optionRequiresImage: Boolean!
-  """
   상품 안에서의 그룹 노출 순서. 오름차순.
   """
   sortOrder: Int!
@@ -4837,6 +7572,10 @@ type SellerOptionGroup {
   노출 여부. false면 구매자에게 그룹 자체가 보이지 않는다.
   """
   isActive: Boolean!
+  """
+  활성 선택지의 threeDKey로 정해지는 3D 카테고리. 이어진 키가 없거나 종류가 섞였으면 null.
+  """
+  threeDCategory: ThreeDOptionCategoryType
   """
   이 그룹의 선택지. sortOrder 오름차순.
   """
@@ -4854,11 +7593,15 @@ type SellerCustomTextToken {
   """
   tokenKey: String!
   """
+  표시 이름(구매자 입력 화면 라벨). 주문에 스냅샷으로 남는다.
+  """
+  label: String!
+  """
   구매자가 입력하지 않았을 때 쓸 기본 문구.
   """
   defaultText: String!
   """
-  입력 가능한 최대 글자 수.
+  입력 가능한 최대 글자 수(코드 포인트, 1~50).
   """
   maxLength: Int!
   """
@@ -4870,38 +7613,50 @@ type SellerCustomTextToken {
   """
   isRequired: Boolean!
   """
-  베이스 이미지 위에서 문구가 놓일 가로 위치. 미지정 시 null이고 배치는 클라이언트가 정한다.
+  문구 영역 왼쪽 위 모서리의 가로 위치. 바탕 이미지 한 변을 10000으로 본 정수 비율(0~10000), 원점은 왼쪽 위.
   """
-  posX: Int
+  posX: Int!
   """
-  베이스 이미지 위에서 문구가 놓일 세로 위치. 미지정 시 null.
+  문구 영역 왼쪽 위 모서리의 세로 위치(0~10000).
   """
-  posY: Int
+  posY: Int!
   """
-  문구 영역 너비. 미지정 시 null.
+  문구 영역 너비(1~10000, posX + width ≤ 10000).
   """
-  width: Int
+  width: Int!
   """
-  문구 영역 높이. 미지정 시 null.
+  문구 영역 높이(1~10000, posY + height ≤ 10000).
   """
-  height: Int
+  height: Int!
+  """
+  글자색(#RRGGBB 대문자).
+  """
+  textColor: String!
+  """
+  자리 안 글자 정렬.
+  """
+  textAlign: CustomTextAlignType!
 }
 
 """
-상품 커스텀 템플릿. 베이스 이미지 위에 문구 슬롯을 올려 구매자가 문구를 넣게 한다.
-상품당 1개다.
+상품 커스텀 템플릿(슬롯형). 정사각 바탕 이미지 위에 문구 슬롯을 올려 구매자가 문구를 넣게 한다.
+상품당 1개다. 구매자에게 열리는지는 템플릿이 아니라 SellerProduct.customMode(SLOT)로 정한다.
 """
 type SellerCustomTemplate {
   id: ID!
   productId: ID!
   """
-  문구를 올릴 바탕 이미지 URL.
+  문구를 올릴 바탕 이미지 URL(정사각).
   """
   baseImageUrl: String!
   """
-  활성 여부. false면 구매자 화면에 커스텀 입력이 열리지 않는다.
+  자유 편집(바탕 위 영역 지정 + 요청 문구·참고 사진) 허용 여부.
   """
-  isActive: Boolean!
+  freeEditEnabled: Boolean!
+  """
+  설정 버전. 템플릿·문구 슬롯이 바뀔 때마다 1 오른다.
+  """
+  revision: Int!
   """
   문구 슬롯. sortOrder 오름차순.
   """
@@ -4939,13 +7694,18 @@ type SellerProduct {
   """
   currency: String!
   """
-  커스텀 도안의 바탕 이미지 URL. 커스텀을 쓰지 않으면 null.
-  """
-  baseDesignImageUrl: String
-  """
   제작 소요 시간(분). 픽업 가능 시각 계산의 리드타임에 반영된다.
   """
   preparationTimeMinutes: Int!
+  """
+  커스텀 방식. 바꾸려면 sellerSetProductCustomMode.
+  """
+  customMode: CustomModeType!
+  """
+  커스텀 방식별 준비 상태(NONE·SLOT·THREE_D 순). 준비 이슈가 있는 방식으로는 바꿀 수 없고,
+  지금 방식에 이슈가 생기면 구매자 주문이 거절된다.
+  """
+  customReadiness: [SellerCustomReadiness!]!
   """
   노출 여부. false면 구매자 화면에 나오지 않는다.
   """
@@ -4972,6 +7732,47 @@ type SellerProduct {
   customTemplate: SellerCustomTemplate
   createdAt: DateTime!
   updatedAt: DateTime!
+}
+
+"""
+커스텀 방식 하나의 준비 상태.
+"""
+type SellerCustomReadiness {
+  """
+  대상 커스텀 방식.
+  """
+  mode: CustomModeType!
+  """
+  issues가 비어 있으면 true.
+  """
+  ready: Boolean!
+  """
+  준비 이슈. 판매자에게 그대로 보여 줄 메시지를 담는다.
+  """
+  issues: [SellerCustomReadinessIssue!]!
+}
+
+"""
+커스텀 준비 이슈 1건.
+"""
+type SellerCustomReadinessIssue {
+  """
+  이슈 코드. 값이 늘 수 있어 문자열이다.
+  슬롯형: SLOT_TEMPLATE_MISSING(바탕 없음), SLOT_NOTHING_TO_EDIT(문구 자리 0개이고 자유 편집 꺼짐).
+  3D: THREE_D_GROUP_MISSING(모양·크기 그룹 없음), THREE_D_GROUP_DUPLICATED(같은 카테고리 그룹이 둘 이상),
+  THREE_D_GROUP_MIXED(한 그룹에 카테고리가 섞였거나 3D 항목 미지정 선택지가 있음),
+  THREE_D_GROUP_NOT_SINGLE_SELECT(모양·크기는 필수·1개 선택, 맛·디자인은 최대 1개 선택이 아님),
+  THREE_D_KEY_DUPLICATED(같은 키가 둘 이상), THREE_D_KEY_UNAVAILABLE(카탈로그에 없거나 퇴역한 키).
+  """
+  code: String!
+  """
+  판매자에게 보여 줄 안내 문장.
+  """
+  message: String!
+  """
+  이슈가 걸린 옵션 그룹. 그룹과 무관하면 null.
+  """
+  optionGroupId: ID
 }
 
 """
@@ -5056,10 +7857,6 @@ input SellerCreateProductInput {
   """
   currency: String = "KRW"
   """
-  커스텀 도안의 바탕 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT.
-  """
-  baseDesignImageUrl: String
-  """
   제작 소요 시간(분). 기본 180.
   """
   preparationTimeMinutes: Int = 180
@@ -5098,10 +7895,6 @@ input SellerUpdateProductInput {
   통화 코드(ISO 4217, 대문자 3자). KRW 외에는 구매자 주문이 거절된다.
   """
   currency: String
-  """
-  커스텀 도안의 바탕 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT.
-  """
-  baseDesignImageUrl: String
   """
   제작 소요 시간(분).
   """
@@ -5221,14 +8014,6 @@ input SellerCreateOptionGroupInput {
   """
   maxSelect: Int = 1
   """
-  구매자 커스텀 입력(설명)이 필요한 그룹으로 표시한다. 기본 false. 현재는 켜면 해당 옵션 주문이 거절된다.
-  """
-  optionRequiresDescription: Boolean = false
-  """
-  구매자 커스텀 입력(이미지)이 필요한 그룹으로 표시한다. 기본 false. 현재는 켜면 해당 옵션 주문이 거절된다.
-  """
-  optionRequiresImage: Boolean = false
-  """
   노출 순서. 오름차순이고 동률의 순서는 보장하지 않는다. 미지정 시 0.
   """
   sortOrder: Int
@@ -5263,14 +8048,6 @@ input SellerUpdateOptionGroupInput {
   최대 선택 개수.
   """
   maxSelect: Int
-  """
-  구매자 커스텀 입력(설명)이 필요한 그룹으로 표시한다. 현재는 켜면 해당 옵션 주문이 거절된다.
-  """
-  optionRequiresDescription: Boolean
-  """
-  구매자 커스텀 입력(이미지)이 필요한 그룹으로 표시한다. 현재는 켜면 해당 옵션 주문이 거절된다.
-  """
-  optionRequiresImage: Boolean
   """
   노출 순서.
   """
@@ -5322,6 +8099,11 @@ input SellerCreateOptionItemInput {
   노출 여부. 기본 true.
   """
   isActive: Boolean = true
+  """
+  3D 카탈로그 선택지 키(customThreeDCatalog.optionChoices.key, 40자 이하). 생략하거나 빈 문자열이면 연결하지 않는다.
+  카탈로그에 없거나 퇴역한 키도 저장되지만 3D 준비 이슈(THREE_D_KEY_UNAVAILABLE)가 되어 3D 주문을 받을 수 없다.
+  """
+  threeDKey: String
 }
 
 """
@@ -5353,6 +8135,10 @@ input SellerUpdateOptionItemInput {
   노출 여부.
   """
   isActive: Boolean
+  """
+  3D 카탈로그 선택지 키(40자 이하). null이나 빈 문자열이면 연결을 끊고, 생략하면 그대로 둔다.
+  """
+  threeDKey: String
 }
 
 """
@@ -5373,24 +8159,13 @@ input SellerReorderOptionItemsInput {
 input SellerUpsertProductCustomTemplateInput {
   productId: ID!
   """
-  문구를 올릴 바탕 이미지 URL. sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 BAD_USER_INPUT.
+  문구를 올릴 바탕 이미지 URL(정사각). sellerCreateUploadUrl(PRODUCT_IMAGE)로 이 계정에 발급된 publicUrl만 허용, 아니면 INVALID_IMAGE_URL.
   """
   baseImageUrl: String!
   """
-  활성 여부. 기본 true.
+  자유 편집 허용 여부. 생략하면 새 템플릿은 false, 기존 템플릿은 지금 값을 둔다.
   """
-  isActive: Boolean = true
-}
-
-"""
-커스텀 템플릿 활성 상태 변경 입력.
-"""
-input SellerSetProductCustomTemplateActiveInput {
-  templateId: ID!
-  """
-  true면 구매자 화면에 커스텀 입력이 열린다.
-  """
-  isActive: Boolean!
+  freeEditEnabled: Boolean
 }
 
 """
@@ -5403,17 +8178,21 @@ input SellerUpsertProductCustomTextTokenInput {
   tokenId: ID
   templateId: ID!
   """
-  슬롯 식별 키. 주문 스냅샷에 그대로 남는다.
+  슬롯 식별 키. 영문 소문자·숫자 1~60자(이 규칙 전에 만든 키는 바꾸지 않는 한 그대로 쓸 수 있다). 주문 스냅샷에 그대로 남는다.
   """
   tokenKey: String!
   """
-  구매자가 입력하지 않았을 때 쓸 기본 문구.
+  표시 이름(1~30자). 생략하면 수정은 지금 값을 두고, 등록은 tokenKey 앞 30자로 채운다.
+  """
+  label: String
+  """
+  구매자가 입력하지 않았을 때 쓸 기본 문구. maxLength 이하(코드 포인트).
   """
   defaultText: String!
   """
-  입력 가능한 최대 글자 수. 기본 30.
+  입력 가능한 최대 글자 수(코드 포인트, 1~50). 기본 20.
   """
-  maxLength: Int = 30
+  maxLength: Int = 20
   """
   입력 화면 노출 순서. 오름차순이고 동률의 순서는 보장하지 않는다. 미지정 시 0.
   """
@@ -5423,21 +8202,29 @@ input SellerUpsertProductCustomTextTokenInput {
   """
   isRequired: Boolean = true
   """
-  베이스 이미지 위 가로 위치. 생략 시 배치를 클라이언트가 정한다.
+  문구 영역 왼쪽 위 모서리의 가로 위치. 바탕 이미지 한 변을 10000으로 본 정수 비율(0~10000), 원점은 왼쪽 위.
   """
-  posX: Int
+  posX: Int!
   """
-  베이스 이미지 위 세로 위치.
+  문구 영역 왼쪽 위 모서리의 세로 위치(0~10000).
   """
-  posY: Int
+  posY: Int!
   """
-  문구 영역 너비.
+  문구 영역 너비(1 이상, posX + width ≤ 10000).
   """
-  width: Int
+  width: Int!
   """
-  문구 영역 높이.
+  문구 영역 높이(1 이상, posY + height ≤ 10000).
   """
-  height: Int
+  height: Int!
+  """
+  글자색 #RRGGBB(대소문자 무관, 대문자로 저장). 생략하면 수정은 지금 값을 두고, 등록은 #000000.
+  """
+  textColor: String
+  """
+  자리 안 글자 정렬. 생략하면 수정은 지금 값을 두고, 등록은 CENTER.
+  """
+  textAlign: CustomTextAlignType
 }
 
 """
@@ -5524,7 +8311,8 @@ type StoreProduct {
 # ---- src/features/product/product-upload.types.graphql ----
 """
 업로드 용도. 용도마다 저장 경로가 다르고, 저장 입력은 같은 용도로 발급된 URL만 받는다.
-역할별 허용 범위: 판매자 PRODUCT_IMAGE·STORE_IMAGE, 관리자 BANNER_IMAGE·STORE_IMAGE(밖이면 BAD_USER_INPUT).
+역할별 허용 범위: 판매자 PRODUCT_IMAGE·STORE_IMAGE·CONVERSATION_IMAGE, 관리자 BANNER_IMAGE·STORE_IMAGE(밖이면 BAD_USER_INPUT).
+최대 크기는 CONVERSATION_IMAGE 10MB, 그 밖의 용도 5MB다.
 """
 enum UploadPurpose {
   """
@@ -5539,6 +8327,10 @@ enum UploadPurpose {
   플랫폼 배너 이미지(관리자).
   """
   BANNER_IMAGE
+  """
+  채팅 첨부 이미지(판매자). sellerSendConversationMessage의 IMAGE 메시지가 이 용도 URL만 받는다.
+  """
+  CONVERSATION_IMAGE
 }
 
 # ---- src/features/product/product.types.graphql ----
@@ -5613,6 +8405,44 @@ enum BannerPlacement {
   HOME_SUB
   """예약값. 이 자리를 읽는 구매자 쿼리가 없어 등록해도 노출되지 않는다."""
   STORE
+}
+
+"""
+상품의 커스텀 방식. 방식이 있는 상품은 구매자가 꾸민 내용 없이 주문할 수 없다.
+"""
+enum CustomModeType {
+  """커스텀 없음. 옵션만 고르고 주문한다."""
+  NONE
+  """슬롯형. 판매자가 정한 바탕 이미지 위 문구 자리에 문구를 넣는다(자유 편집은 상품별 선택)."""
+  SLOT
+  """3D. 모양·크기 등 옵션을 3D 케이크로 꾸민다. 자유 편집은 없다."""
+  THREE_D
+}
+
+"""
+문구 자리 안 글자 정렬.
+"""
+enum CustomTextAlignType {
+  """왼쪽 정렬."""
+  LEFT
+  """가운데 정렬."""
+  CENTER
+  """오른쪽 정렬."""
+  RIGHT
+}
+
+"""
+3D 옵션 카테고리. 옵션 항목의 threeDKey가 가리키는 카탈로그 선택지의 종류다.
+"""
+enum ThreeDOptionCategoryType {
+  """케이크 크기. 3D 상품은 필수 단일 선택 그룹이 있어야 한다."""
+  SIZE
+  """시트·크림 맛. 고르지 않아도 되는 그룹으로 둘 수 있다."""
+  FLAVOR
+  """시트 모양. 3D 상품은 필수 단일 선택 그룹이 있어야 한다."""
+  SHAPE
+  """시트 디자인. 고르지 않으면 장식 없는 시트로 그린다."""
+  DESIGN
 }
 
 # ---- src/features/region/region-admin.graphql ----
@@ -7306,7 +10136,7 @@ input AdminSellerListInput {
 """
 input AdminCreateSellerInput {
   """
-  로그인 username. 4~80자, 소문자·숫자·`.`·`_`·`-`만 허용. 이미 쓰이고 있으면 BAD_USER_INPUT.
+  로그인 username. 4~80자, 영문 대소문자·숫자·`.`·`_`·`-`만 허용. 이미 쓰이고 있으면(대소문자만 달라도) BAD_USER_INPUT.
   """
   username: String!
   """
@@ -7737,12 +10567,22 @@ extend type Query {
     storeId: ID!
     """대상 연월. "YYYY-MM" 형식(KST 기준). 예: "2026-09". 형식이 어긋나면 BAD_USER_INPUT."""
     yearMonth: String!
+    """
+    주문할 상품 ID. 주면 매장 리드타임과 상품 제작 시간 중 긴 쪽을 픽업 하한으로 쓴다(createOrder와 같은 판정).
+    그 매장의 판매 중 상품이 아니면 PRODUCT_NOT_FOUND.
+    """
+    productId: ID
   ): PickupCalendar!
   """매장별 선택 날짜의 픽업 시간 슬롯. date: "YYYY-MM-DD" """
   pickupTimeSlots(
     storeId: ID!
     """대상 날짜. "YYYY-MM-DD" 형식(KST 기준). 예: "2026-09-10". 형식이 어긋나면 BAD_USER_INPUT."""
     date: String!
+    """
+    주문할 상품 ID. 주면 매장 리드타임과 상품 제작 시간 중 긴 쪽을 픽업 하한으로 쓴다(createOrder와 같은 판정).
+    그 매장의 판매 중 상품이 아니면 PRODUCT_NOT_FOUND.
+    """
+    productId: ID
   ): PickupTimeSlots!
 }
 
@@ -7754,13 +10594,13 @@ type PickupCalendar {
   days: [PickupDay!]!
 }
 
-"""매장 달력의 하루. 매장 영업요일·특별휴무·일별 생산 수량이 모두 반영된 결과다."""
+"""매장 달력의 하루. 매장 영업요일·특별휴무·일별 생산 수량·픽업 하한(리드타임, productId를 주면 상품 제작 시간 중 긴 쪽)이 모두 반영된 결과다."""
 type PickupDay {
   """날짜. "YYYY-MM-DD" (KST)."""
   date: String!
   """픽업 예약 가능 여부."""
   selectable: Boolean!
-  """선택 불가 사유. PAST | OUT_OF_RANGE | CLOSED(휴무·영업요일 아님·당일 잔여 슬롯 없음) | CAPACITY_FULL. 선택 가능 시 null."""
+  """선택 불가 사유. PAST | OUT_OF_RANGE | CLOSED(휴무·영업요일 아님·픽업 하한 이후 그날 잔여 슬롯 없음) | CAPACITY_FULL. 선택 가능 시 null."""
   reason: String
 }
 
@@ -7778,14 +10618,73 @@ type PickupTimeSlots {
 type PickupSlot {
   """슬롯 시각. "HH:mm" (KST)."""
   time: String!
-  """예약 가능 여부. 매장 리드타임·영업시간·잔여 수량을 반영한 값이다."""
+  """예약 가능 여부. 매장 리드타임(productId를 주면 상품 제작 시간 포함)·영업시간·잔여 수량을 반영한 값이다."""
   available: Boolean!
+}
+
+# ---- src/features/store/store-pickup-stores.graphql ----
+extend type Query {
+  """매장 선택(메인 검색 결과). 픽업 날짜·시간에 예약 가능한 매장을 요청한 정렬로 돌려준다. 비로그인 접근 가능."""
+  pickupStores(input: PickupStoresInput!): PickupStoreConnection!
+}
+
+"""매장 선택 조회 조건. 커서가 아니라 오프셋 방식이다."""
+input PickupStoresInput {
+  """픽업 날짜. "YYYY-MM-DD"(KST). 형식이 어긋나면 INVALID_DATE, 오늘보다 앞서면 PICKUP_DATE_PAST."""
+  date: String!
+  """픽업 시각. "HH:mm"(KST). 그 슬롯이 예약 가능한 매장만 남긴다. 생략·null이면 그날 예약 가능한 슬롯이 하나라도 있는 매장. 형식이 어긋나면 INVALID_TIME_VALUE."""
+  time: String
+  """2차 시군구 ID 다중 선택. 비우면 전국 대상."""
+  regionIds: [ID!]
+  """정렬 기준. 기본 인기순."""
+  sort: StoreSort = POPULAR
+  """건너뛸 개수. 기본 0."""
+  offset: Int = 0
+  """조회 개수(최대 50)."""
+  limit: Int = 20
+}
+
+"""매장 선택 결과 목록."""
+type PickupStoreConnection {
+  """매장 항목. 요청한 sort 순서로 온다."""
+  items: [PickupStoreItem!]!
+  """조건에 맞는 전체 매장 수."""
+  totalCount: Int!
+  """다음 페이지 존재 여부."""
+  hasMore: Boolean!
+  """
+  선택한 지역들의 중심 좌표를 모두 담는 범위(지도 카메라용). 매장이 0건이어도 온다. 지역이 하나면 한 점(south=north, west=east)이다.
+  regionIds를 비웠거나(전국) 좌표가 등록된 2차 지역이 없으면 null.
+  """
+  regionBounds: MapBounds
+}
+
+"""지도 범위(WGS84)."""
+type MapBounds {
+  """남쪽 끝 위도."""
+  south: Float!
+  """서쪽 끝 경도."""
+  west: Float!
+  """북쪽 끝 위도."""
+  north: Float!
+  """동쪽 끝 경도."""
+  east: Float!
+}
+
+"""매장 선택 항목. 매장 카드와 지도 마커 좌표."""
+type PickupStoreItem {
+  """매장 카드."""
+  store: StoreCard!
+  """위도(지도 마커). 미설정 시 null."""
+  latitude: Float
+  """경도(지도 마커). 미설정 시 null."""
+  longitude: Float
 }
 
 # ---- src/features/store/store-search.graphql ----
 extend type Query {
   """
-  매장 검색(검색 결과 매장 탭). 매장명에 단어별 AND 부분일치, 인기순 고정. keyword를 생략하면 지역 조건만 적용한다. 비로그인 접근 가능.
+  매장 검색(검색 결과 매장 탭). 매장명에 단어별 AND 부분일치. keyword를 생략하면 지역 조건만 적용한다. 비로그인 접근 가능.
   """
   searchStores(input: SearchStoresInput!): SearchStoreConnection!
 }
@@ -7796,6 +10695,8 @@ input SearchStoresInput {
   keyword: String
   """2차 시군구 ID 다중 선택. 비우면 전국 대상."""
   regionIds: [ID!]
+  """정렬 기준. 기본 인기순."""
+  sort: StoreSort = POPULAR
   """건너뛸 개수. 기본 0."""
   offset: Int = 0
   """조회 개수(최대 50)."""
@@ -7804,7 +10705,7 @@ input SearchStoresInput {
 
 """매장 검색 결과 목록."""
 type SearchStoreConnection {
-  """매장 카드. 인기순으로 온다 — 찜 수·리뷰 통계·최근 주문 수로 산출하며 검색어 관련도는 반영하지 않는다."""
+  """매장 카드. 요청한 sort 순서로 온다. 검색어 관련도는 반영하지 않는다."""
   items: [StoreCard!]!
   """조건에 맞는 전체 매장 수. 탭 카운트에 쓴다."""
   totalCount: Int!
@@ -7821,7 +10722,7 @@ extend type Query {
 }
 
 """
-판매자 조작 감사 로그 1건. 매장 설정·상품·주문 변경 이력을 남긴다.
+내 매장 감사 로그 1건. 매장 설정·상품·주문·정산 계좌 변경 이력을 남기며, 관리자가 이 매장에 한 조작(대리 수정·주문 취소 등)도 포함한다.
 로그는 누적만 되고 수정·삭제되지 않는다.
 """
 type SellerAuditLog {
@@ -8319,6 +11220,16 @@ type StoreCard {
   cakeImageUrls: [String!]!
   """로그인 사용자의 찜 여부(비로그인 시 false)."""
   isWishlisted: Boolean!
+}
+
+"""매장 목록 정렬. 시안 '추천순' 라벨은 POPULAR(기본)로 해석한다."""
+enum StoreSort {
+  """인기순(최근 30일 주문 수·찜 수·베이지안 평점 — 인기 매장과 동일 산식)."""
+  POPULAR
+  """등록순(최신 등록 매장 우선)."""
+  LATEST
+  """판매순(최근 30일 유효 주문 수량 합)."""
+  BEST_SELLING
 }
 
 """매장 지도 연동 provider. 구매자·판매자 API가 공용으로 쓴다."""

@@ -1,4 +1,49 @@
-import { describeAudit, diffJson, diffText, formatAuditAt, formatValue, parseJson } from './audit';
+import { orderStatusView } from '@/features/orders/model/status';
+import { enumValues } from '@/test/generated-enums';
+
+import {
+  AUDIT_FILTERS,
+  auditActionView,
+  auditTargetLabel,
+  describeAudit,
+  diffJson,
+  diffText,
+  formatAuditAt,
+  formatValue,
+  parseJson,
+} from './audit';
+
+describe('auditActionView', () => {
+  const table: [string, string, string][] = [
+    ['CREATE', '생성', 'mint'],
+    ['UPDATE', '수정', 'purple'],
+    ['DELETE', '삭제', 'red'],
+    ['STATUS_CHANGE', '상태 변경', 'gray'],
+  ];
+
+  it('표가 생성 enum 값 전부를 덮는다', () => {
+    expect(table.map(([action]) => action).sort()).toEqual(
+      [...enumValues('AuditActionType')].sort(),
+    );
+  });
+
+  it.each([...table, ['NEW_ACTION', '변경', 'gray']])('%s → %s·%s', (action, label, tone) => {
+    expect(auditActionView(action)).toEqual({ label, tone });
+  });
+});
+
+describe('auditTargetLabel', () => {
+  it.each(AUDIT_FILTERS.flatMap((f) => (f.value ? [[f.value, f.label]] : [])))(
+    '판매자 필터 대상 %s → %s',
+    (target, label) => {
+      expect(auditTargetLabel(target)).toBe(label);
+    },
+  );
+
+  it('모르는 대상은 기타로 본다', () => {
+    expect(auditTargetLabel('NEW_TARGET')).toBe('기타');
+  });
+});
 
 describe('diffJson', () => {
   it('바뀐 키만 이전 → 이후로', () => {
@@ -66,6 +111,10 @@ describe('formatValue', () => {
     ['note', '가'.repeat(61), `${'가'.repeat(60)}…`],
   ])('%s=%j → %s', (key, value, expected) => {
     expect(formatValue(key, value)).toBe(expected);
+  });
+
+  it.each(enumValues('OrderStatusType'))('주문 상태 %s의 라벨은 주문 화면과 같다', (status) => {
+    expect(formatValue('status', status)).toBe(orderStatusView(status).label);
   });
 });
 
@@ -149,8 +198,20 @@ describe('describeAudit', () => {
       '비밀번호',
       0,
     ],
+    [
+      '정산 계좌(번호 없이, 관리자 사유 포함)',
+      {
+        targetType: 'SETTLEMENT_ACCOUNT',
+        targetId: '4',
+        beforeJson: '{"bank_code":"004","account_holder":"해즈","account_number_last4":"1234"}',
+        afterJson:
+          '{"bank_code":"088","account_holder":"해즈","account_number_last4":"5678","reason":"판매자 요청"}',
+      },
+      '정산 계좌',
+      3,
+    ],
     ['깨진 JSON', { targetType: 'STORE', targetId: '3', afterJson: '{' }, '매장', 0],
-    ['목록 밖 대상', { targetType: 'BANNER', targetId: '1' }, 'BANNER #1', 0],
+    ['목록 밖 대상', { targetType: 'BANNER', targetId: '1' }, '기타 #1', 0],
   ] as const)('%s', (_, log, title, diffCount) => {
     const result = describeAudit(log);
     expect(result.title).toBe(title);
@@ -164,6 +225,26 @@ describe('describeAudit', () => {
     ['{"a":1}', { a: 1 }],
   ])('parseJson(%j) → %j', (raw, expected) => {
     expect(parseJson(raw)).toEqual(expected);
+  });
+});
+
+describe('정산 계좌 변경', () => {
+  it('은행 코드·끝 4자리·사유만 이전 → 이후로 보인다', () => {
+    expect(
+      diffText(
+        describeAudit({
+          targetType: 'SETTLEMENT_ACCOUNT',
+          targetId: '4',
+          beforeJson: '{"bank_code":"004","account_holder":"해즈","account_number_last4":"1234"}',
+          afterJson:
+            '{"bank_code":"088","account_holder":"해즈","account_number_last4":"5678","reason":"판매자 요청"}',
+        }).diff,
+      ),
+    ).toBe(
+      ['은행 코드: 004 → 088', '계좌번호 끝 4자리: 1234 → 5678', '사유: 없음 → 판매자 요청'].join(
+        '\n',
+      ),
+    );
   });
 });
 

@@ -31,6 +31,7 @@ export const colors = {
   text2: '#2E2E2E',
   text3: '#2D2A32',
   ink: '#000000',
+  slotTextDefault: '#000000', // 새 문구 자리 글자색 — 서버 기본값과 같아야 해 UI 색과 떼어 둔다
   label: '#555555',
   sublabel: '#6A6A6B',
   muted: '#8E8E8E',
@@ -55,6 +56,16 @@ export const colors = {
   toastText: '#FFFFFF',
   toastSuccess: '#9CF0C6', // 성공 ✓
   toastError: '#FF9EA1', // 실패 ! — 어두운 바탕에서 읽히는 연한 빨강
+} as const;
+
+/** 3D 케이크 렌더 색. 구매자 편집기와 같은 그림이 나와야 해 UI 색과 떼어 둔다 */
+export const renderColors = {
+  outline: '#2D2D2D', // 드로잉 효과 외곽선
+  sparkle: '#D8DDE5', // 반짝 장식
+  dripSpecular: '#2B2B2B', // 흘림 크림 반사광
+  shadow: '#000000', // 흘림 접촉 그림자
+  decoFallback: '#F3F4F6', // 꾸미기 이미지를 못 받았을 때의 상자
+  decoFallbackText: '#6B7280',
 } as const;
 
 /** CSS linear-gradient(angle, 색 위치…) 그대로. RN 스타일에는 그라디언트가 없어 SVG로 그린다 */

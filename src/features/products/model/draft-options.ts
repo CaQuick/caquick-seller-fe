@@ -6,6 +6,8 @@ export interface ItemFields {
   imageUrl: string | null;
   /** 상품 관리만 쓴다. 꺼진 옵션은 구매자에게 숨는다 */
   isActive?: boolean;
+  /** 상품 관리만 쓴다. 이어진 3D 카탈로그 선택지 키 */
+  threeDKey?: string | null;
 }
 
 export interface GroupFields {

@@ -5,6 +5,7 @@ describe('toOptionGroups', () => {
     expect(
       toOptionGroups({
         id: '7',
+        customMode: 'NONE',
         customTemplate: null,
         optionGroups: [
           {
@@ -22,6 +23,7 @@ describe('toOptionGroups', () => {
                 imageUrl: null,
                 priceDelta: 0,
                 isActive: false,
+                threeDKey: 'size.mini',
               },
             ],
           },
@@ -43,6 +45,7 @@ describe('toOptionGroups', () => {
             imageUrl: null,
             priceDelta: 0,
             isActive: false,
+            threeDKey: 'size.mini',
           },
         ],
       },

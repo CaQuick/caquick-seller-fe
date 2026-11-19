@@ -9,6 +9,8 @@ const msg = (id: string, over: Partial<Message> = {}): Message => ({
   bodyFormat: 'TEXT',
   bodyText: `본문${id}`,
   bodyHtml: null,
+  imageUrl: null,
+  orderCard: null,
   createdAt: '2026-10-06T00:00:00.000Z',
   ...over,
 });

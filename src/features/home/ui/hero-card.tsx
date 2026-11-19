@@ -44,8 +44,17 @@ function HeroBackground() {
 const sentence = 'mt-[3px] font-sans text-4xl text-text';
 const sentenceStyle = { letterSpacing: tracking(22, -0.02) };
 
-/** 오늘 남은 제작 수량. 설정이 없으면(null) 설정 화면으로 안내한다 */
-export function HeroCard({ remainingCapacity }: { remainingCapacity: number | null }) {
+/**
+ * 오늘 남은 제작 수량. 설정이 없으면(null) 설정 화면으로 안내한다.
+ * 입금 대기 주문은 판매자에게 보이지 않지만 수량을 차지해 그 몫을 따로 적는다(수량만)
+ */
+export function HeroCard({
+  remainingCapacity,
+  pendingPaymentQuantity = 0,
+}: {
+  remainingCapacity: number | null;
+  pendingPaymentQuantity?: number;
+}) {
   const router = useRouter();
   return (
     <View testID="hero" style={shadow.native.hero} className="mx-[18px] mt-6 rounded-xl bg-surface">
@@ -67,11 +76,21 @@ export function HeroCard({ remainingCapacity }: { remainingCapacity: number | nu
             </Pressable>
           </>
         ) : (
-          <Text className={cn(sentence, 'mb-[33px]')} style={sentenceStyle}>
-            <Text className="font-bold">오늘 제작 가능</Text>한{'\n'}수량은{' '}
-            <Text className="font-bold text-accent">{formatCount(remainingCapacity, '개')}</Text>{' '}
-            예요
-          </Text>
+          <>
+            <Text
+              className={cn(sentence, pendingPaymentQuantity > 0 ? 'mb-1.5' : 'mb-[33px]')}
+              style={sentenceStyle}
+            >
+              <Text className="font-bold">오늘 제작 가능</Text>한{'\n'}수량은{' '}
+              <Text className="font-bold text-accent">{formatCount(remainingCapacity, '개')}</Text>{' '}
+              예요
+            </Text>
+            {pendingPaymentQuantity > 0 ? (
+              <Text className="mb-[19px] font-sans text-sm tracking-tight text-sublabel">
+                {HOME_COPY.pendingPayment(pendingPaymentQuantity)}
+              </Text>
+            ) : null}
+          </>
         )}
         <Button pill title={HOME_COPY.checkOrders} onPress={() => router.navigate('/orders')} />
       </View>

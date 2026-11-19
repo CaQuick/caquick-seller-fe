@@ -3,6 +3,7 @@ export { ProductEditScreen } from './ui/edit-screen';
 export { ProductImagesScreen } from './ui/images-screen';
 export { ProductOptionsScreen } from './ui/options-manage-screen';
 export { ProductCustomTemplateScreen } from './ui/template-screen';
+export { ProductCustomizationScreen } from './ui/customization-screen';
 export { ProductDetailScreen } from './ui/detail-screen';
 export { ProductsScreen } from './ui/list-screen';
 export { ProductNewLayout } from './ui/create-frame';

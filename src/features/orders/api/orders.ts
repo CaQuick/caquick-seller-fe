@@ -3,7 +3,9 @@ import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { graphql } from '@/graphql/generated';
 import {
   type OrderStatusType,
+  type SellerCancelOrderInput,
   type SellerOrderConversationsQuery,
+  type SellerRescheduleOrderPickupInput,
 } from '@/graphql/generated/graphql';
 import { gqlRequest } from '@/shared/api';
 
@@ -26,11 +28,29 @@ const SellerOrdersListDocument = graphql(`
         totalPrice
         firstItemName
         firstItemImageUrl
+        firstItemCustomImageUrl
+        hasCustom
       }
       totalCount
       hasMore
       nextCursor
     }
+  }
+`);
+
+graphql(`
+  fragment SellerOrderThreeDItemFields on ThreeDDesignItem {
+    kind
+    x
+    y
+    size
+    effect {
+      type
+      intensity
+    }
+    text
+    color
+    decoId
   }
 `);
 
@@ -44,6 +64,8 @@ const SellerOrderDetailDocument = graphql(`
       pickupAt
       buyerName
       buyerPhone
+      requestNote
+      paymentMethod
       subtotalPrice
       discountPrice
       totalPrice
@@ -52,6 +74,13 @@ const SellerOrderDetailDocument = graphql(`
       madeAt
       pickedUpAt
       canceledAt
+      noShowAt
+      confirmDeadlineAt
+      autoPickupAt
+      canMarkNoShow
+      commissionRateBps
+      expectedPayoutAmount
+      settlementBaseAmount
       createdAt
       updatedAt
       items {
@@ -64,16 +93,43 @@ const SellerOrderDetailDocument = graphql(`
           optionTitle
           priceDelta
         }
+        customMode
+        customPreviewImageUrl
+        customBaseImageUrl
+        customImages {
+          id
+          kind
+          imageUrl
+        }
+        threeDDesign {
+          schemaVersion
+          basic {
+            shape
+            size
+            design
+            flavor
+            sheetColor
+          }
+          top {
+            ...SellerOrderThreeDItemFields
+          }
+          side {
+            ...SellerOrderThreeDItemFields
+          }
+        }
         customTexts {
           id
-          tokenKey
+          label
           defaultText
           valueText
           sortOrder
         }
         freeEdits {
           id
-          cropImageUrl
+          posX
+          posY
+          width
+          height
           descriptionText
           sortOrder
           attachments {
@@ -89,6 +145,19 @@ const SellerOrderDetailDocument = graphql(`
         changedAt
         note
       }
+      cancellation {
+        actorType
+        reasonLabel
+        refundAmount
+        refundStatus
+      }
+      pickupChanges {
+        id
+        fromPickupAt
+        toPickupAt
+        changedAt
+        note
+      }
     }
   }
 `);
@@ -98,6 +167,51 @@ const SellerUpdateOrderStatusDocument = graphql(`
     sellerUpdateOrderStatus(input: $input) {
       id
       status
+    }
+  }
+`);
+
+const SellerCancelOrderDocument = graphql(`
+  mutation SellerCancelOrder($input: SellerCancelOrderInput!) {
+    sellerCancelOrder(input: $input) {
+      id
+      status
+    }
+  }
+`);
+
+const SellerOrderPickupCalendarDocument = graphql(`
+  query SellerOrderPickupCalendar($orderId: ID!, $yearMonth: String!) {
+    sellerOrderPickupCalendar(orderId: $orderId, yearMonth: $yearMonth) {
+      days {
+        date
+        selectable
+        reason
+      }
+    }
+  }
+`);
+
+const SellerOrderPickupTimeSlotsDocument = graphql(`
+  query SellerOrderPickupTimeSlots($orderId: ID!, $date: String!) {
+    sellerOrderPickupTimeSlots(orderId: $orderId, date: $date) {
+      morning {
+        time
+        available
+      }
+      afternoon {
+        time
+        available
+      }
+    }
+  }
+`);
+
+const SellerRescheduleOrderPickupDocument = graphql(`
+  mutation SellerRescheduleOrderPickup($input: SellerRescheduleOrderPickupInput!) {
+    sellerRescheduleOrderPickup(input: $input) {
+      id
+      pickupAt
     }
   }
 `);
@@ -119,12 +233,15 @@ const SellerOrderConversationsDocument = graphql(`
 export const SellerOrdersUpdatedDocument = graphql(`
   subscription SellerOrdersUpdated {
     sellerOrderUpdated {
+      kind
       orderId
       status
       pickupAt
       buyerName
       totalPrice
       productName
+      hasCustom
+      confirmDeadlineAt
       updatedAt
     }
   }
@@ -179,4 +296,29 @@ export function updateOrderStatus(input: {
   note?: string;
 }) {
   return gqlRequest(SellerUpdateOrderStatusDocument, { input });
+}
+
+export function cancelOrder(input: SellerCancelOrderInput) {
+  return gqlRequest(SellerCancelOrderDocument, { input });
+}
+
+/** 픽업 일시 변경 달력. 이 주문이 점유한 수량은 빼고 센다 */
+export const pickupChangeCalendarQueryOptions = (orderId: string, yearMonth: string) =>
+  queryOptions({
+    queryKey: ordersKeys.pickupCalendar(orderId, yearMonth),
+    queryFn: async () =>
+      (await gqlRequest(SellerOrderPickupCalendarDocument, { orderId, yearMonth }))
+        .sellerOrderPickupCalendar.days,
+  });
+
+export const pickupChangeSlotsQueryOptions = (orderId: string, date: string) =>
+  queryOptions({
+    queryKey: ordersKeys.pickupSlots(orderId, date),
+    queryFn: async () =>
+      (await gqlRequest(SellerOrderPickupTimeSlotsDocument, { orderId, date }))
+        .sellerOrderPickupTimeSlots,
+  });
+
+export function rescheduleOrderPickup(input: SellerRescheduleOrderPickupInput) {
+  return gqlRequest(SellerRescheduleOrderPickupDocument, { input });
 }

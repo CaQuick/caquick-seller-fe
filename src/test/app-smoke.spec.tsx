@@ -21,6 +21,7 @@ import R_app_tabs_store from '../../app/(app)/(tabs)/store';
 import R_app_chats_conversationId from '../../app/(app)/chats/[conversationId]';
 import R_app_orders_id from '../../app/(app)/orders/[id]';
 import R_app_products_id_custom_template from '../../app/(app)/products/[id]/custom-template';
+import R_app_products_id_customization from '../../app/(app)/products/[id]/customization';
 import R_app_products_id_edit from '../../app/(app)/products/[id]/edit';
 import R_app_products_id_images from '../../app/(app)/products/[id]/images';
 import R_app_products_id_index from '../../app/(app)/products/[id]/index';
@@ -41,6 +42,9 @@ import R_app_store_pickup_policy from '../../app/(app)/store/pickup-policy';
 import R_app_store_preview from '../../app/(app)/store/preview';
 import R_app_store_reviews_id from '../../app/(app)/store/reviews/[id]';
 import R_app_store_reviews_index from '../../app/(app)/store/reviews/index';
+import R_app_store_settlement_account from '../../app/(app)/store/settlement-account';
+import R_app_store_settlements_id from '../../app/(app)/store/settlements/[id]';
+import R_app_store_settlements_index from '../../app/(app)/store/settlements/index';
 import R_app_store_special_closures from '../../app/(app)/store/special-closures';
 import R_auth_layout from '../../app/(auth)/_layout';
 import R_auth_change_password from '../../app/(auth)/change-password';
@@ -68,6 +72,7 @@ const routes = {
   '(app)/chats/[conversationId]': R_app_chats_conversationId,
   '(app)/orders/[id]': R_app_orders_id,
   '(app)/products/[id]/custom-template': R_app_products_id_custom_template,
+  '(app)/products/[id]/customization': R_app_products_id_customization,
   '(app)/products/[id]/edit': R_app_products_id_edit,
   '(app)/products/[id]/images': R_app_products_id_images,
   '(app)/products/[id]/index': R_app_products_id_index,
@@ -88,6 +93,9 @@ const routes = {
   '(app)/store/preview': R_app_store_preview,
   '(app)/store/reviews/[id]': R_app_store_reviews_id,
   '(app)/store/reviews/index': R_app_store_reviews_index,
+  '(app)/store/settlement-account': R_app_store_settlement_account,
+  '(app)/store/settlements/[id]': R_app_store_settlements_id,
+  '(app)/store/settlements/index': R_app_store_settlements_index,
   '(app)/store/special-closures': R_app_store_special_closures,
   '(auth)/_layout': R_auth_layout,
   '(auth)/change-password': R_auth_change_password,
@@ -175,12 +183,14 @@ describe('앱 셸', () => {
       Promise.resolve(
         sink.next({
           sellerOrderUpdated: {
+            kind: 'SUBMITTED',
             orderId: '77',
             status: 'SUBMITTED',
             pickupAt: '2026-10-12T02:00:00.000Z',
             buyerName: '김다은',
             totalPrice: 38000,
             productName: '딸기 타르트',
+            hasCustom: false,
             updatedAt: '2026-10-06T02:00:00.000Z',
           },
         }),

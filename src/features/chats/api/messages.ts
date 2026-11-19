@@ -17,6 +17,14 @@ const SellerChatsMessagesDocument = graphql(`
         bodyFormat
         bodyText
         bodyHtml
+        imageUrl
+        orderCard {
+          orderId
+          orderNumber
+          productName
+          thumbnailUrl
+          pickupAt
+        }
         createdAt
       }
       totalCount
@@ -36,6 +44,14 @@ const SellerChatsSendMessageDocument = graphql(`
       bodyFormat
       bodyText
       bodyHtml
+      imageUrl
+      orderCard {
+        orderId
+        orderNumber
+        productName
+        thumbnailUrl
+        pickupAt
+      }
       createdAt
     }
   }
@@ -65,17 +81,24 @@ export const SellerChatsMessageAddedDocument = graphql(`
       bodyFormat
       bodyText
       bodyHtml
+      imageUrl
+      orderCard {
+        orderId
+        orderNumber
+        productName
+        thumbnailUrl
+        pickupAt
+      }
       createdAt
     }
   }
 `);
 
-const SellerChatsBuyerOrderDocument = graphql(`
-  query SellerChatsBuyerOrder($input: SellerOrderListInput) {
-    sellerOrderList(input: $input) {
+const SellerChatsBuyerLatestOrderDocument = graphql(`
+  query SellerChatsBuyerLatestOrder($buyerAccountId: ID!) {
+    sellerOrderList(input: { buyerAccountId: $buyerAccountId, limit: 1 }) {
       items {
         id
-        buyerName
         pickupAt
         firstItemName
       }
@@ -119,21 +142,25 @@ export async function sendTextMessage(conversationId: string, bodyText: string) 
   ).sellerSendConversationMessage;
 }
 
+/** 올린 사진(CONVERSATION_IMAGE publicUrl) 한 장을 보낸다 */
+export async function sendImageMessage(conversationId: string, imageUrl: string) {
+  return (
+    await gqlRequest(SellerChatsSendMessageDocument, {
+      input: { conversationId, bodyFormat: 'IMAGE', imageUrl },
+    })
+  ).sellerSendConversationMessage;
+}
+
 export async function markConversationRead(conversationId: string) {
   return (await gqlRequest(SellerChatsMarkReadDocument, { conversationId }))
     .sellerMarkConversationRead;
 }
 
-/** 주문에 구매자 계정 필터가 없어 주문자 이름으로 찾고, 부분일치 결과 중 이름이 같은 첫 주문(최신순)을 고른다 */
-export const buyerOrderQueryOptions = (buyerName: string) =>
+/** 이 대화 상대(구매자 계정)의 최신 주문. 없으면 null */
+export const buyerLatestOrderQueryOptions = (buyerAccountId: string) =>
   queryOptions({
-    queryKey: chatsKeys.buyerOrder(buyerName),
-    queryFn: async () => {
-      const { items } = (
-        await gqlRequest(SellerChatsBuyerOrderDocument, {
-          input: { search: buyerName, limit: 20 },
-        })
-      ).sellerOrderList;
-      return items.find((o) => o.buyerName === buyerName) ?? null;
-    },
+    queryKey: chatsKeys.buyerOrder(buyerAccountId),
+    queryFn: async () =>
+      (await gqlRequest(SellerChatsBuyerLatestOrderDocument, { buyerAccountId })).sellerOrderList
+        .items[0] ?? null,
   });

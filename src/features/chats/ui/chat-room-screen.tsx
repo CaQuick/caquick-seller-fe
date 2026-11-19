@@ -16,9 +16,10 @@ import { colors } from '@/shared/config/tokens';
 import { Empty, ErrorState, Screen, SkeletonRows, showToast } from '@/shared/ui';
 
 import { type Conversation, type ConversationPages } from '../api/conversations';
-import { type Message, buyerOrderQueryOptions } from '../api/messages';
+import { type Message, buyerLatestOrderQueryOptions } from '../api/messages';
 import { chatsKeys } from '../api/queryKeys';
 import { findConversation } from '../model/conversation-merge';
+import { pickChatImage } from '../model/chat-image';
 import { CHATS_COPY } from '../model/copy';
 import { buyerName, formatDayLine, formatPickup, kstDayKey } from '../model/format';
 import { type PendingMessage, useChatRoom } from '../model/use-chat-room';
@@ -65,8 +66,11 @@ export function ChatRoomScreen() {
   );
   const requestRead = useMarkRead(conversationId, setConversation);
   const room = useChatRoom(conversationId, requestRead);
-  const nickname = conversation?.buyerNickname?.trim();
-  const order = useQuery({ ...buyerOrderQueryOptions(nickname ?? ''), enabled: !!nickname });
+  const buyerAccountId = conversation?.accountId;
+  const order = useQuery({
+    ...buyerLatestOrderQueryOptions(buyerAccountId ?? ''),
+    enabled: buyerAccountId !== undefined,
+  });
 
   const notFound =
     room.query.error instanceof ApiError && room.query.error.classification === 'NOT_FOUND';
@@ -154,7 +158,15 @@ export function ChatRoomScreen() {
             keyboardShouldPersistTaps="handled"
           />
         </HtmlProvider>
-        <ChatInputBar sending={room.sending} onSend={room.send} />
+        <ChatInputBar
+          sending={room.sending}
+          onSend={room.send}
+          onAttach={() =>
+            void pickChatImage().then((image) => {
+              if (image) room.sendImage(image);
+            })
+          }
+        />
       </KeyboardAvoidingView>
       <RoomMenuSheet
         ref={menu}

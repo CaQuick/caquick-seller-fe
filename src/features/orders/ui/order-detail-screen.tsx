@@ -24,27 +24,44 @@ import {
   showToast,
   SkeletonRows,
   StatusChip,
-  TextField,
   Timeline,
 } from '@/shared/ui';
 
-import { orderDetailQueryOptions, updateOrderStatus } from '../api/orders';
+import {
+  cancelOrder,
+  orderDetailQueryOptions,
+  rescheduleOrderPickup,
+  updateOrderStatus,
+} from '../api/orders';
 import { ordersKeys } from '../api/queryKeys';
+import { CANCEL_COPY, type CancelInput } from '../model/cancel-form';
 import { formatDateTime, formatSigned } from '../model/format';
 import { orderErrorMessage } from '../model/messages';
+import { cancellationRows, type PaymentRow, settlementRows } from '../model/payment';
+import { PICKUP_CHANGE_COPY, pickupChangeItems } from '../model/pickup-change';
 import {
+  autoTransitionNotice,
   buildTimeline,
-  ORDER_ACTIONS,
+  noShowWindow,
+  orderActions,
+  orderStatusView,
   paymentBreakdown,
-  STATUS_LABEL,
-  STATUS_TONE,
 } from '../model/status';
 import { useOrderUpdates } from '../model/use-order-updates';
 import { BuyerChatRow } from './buyer-chat-row';
+import { CancelOrderSheet } from './cancel-order-sheet';
 import { OrderItemCard } from './order-item-card';
+import { type OtherAction, OtherActionsSheet } from './other-actions-sheet';
+import { PickupChangeSheet } from './pickup-change-sheet';
 
-const CANCELED_TOAST = '주문을 취소했어요';
-const NOTE_MAX = 500;
+type Order = SellerOrderDetailQuery['sellerOrder'];
+interface Reschedule {
+  pickupAt: string;
+  note?: string;
+}
+type Change = { done: string } & (
+  { to: OrderStatusType } | { cancel: CancelInput } | { reschedule: Reschedule }
+);
 
 const backToList = () => (router.canGoBack() ? router.back() : router.replace('/orders'));
 
@@ -53,80 +70,191 @@ export function OrderDetailScreen() {
   const queryClient = useQueryClient();
   const query = useQuery(orderDetailQueryOptions(id));
   const cancelSheet = useRef<BottomSheetModal>(null);
-  const [note, setNote] = useState('');
+  const moreSheet = useRef<BottomSheetModal>(null);
+  const noShowSheet = useRef<BottomSheetModal>(null);
+  const pickupSheet = useRef<BottomSheetModal>(null);
+  // 성공하면 다시 마운트해 취소·픽업 변경 시트 입력을 비운다
+  const [cancelKey, setCancelKey] = useState(0);
+  const [pickupKey, setPickupKey] = useState(0);
+  const [pickupOpened, setPickupOpened] = useState(false);
+  const [pickupError, setPickupError] = useState<string | null>(null);
+  // 노쇼 가능 구간은 '다른 처리'를 연 시각으로 판정한다
+  const [now, setNow] = useState(() => new Date());
   useOrderUpdates();
 
   const mutation = useMutation({
-    mutationFn: (v: { to: OrderStatusType; done: string; note?: string }) =>
-      updateOrderStatus({ orderId: id, toStatus: v.to, note: v.note }),
+    mutationFn: async (v: Change) => {
+      if ('cancel' in v) await cancelOrder({ orderId: id, ...v.cancel });
+      else if ('reschedule' in v) await rescheduleOrderPickup({ orderId: id, ...v.reschedule });
+      else await updateOrderStatus({ orderId: id, toStatus: v.to });
+    },
     onSuccess: (_, v) => {
-      if (v.to === 'CANCELED') {
-        cancelSheet.current?.dismiss();
-        setNote('');
-      }
+      for (const sheet of [cancelSheet, moreSheet, noShowSheet, pickupSheet])
+        sheet.current?.dismiss();
+      if ('cancel' in v) setCancelKey((k) => k + 1);
+      if ('reschedule' in v) setPickupKey((k) => k + 1);
       showToast.success(v.done);
     },
-    onError: (e) => showToast.error(orderErrorMessage(e)),
+    onError: (e, v) => {
+      // 픽업 변경 거절(모두 BAD_USER_INPUT)은 열린 시트 안에 두고 다시 받은 슬롯에서 고르게 한다
+      if ('reschedule' in v && e instanceof ApiError && e.classification === 'BAD_USER_INPUT')
+        setPickupError(orderErrorMessage(e));
+      else showToast.error(orderErrorMessage(e));
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ordersKeys.all }),
   });
+
+  if (!query.data) {
+    return (
+      <Screen edges={['top']}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader title="주문 상세" onBack={backToList} />
+        {query.isPending ? (
+          <View className="px-5">
+            <SkeletonRows count={3} card />
+          </View>
+        ) : query.error instanceof ApiError && query.error.classification === 'NOT_FOUND' ? (
+          <ErrorState
+            title="주문을 찾을 수 없어요"
+            description="삭제되었거나 이 매장의 주문이 아니에요"
+            retryLabel="목록으로"
+            onRetry={backToList}
+          />
+        ) : (
+          <ErrorState onRetry={() => void query.refetch()} />
+        )}
+      </Screen>
+    );
+  }
+
+  const order = query.data;
+  const actions = orderActions(order.status);
+  const cancelMode = actions.cancel;
+  const noShow = noShowWindow(order, now);
+  // 환불 상한은 확인된 결제액이다. 결제 도입 전 주문은 결제 기록이 없어 0
+  const refundable = order.paymentMethod ? order.totalPrice : 0;
+  const switchTo = (sheet: typeof cancelSheet) => {
+    moreSheet.current?.dismiss();
+    sheet.current?.present();
+  };
+  const others: OtherAction[] = [
+    ...actions.others.map((to): OtherAction =>
+      to === 'PICKED_UP'
+        ? {
+            key: to,
+            title: '픽업 완료',
+            description: '구매자가 주문을 받아 갔어요',
+            onPress: () => {
+              moreSheet.current?.dismiss();
+              mutation.mutate({ to, done: '픽업 완료로 바꿨어요' });
+            },
+          }
+        : {
+            key: to,
+            title: '노쇼',
+            description: noShow.reason,
+            onPress: noShow.enabled ? () => switchTo(noShowSheet) : undefined,
+          },
+    ),
+    ...(cancelMode === 'cancel'
+      ? [
+          {
+            key: 'CANCEL',
+            title: '주문 취소',
+            description: '사정에 따라 환불 금액이 정해져요',
+            danger: true,
+            onPress: () => switchTo(cancelSheet),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <Screen edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
       <AppHeader title="주문 상세" onBack={backToList} />
-      {query.data ? (
-        <>
-          <OrderBody order={query.data} />
-          <OrderActionBar
-            status={query.data.status}
-            busy={mutation.isPending}
-            onNext={(next) => mutation.mutate(next)}
-            onCancel={() => cancelSheet.current?.present()}
-          />
-          <ConfirmSheet
-            ref={cancelSheet}
-            title="주문을 취소할까요?"
-            description="구매자에게 취소 사유가 전달되고 결제가 취소돼요"
-            confirmLabel="취소 확정"
-            confirmDisabled={note.trim() === ''}
-            loading={mutation.isPending}
-            onConfirm={() =>
-              mutation.mutate({ to: 'CANCELED', done: CANCELED_TOAST, note: note.trim() })
-            }
-          >
-            <TextField
-              sublabel="취소 사유 (필수)"
-              accessibilityLabel="취소 사유"
-              placeholder="구매자에게 전달할 사유를 적어 주세요"
-              multiline
-              maxLength={NOTE_MAX}
-              value={note}
-              onChangeText={setNote}
-            />
-          </ConfirmSheet>
-        </>
-      ) : query.isPending ? (
-        <View className="px-5">
-          <SkeletonRows count={3} card />
-        </View>
-      ) : query.error instanceof ApiError && query.error.classification === 'NOT_FOUND' ? (
-        <ErrorState
-          title="주문을 찾을 수 없어요"
-          description="삭제되었거나 이 매장의 주문이 아니에요"
-          retryLabel="목록으로"
-          onRetry={backToList}
+      <OrderBody
+        order={order}
+        onReschedule={
+          actions.reschedule
+            ? () => {
+                setPickupOpened(true);
+                pickupSheet.current?.present();
+              }
+            : undefined
+        }
+      />
+      <OrderActionBar
+        status={order.status}
+        busy={mutation.isPending}
+        onNext={(next) => mutation.mutate(next)}
+        onReject={() => cancelSheet.current?.present()}
+        onMore={() => {
+          setNow(new Date());
+          moreSheet.current?.present();
+        }}
+      />
+      {cancelMode ? (
+        <CancelOrderSheet
+          key={`${order.status}-${cancelKey}`}
+          ref={cancelSheet}
+          mode={cancelMode}
+          total={refundable}
+          loading={mutation.isPending}
+          onSubmit={(cancel) => mutation.mutate({ cancel, done: CANCEL_COPY[cancelMode].done })}
         />
-      ) : (
-        <ErrorState onRetry={() => void query.refetch()} />
-      )}
+      ) : null}
+      {cancelMode === 'cancel' ? <OtherActionsSheet ref={moreSheet} actions={others} /> : null}
+      {actions.reschedule ? (
+        <PickupChangeSheet
+          key={`${order.pickupAt}-${pickupKey}`}
+          ref={pickupSheet}
+          orderId={order.id}
+          pickupAt={order.pickupAt}
+          active={pickupOpened}
+          loading={mutation.isPending}
+          error={pickupError}
+          onPick={() => setPickupError(null)}
+          onDismiss={() => {
+            setPickupOpened(false);
+            setPickupError(null);
+          }}
+          onSubmit={(reschedule) => {
+            setPickupError(null);
+            mutation.mutate({ reschedule, done: PICKUP_CHANGE_COPY.done });
+          }}
+        />
+      ) : null}
+      {actions.others.includes('NO_SHOW') ? (
+        <ConfirmSheet
+          ref={noShowSheet}
+          title="노쇼로 처리할까요?"
+          description="환불 없이 끝나고 픽업 완료와 같이 정산돼요. 되돌릴 수 없어요."
+          confirmLabel="노쇼 처리"
+          loading={mutation.isPending}
+          onConfirm={() => mutation.mutate({ to: 'NO_SHOW', done: '노쇼로 처리했어요' })}
+        />
+      ) : null}
     </Screen>
   );
 }
 
-type Order = SellerOrderDetailQuery['sellerOrder'];
+function Rows({ rows }: { rows: PaymentRow[] }) {
+  return rows.map((row) => (
+    <View key={row.label}>
+      <KeyValue label={row.label} value={row.value} />
+      {row.hint ? (
+        <Text className="text-right font-sans text-xs tracking-tight text-muted">{row.hint}</Text>
+      ) : null}
+    </View>
+  ));
+}
 
-function OrderBody({ order }: { order: Order }) {
+function OrderBody({ order, onReschedule }: { order: Order; onReschedule?: () => void }) {
   const pay = paymentBreakdown(order);
+  const status = orderStatusView(order.status);
+  const autoNotice = autoTransitionNotice(order);
+  const canceled = cancellationRows(order);
   const call = () =>
     Linking.openURL(`tel:${order.buyerPhone.replace(/[^\d+]/g, '')}`).catch(() =>
       showToast.error('전화를 걸 수 없어요'),
@@ -135,7 +263,7 @@ function OrderBody({ order }: { order: Order }) {
     <ScrollView contentContainerClassName="px-5 pb-6">
       <Card
         title="주문번호"
-        aside={<StatusChip tone={STATUS_TONE[order.status]} label={STATUS_LABEL[order.status]} />}
+        aside={<StatusChip tone={status.tone} label={status.label} />}
         className="mt-4"
       >
         <Text selectable className="mb-2 font-sans text-sm tracking-tight text-sublabel">
@@ -147,8 +275,38 @@ function OrderBody({ order }: { order: Order }) {
         <Text className="font-sans text-4xl font-bold tracking-tighter text-text">
           {formatDateTime(order.pickupAt, true)}
         </Text>
+        {onReschedule ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={PICKUP_CHANGE_COPY.open}
+            onPress={onReschedule}
+            hitSlop={12}
+            className="mt-1.5 self-start"
+          >
+            <Text className="font-sans text-sm font-medium tracking-tight text-primary-strong">
+              {`${PICKUP_CHANGE_COPY.open} ›`}
+            </Text>
+          </Pressable>
+        ) : null}
         <KeyValue label="주문 일시" value={formatDateTime(order.createdAt, true)} />
+        {autoNotice ? (
+          <View className="mt-2 rounded-lg bg-tint2 p-3">
+            <Text className="font-sans text-sm tracking-tight text-text3">{autoNotice}</Text>
+          </View>
+        ) : null}
       </Card>
+
+      {order.pickupChanges.length > 0 ? (
+        <>
+          <SectionHeader
+            title={PICKUP_CHANGE_COPY.history}
+            count={`${order.pickupChanges.length}건`}
+          />
+          <Card>
+            <Timeline items={pickupChangeItems(order.pickupChanges)} />
+          </Card>
+        </>
+      ) : null}
 
       <SectionHeader title="주문자" />
       <MenuGroup>
@@ -169,14 +327,28 @@ function OrderBody({ order }: { order: Order }) {
         <BuyerChatRow accountId={order.accountId} />
       </MenuGroup>
 
+      {order.requestNote ? (
+        <>
+          <SectionHeader title="요청 사항" />
+          <Card>
+            <Text
+              selectable
+              className="font-sans text-base leading-[21px] tracking-tight text-text"
+            >
+              {order.requestNote}
+            </Text>
+          </Card>
+        </>
+      ) : null}
+
       <SectionHeader title="주문 상품" count={`${order.items.length}건`} />
       <View className="gap-3">
         {order.items.map((item) => (
-          <OrderItemCard key={item.id} item={item} />
+          <OrderItemCard key={item.id} orderId={order.id} item={item} />
         ))}
       </View>
 
-      <SectionHeader title="결제 금액" />
+      <SectionHeader title="결제" />
       <Card>
         <KeyValue label="상품 금액" value={formatKrw(pay.product)} />
         <KeyValue label="옵션 추가" value={formatSigned(pay.options)} />
@@ -185,6 +357,14 @@ function OrderBody({ order }: { order: Order }) {
           value={pay.discount > 0 ? `-${formatKrw(pay.discount)}` : formatKrw(0)}
         />
         <KeyValue label="총액" value={formatKrw(pay.total)} total />
+        <View className="mt-2 border-t border-line2 pt-2">
+          <Rows rows={settlementRows(order)} />
+        </View>
+        {canceled.length > 0 ? (
+          <View className="mt-2 border-t border-line2 pt-2">
+            <Rows rows={canceled} />
+          </View>
+        ) : null}
       </Card>
 
       <SectionHeader title="진행 이력" />
@@ -199,15 +379,17 @@ function OrderActionBar({
   status,
   busy,
   onNext,
-  onCancel,
+  onReject,
+  onMore,
 }: {
   status: OrderStatusType;
   busy: boolean;
   onNext: (next: { to: OrderStatusType; done: string }) => void;
-  onCancel: () => void;
+  onReject: () => void;
+  onMore: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const { next, cancellable, notice } = ORDER_ACTIONS[status];
+  const { next, cancel, notice } = orderActions(status);
   if (!next) {
     return (
       <View
@@ -220,14 +402,16 @@ function OrderActionBar({
       </View>
     );
   }
+  const secondary =
+    cancel === 'reject'
+      ? { title: '거절', variant: 'dangerOutline' as const, onPress: onReject }
+      : cancel
+        ? { title: '다른 처리', onPress: onMore }
+        : undefined;
   return (
     <ActionBar
       primary={{ title: next.label, loading: busy, onPress: () => onNext(next) }}
-      secondary={
-        cancellable
-          ? { title: '주문 취소', variant: 'dangerOutline', disabled: busy, onPress: onCancel }
-          : undefined
-      }
+      secondary={secondary && { ...secondary, disabled: busy }}
     />
   );
 }
