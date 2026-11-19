@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { homeKeys } from '@/features/home';
 import { messageFor, subscribe } from '@/shared/api';
+import { type PickedImage } from '@/shared/lib/upload';
 import { showToast } from '@/shared/ui';
 
 import {
@@ -10,24 +11,31 @@ import {
   type MessagePages,
   SellerChatsMessageAddedDocument,
   messagesQueryOptions,
+  sendImageMessage,
   sendTextMessage,
 } from '../api/messages';
 import { chatsKeys } from '../api/queryKeys';
+import { uploadChatImage } from './chat-image';
 import { hasMessage, upsertMessage } from './message-list';
 
 export const MAX_TEXT_LENGTH = 2000;
 
-export interface PendingMessage {
+/** 보내는 중·실패한 글 또는 사진. 사진은 올린 뒤 실패하면 받은 주소로 다시 보낸다 */
+export type PendingMessage = {
   localId: string;
-  text: string;
   status: 'sending' | 'failed';
-}
+} & (
+  { kind: 'text'; text: string } | { kind: 'image'; image: PickedImage; imageUrl: string | null }
+);
+
+type Outgoing =
+  { kind: 'text'; text: string } | { kind: 'image'; image: PickedImage; imageUrl: string | null };
 
 let seq = 0;
 
 /**
  * 채팅방 메시지: 역순 무한 조회 + 새 메시지 구독(id 중복 제거) + 전송.
- * 전송 중인 글은 서버 응답 전까지 대기 버블로 그리고, 실패하면 같은 내용으로 다시 보낼 수 있게 남긴다.
+ * 전송 중인 글·사진은 서버 응답 전까지 대기 버블로 그리고, 실패하면 같은 내용으로 다시 보낼 수 있게 남긴다.
  */
 export function useChatRoom(conversationId: string, onBuyerMessage: () => void) {
   const queryClient = useQueryClient();
@@ -63,13 +71,23 @@ export function useChatRoom(conversationId: string, onBuyerMessage: () => void) 
   }, [conversationId, queryClient]);
 
   const { mutate } = useMutation({
-    mutationFn: ({ text }: { localId: string; text: string }) =>
-      sendTextMessage(conversationId, text),
-    onMutate: ({ localId, text }) => {
+    mutationFn: async ({ localId, ...out }: Outgoing & { localId: string }) => {
+      if (out.kind === 'text') return sendTextMessage(conversationId, out.text);
+      let { imageUrl } = out;
+      if (!imageUrl) {
+        const uploaded = await uploadChatImage(out.image);
+        imageUrl = uploaded;
+        setPending((list) =>
+          list.map((p) => (p.localId === localId ? { ...p, imageUrl: uploaded } : p)),
+        );
+      }
+      return sendImageMessage(conversationId, imageUrl);
+    },
+    onMutate: ({ localId, ...out }) => {
       inFlight.current += 1;
       setPending((list) => [
         ...list.filter((p) => p.localId !== localId),
-        { localId, text, status: 'sending' },
+        { ...out, localId, status: 'sending' },
       ]);
     },
     onSuccess: (message: Message, { localId }) => {
@@ -96,7 +114,9 @@ export function useChatRoom(conversationId: string, onBuyerMessage: () => void) 
     messages,
     pending,
     sending: pending.some((p) => p.status === 'sending'),
-    send: (text: string) => mutate({ localId: `local-${++seq}`, text }),
-    retry: (p: PendingMessage) => mutate({ localId: p.localId, text: p.text }),
+    send: (text: string) => mutate({ localId: `local-${++seq}`, kind: 'text', text }),
+    sendImage: (image: PickedImage) =>
+      mutate({ localId: `local-${++seq}`, kind: 'image', image, imageUrl: null }),
+    retry: ({ status: _status, ...out }: PendingMessage) => mutate(out),
   };
 }

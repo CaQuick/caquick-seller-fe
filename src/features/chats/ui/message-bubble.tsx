@@ -12,6 +12,7 @@ import { CHATS_COPY } from '../model/copy';
 import { formatPickup } from '../model/format';
 import { type BubbleKind, bubbleKind, messageBody } from '../model/message-list';
 import { type PendingMessage } from '../model/use-chat-room';
+import { ChatImage } from './chat-image';
 import { HtmlBody } from './html-body';
 
 const BUBBLE: Record<Exclude<BubbleKind, 'system'>, string> = {
@@ -29,10 +30,13 @@ function Bubble({
   kind,
   children,
   aside,
+  bare = false,
 }: {
   kind: Exclude<BubbleKind, 'system'>;
   children: ReactNode;
   aside: ReactNode;
+  /** 사진처럼 말풍선 바탕 없이 그린다 */
+  bare?: boolean;
 }) {
   return (
     <View
@@ -41,14 +45,18 @@ function Bubble({
         kind === 'store' ? 'flex-row-reverse self-end' : 'flex-row self-start',
       )}
     >
-      <View className={cn('shrink rounded-xl px-3.5 py-2.5', BUBBLE[kind])}>
-        {kind === 'auto' ? (
-          <Text className="mb-1 font-sans text-2xs font-semibold text-purple-text">
-            {CHATS_COPY.autoReply}
-          </Text>
-        ) : null}
-        {children}
-      </View>
+      {bare ? (
+        children
+      ) : (
+        <View className={cn('shrink rounded-xl px-3.5 py-2.5', BUBBLE[kind])}>
+          {kind === 'auto' ? (
+            <Text className="mb-1 font-sans text-2xs font-semibold text-purple-text">
+              {CHATS_COPY.autoReply}
+            </Text>
+          ) : null}
+          {children}
+        </View>
+      )}
       {aside}
     </View>
   );
@@ -121,6 +129,12 @@ export function MessageBubble({ message }: { message: Message }) {
         {body}
       </Text>
     );
+  if (message.bodyFormat === 'IMAGE' && message.imageUrl)
+    return (
+      <Bubble kind={kind} bare aside={<Time iso={message.createdAt} />}>
+        <ChatImage uri={message.imageUrl} />
+      </Bubble>
+    );
   return (
     <Bubble kind={kind} aside={<Time iso={message.createdAt} />}>
       {message.bodyFormat === 'HTML' ? (
@@ -134,7 +148,7 @@ export function MessageBubble({ message }: { message: Message }) {
   );
 }
 
-/** 전송 중(흐리게)·실패(재시도) 버블 */
+/** 전송 중(흐리게)·실패(재시도) 버블. 사진은 고른 원본을 그린다 */
 export function PendingBubble({
   message,
   onRetry,
@@ -143,14 +157,16 @@ export function PendingBubble({
   onRetry: () => void;
 }) {
   const failed = message.status === 'failed';
+  const subject = message.kind === 'text' ? message.text : CHATS_COPY.photo;
   return (
     <Bubble
       kind="store"
+      bare={message.kind === 'image'}
       aside={
         failed ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${CHATS_COPY.retry}: ${message.text}`}
+            accessibilityLabel={`${CHATS_COPY.retry}: ${subject}`}
             onPress={onRetry}
             hitSlop={12}
             className="items-center gap-0.5"
@@ -161,14 +177,18 @@ export function PendingBubble({
         ) : null
       }
     >
-      <Text
-        className={cn(
-          'font-sans text-md leading-[21px] tracking-tight text-surface',
-          !failed && 'opacity-60',
-        )}
-      >
-        {message.text}
-      </Text>
+      {message.kind === 'image' ? (
+        <ChatImage uri={message.image.uri} sending={!failed} />
+      ) : (
+        <Text
+          className={cn(
+            'font-sans text-md leading-[21px] tracking-tight text-surface',
+            !failed && 'opacity-60',
+          )}
+        >
+          {message.text}
+        </Text>
+      )}
     </Bubble>
   );
 }

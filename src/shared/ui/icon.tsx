@@ -53,6 +53,7 @@ const ICONS = {
   location: { d: `M12 21s7-6 7-11a7 7 0 0 0-14 0c0 5 7 11 7 11z${circle(12, 10, 2.5)}` },
   bank: { d: 'M3 9.5 12 4l9 5.5M5 10v8M9.7 10v8M14.3 10v8M19 10v8M3 20h18' },
   wallet: { d: `${rect(3, 6, 18, 14, 2)}M3 10h18M15 15h2` },
+  photo: { d: `${rect(3, 5, 18, 14, 2)}${circle(8.5, 10, 1.5)}M21 16l-5-5-9 8` },
 } satisfies Record<string, { d: string; stroke?: number }>;
 
 /** 색이 박힌 채움 아이콘(획 없음). 홈 활성 탭은 시안대로 집 채움 + 가운데 점 */

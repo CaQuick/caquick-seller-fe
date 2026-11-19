@@ -4,7 +4,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { ApiError } from '@/shared/api/errors';
 
 /** schema.graphql의 UploadPurpose. codegen은 문서가 쓰는 타입만 내놓아 여기 적는다 */
-export type UploadPurpose = 'PRODUCT_IMAGE' | 'STORE_IMAGE' | 'BANNER_IMAGE';
+export type UploadPurpose = 'PRODUCT_IMAGE' | 'STORE_IMAGE' | 'BANNER_IMAGE' | 'CONVERSATION_IMAGE';
 
 export interface PickedImage {
   uri: string;
@@ -16,7 +16,9 @@ export interface PickedImage {
 
 export const MAX_EDGE = 1600;
 export const JPEG_QUALITY = 0.85;
-const MAX_BYTES = 5 * 1024 * 1024;
+const MB = 1024 * 1024;
+/** 용도별 최대 크기(MB). 서버 presign이 같은 값으로 막는다 */
+const maxMegabytes = (purpose: UploadPurpose) => (purpose === 'CONVERSATION_IMAGE' ? 10 : 5);
 const CONTENT_TYPE = 'image/jpeg';
 
 export interface PresignInput {
@@ -77,8 +79,9 @@ export async function uploadImage(
   const file = deps.createFile(uri);
   const size = file.size ?? 0;
   if (size < 1) throw new ApiError('빈 파일입니다.', 'BAD_USER_INPUT', null, 400);
-  if (size > MAX_BYTES)
-    throw new ApiError('5MB 이하만 올릴 수 있습니다.', 'BAD_USER_INPUT', null, 400);
+  const limit = maxMegabytes(purpose);
+  if (size > limit * MB)
+    throw new ApiError(`${limit}MB 이하만 올릴 수 있습니다.`, 'BAD_USER_INPUT', null, 400);
   const { uploadUrl, publicUrl } = await presign({
     purpose,
     contentType: CONTENT_TYPE,

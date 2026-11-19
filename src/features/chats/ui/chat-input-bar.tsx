@@ -12,10 +12,12 @@ import { MAX_TEXT_LENGTH } from '../model/use-chat-room';
 interface Props {
   sending: boolean;
   onSend: (text: string) => void;
+  /** 사진 한 장을 고르면 바로 보낸다 */
+  onAttach: () => void;
 }
 
-/** 입력바(.chatbar): 텍스트만(첨부 없음). 보내기는 글자가 있고 전송 중이 아닐 때만 */
-export function ChatInputBar({ sending, onSend }: Props) {
+/** 입력바(.chatbar): 사진 첨부 + 글. 보내기는 글자가 있고 전송 중이 아닐 때만 */
+export function ChatInputBar({ sending, onSend, onAttach }: Props) {
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const canSend = text.trim().length > 0 && !sending;
@@ -29,6 +31,17 @@ export function ChatInputBar({ sending, onSend }: Props) {
       style={{ paddingBottom: Math.max(insets.bottom, 8) }}
       className="flex-row items-center gap-2 border-t border-line bg-surface px-3 pt-2"
     >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={CHATS_COPY.attach}
+        accessibilityState={{ disabled: sending }}
+        disabled={sending}
+        onPress={onAttach}
+        hitSlop={4}
+        className="h-9 w-9 items-center justify-center rounded-md"
+      >
+        <Icon name="photo" size={22} color={sending ? colors.placeholder : colors.muted} />
+      </Pressable>
       <TextInput
         accessibilityLabel={CHATS_COPY.inputPlaceholder}
         accessibilityState={{ disabled: sending }}

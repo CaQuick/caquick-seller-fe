@@ -52,6 +52,7 @@ const msg = (id: string, over: Partial<Message> = {}): Message => ({
   bodyFormat: 'TEXT',
   bodyText: `메시지${id}`,
   bodyHtml: null,
+  imageUrl: null,
   orderCard: null,
   createdAt: at(2),
   ...over,
