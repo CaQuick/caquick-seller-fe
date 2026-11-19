@@ -48,11 +48,13 @@ const PRODUCT: Product = {
       minSelect: 1,
       maxSelect: 1,
       isActive: true,
+      threeDCategory: null,
       optionItems: [{ id: 'o1' }, { id: 'o2' }],
     },
   ],
   customMode: 'SLOT',
-  customTemplate: { id: 'ct1', textTokens: [{ id: 'k1' }, { id: 'k2' }] },
+  customReadiness: [],
+  customTemplate: { id: 'ct1', freeEditEnabled: true, textTokens: [{ id: 'k1' }, { id: 'k2' }] },
 };
 
 const BARE: Product = {
@@ -107,7 +109,7 @@ function open() {
       'products/[id]/edit': stub,
       'products/[id]/images': stub,
       'products/[id]/options': stub,
-      'products/[id]/custom-template': stub,
+      'products/[id]/customization': stub,
     },
     {
       initialUrl: '/products/7',
@@ -147,7 +149,7 @@ describe('ProductDetailScreen', () => {
     ).toBeTruthy();
     expect(screen.getByRole('button', { name: '이미지 관리, 5장' })).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: '커스텀 문구, 문구 슬롯 2개, 사용 중' }),
+      screen.getByRole('button', { name: '커스텀 방식, 문구 자리 2개 · 자유 편집 켬, 슬롯형' }),
     ).toBeTruthy();
   });
 
@@ -160,20 +162,45 @@ describe('ProductDetailScreen', () => {
     expect(screen.getByText('즉시 제작')).toBeTruthy();
     expect(screen.getByRole('button', { name: /^옵션 그룹 추가/ })).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: '커스텀 문구, 등록하지 않았어요, 사용 안 함' }),
+      screen.getByRole('button', { name: '커스텀 방식, 구매자는 옵션만 고르고 주문해요, 없음' }),
     ).toBeTruthy();
   });
 
-  it.each(['NONE', 'THREE_D'] as const)(
-    '템플릿이 있어도 커스텀 방식이 %s일 때는 사용 안 함이다',
-    async (customMode) => {
-      server.use(detailOk({ ...PRODUCT, customMode }));
-      await open();
-      expect(
-        await screen.findByRole('button', { name: '커스텀 문구, 문구 슬롯 2개, 사용 안 함' }),
-      ).toBeTruthy();
-    },
-  );
+  it.each<[string, Partial<Product>, string]>([
+    [
+      '3D는 3D 항목 옵션 그룹을 요약한다',
+      {
+        customMode: 'THREE_D',
+        optionGroups: [
+          { ...PRODUCT.optionGroups[0]!, threeDCategory: 'SIZE' },
+          { ...PRODUCT.optionGroups[0]!, id: 'g2', threeDCategory: 'SHAPE' },
+          { ...PRODUCT.optionGroups[0]!, id: 'g3', isActive: false, threeDCategory: 'FLAVOR' },
+        ],
+      },
+      '커스텀 방식, 3D 항목 옵션: 크기·모양, 3D',
+    ],
+    [
+      '지금 방식에 준비 이슈가 있으면 주문이 거절된다고 알린다',
+      {
+        customReadiness: [
+          {
+            mode: 'SLOT',
+            issues: [{ code: 'SLOT_NOTHING_TO_EDIT', message: '문구 자리가 없어요' }],
+          },
+        ],
+      },
+      '커스텀 방식, 지금 상태로는 구매자 주문이 거절돼요, 슬롯형',
+    ],
+    [
+      '모르는 방식은 확인 필요로 그린다',
+      { customMode: 'STICKER' as Product['customMode'] },
+      '커스텀 방식, 앱을 최신 버전으로 업데이트하면 볼 수 있어요, 확인 필요',
+    ],
+  ])('%s', async (_, patch, name) => {
+    server.use(detailOk({ ...PRODUCT, ...patch }));
+    await open();
+    expect(await screen.findByRole('button', { name })).toBeTruthy();
+  });
 
   it('썸네일을 누르면 그 장을 고른다', async () => {
     server.use(detailOk());
@@ -188,7 +215,7 @@ describe('ProductDetailScreen', () => {
     ['수정', '/products/7/edit'],
     ['편집 ›', '/products/7/options'],
     ['이미지 관리, 5장', '/products/7/images'],
-    ['커스텀 문구, 문구 슬롯 2개, 사용 중', '/products/7/custom-template'],
+    ['커스텀 방식, 문구 자리 2개 · 자유 편집 켬, 슬롯형', '/products/7/customization'],
   ])('"%s"는 %s로 간다', async (name, path) => {
     server.use(detailOk());
     const router = open();

@@ -4,13 +4,16 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import Sortable from 'react-native-sortables';
 
+import { customCatalogQueryOptions } from '@/features/custom';
 import { type SellerProductManageQuery } from '@/graphql/generated/graphql';
 import { messageFor } from '@/shared/api';
 import { colors, shadow } from '@/shared/config/tokens';
+import { cn } from '@/shared/lib/cn';
 import {
   ConfirmSheet,
   ImageDropzone,
   RemoteImage,
+  Segmented,
   showToast,
   Switch,
   TextField,
@@ -25,8 +28,12 @@ import {
 } from '../api/manage';
 import { productsKeys } from '../api/queryKeys';
 import { toDigits } from '../model/draft-form';
-import { pickImages, uploadProductImage } from '../model/draft-images';
+import { pickSquareImage, uploadProductImage } from '../model/draft-images';
 import {
+  ALIGN_ITEMS,
+  cleanText,
+  codePoints,
+  isHexColor,
   newSlot,
   type Rect,
   type Slot,
@@ -53,6 +60,7 @@ export function ProductCustomTemplateScreen() {
 interface Saved {
   templateId: string | null;
   baseImageUrl: string | null;
+  freeEditEnabled: boolean;
   slots: Slot[];
 }
 
@@ -65,12 +73,15 @@ const BASE_SIDE = 285;
 /** 베이스 이미지 위 슬롯 박스 + 슬롯 카드. '저장'이 템플릿 1회 + 바뀐 슬롯만 보낸다 */
 function TemplateBody({ product }: { product: Product }) {
   const queryClient = useQueryClient();
+  const presets = useQuery(customCatalogQueryOptions()).data?.textColorPresets ?? [];
   const [saved, setSaved] = useState<Saved>(() => ({
     templateId: product.customTemplate?.id ?? null,
     baseImageUrl: product.customTemplate?.baseImageUrl ?? null,
+    freeEditEnabled: product.customTemplate?.freeEditEnabled ?? false,
     slots: toSlots(product.customTemplate?.textTokens ?? []),
   }));
   const [baseImageUrl, setBaseImageUrl] = useState(saved.baseImageUrl);
+  const [freeEditEnabled, setFreeEditEnabled] = useState(saved.freeEditEnabled);
   const [slots, setSlots] = useState(saved.slots);
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -84,7 +95,9 @@ function TemplateBody({ product }: { product: Product }) {
   const savedById = new Map(saved.slots.map((s) => [s.id, s]));
   const changed = slots.filter((s) => slotChanged(s, s.id ? savedById.get(s.id) : undefined));
   const templateDirty =
-    saved.templateId == null ? baseImageUrl != null : baseImageUrl !== saved.baseImageUrl;
+    saved.templateId == null
+      ? baseImageUrl != null
+      : baseImageUrl !== saved.baseImageUrl || freeEditEnabled !== saved.freeEditEnabled;
   const dirty =
     templateDirty ||
     deleted.length > 0 ||
@@ -100,10 +113,19 @@ function TemplateBody({ product }: { product: Product }) {
   );
   const patchSlot = (key: string, next: Partial<Slot>) =>
     setSlots((list) => list.map((s) => (s.key === key ? { ...s, ...next } : s)));
-  const label = (slot: Slot) => slot.tokenKey || `슬롯 ${slots.indexOf(slot) + 1}`;
+  const label = (slot: Slot) => slot.label.trim() || `슬롯 ${slots.indexOf(slot) + 1}`;
+  // 지운 자리의 키도 피한다 — 같은 저장에서 지운 자리를 되살리지 않게
+  const addSlot = () =>
+    setSlots((list) => [
+      ...list,
+      newSlot(
+        list.length,
+        [...list, ...saved.slots].map((s) => s.tokenKey),
+      ),
+    ]);
 
   const changeBase = async () => {
-    const [picked] = await pickImages(1);
+    const picked = await pickSquareImage();
     if (!picked) return;
     setUploading(true);
     try {
@@ -131,8 +153,8 @@ function TemplateBody({ product }: { product: Product }) {
     try {
       let templateId = next.templateId;
       if (templateId == null || templateDirty) {
-        templateId = await upsertCustomTemplate(product.id, baseImageUrl);
-        commit({ templateId, baseImageUrl });
+        templateId = await upsertCustomTemplate(product.id, baseImageUrl, freeEditEnabled);
+        commit({ templateId, baseImageUrl, freeEditEnabled });
       }
       for (const slot of deleted) {
         await deleteTextToken(slot.id!);
@@ -238,6 +260,27 @@ function TemplateBody({ product }: { product: Product }) {
             ) : null}
           </View>
         )}
+        <Text className="mt-1.5 text-center font-sans text-xs tracking-tight text-muted">
+          {TEMPLATE_COPY.squareHint}
+        </Text>
+
+        <View style={shadow.native.card} className="mt-5 rounded-xl bg-surface px-4 py-2.5">
+          <View className="min-h-9 flex-row items-center gap-3">
+            <View className="flex-1">
+              <Text className="font-sans text-md font-medium tracking-tight text-text">
+                {TEMPLATE_COPY.freeEdit}
+              </Text>
+              <Text className="mt-0.5 font-sans text-xs tracking-tight text-muted">
+                {TEMPLATE_COPY.freeEditDescription}
+              </Text>
+            </View>
+            <Switch
+              value={freeEditEnabled}
+              onValueChange={setFreeEditEnabled}
+              accessibilityLabel={TEMPLATE_COPY.freeEdit}
+            />
+          </View>
+        </View>
 
         <View className="flex-row items-baseline pb-2.5 pt-6">
           <Text className="font-sans text-lg font-bold tracking-tight text-text2">
@@ -254,6 +297,7 @@ function TemplateBody({ product }: { product: Product }) {
             <SlotCard
               slot={item}
               label={label(item)}
+              presets={presets}
               errors={showErrors ? errors[item.key] : undefined}
               onChange={(next) => patchSlot(item.key, next)}
               onRemove={() => remove(item)}
@@ -265,7 +309,7 @@ function TemplateBody({ product }: { product: Product }) {
           accessibilityLabel="슬롯 추가"
           accessibilityState={{ disabled: !baseImageUrl }}
           disabled={!baseImageUrl}
-          onPress={() => setSlots((list) => [...list, newSlot(list.length)])}
+          onPress={addSlot}
           className="mt-4 h-12 items-center justify-center rounded-sm border border-dashed border-border"
         >
           <Text className="font-sans text-base tracking-tight text-border">
@@ -288,20 +332,23 @@ function TemplateBody({ product }: { product: Product }) {
   );
 }
 
-/** .pcard: 치환 키·최대 글자 수 2열, 기본 문구, 필수 입력 스위치 */
+/** .pcard: 표시 이름·최대 글자 수 2열, 기본 문구, 글자색·정렬, 필수 입력 스위치 */
 function SlotCard({
   slot,
   label,
+  presets,
   errors,
   onChange,
   onRemove,
 }: {
   slot: Slot;
   label: string;
+  presets: readonly string[];
   errors?: ReturnType<typeof slotErrors>[string];
   onChange: (next: Partial<Slot>) => void;
   onRemove: () => void;
 }) {
+  const color = slot.textColor.toUpperCase();
   return (
     <View style={shadow.native.card} className="rounded-xl bg-surface p-4">
       <View className="mb-2 flex-row items-center justify-between">
@@ -319,36 +366,80 @@ function SlotCard({
       <View className="flex-row gap-2.5">
         <TextField
           className="flex-1"
-          sublabel="치환 키"
-          accessibilityLabel={`${label} 치환 키`}
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder="name"
-          value={slot.tokenKey}
-          onChangeText={(tokenKey) => onChange({ tokenKey })}
-          error={errors?.tokenKey}
+          sublabel="표시 이름"
+          accessibilityLabel={`${label} 표시 이름`}
+          placeholder="예) 받는 사람"
+          value={slot.label}
+          onChangeText={(text) => onChange({ label: text })}
+          error={errors?.label}
         />
         <TextField
-          className="flex-1"
+          className="w-[120px]"
           sublabel="최대 글자 수"
           accessibilityLabel={`${label} 최대 글자 수`}
           keyboardType="number-pad"
           alignRight
           suffix="자"
           value={slot.maxLength}
-          onChangeText={(t) => onChange({ maxLength: toDigits(t).slice(0, 4) })}
+          onChangeText={(t) => onChange({ maxLength: toDigits(t).slice(0, 2) })}
           error={errors?.maxLength}
         />
       </View>
       <TextField
         className="mt-3"
-        sublabel="기본 문구"
+        sublabel={`기본 문구 · ${codePoints(cleanText(slot.defaultText))}/${slot.maxLength || 0}자`}
         accessibilityLabel={`${label} 기본 문구`}
-        placeholder="구매자가 입력하지 않으면 쓰는 문구"
-        maxLength={200}
+        placeholder="구매자가 바꾸지 않으면 그대로 쓰는 문구"
+        multiline
         value={slot.defaultText}
         onChangeText={(defaultText) => onChange({ defaultText })}
         error={errors?.defaultText}
+      />
+      <Text className="mb-2 mt-3 font-sans text-sm tracking-tight text-sublabel">글자색</Text>
+      <View className="flex-row flex-wrap gap-2">
+        {presets.map((hex) => (
+          <Pressable
+            key={hex}
+            accessibilityRole="button"
+            accessibilityLabel={`${label} 글자색 ${hex}`}
+            accessibilityState={{ selected: hex === color }}
+            onPress={() => onChange({ textColor: hex })}
+            hitSlop={4}
+            className={cn(
+              'h-8 w-8 items-center justify-center rounded-full border-2',
+              hex === color ? 'border-primary' : 'border-surface',
+            )}
+          >
+            <View
+              style={{ backgroundColor: hex }}
+              className="h-6 w-6 rounded-full border border-line"
+            />
+          </Pressable>
+        ))}
+      </View>
+      <View className="mt-2 flex-row items-start gap-2.5">
+        <View
+          style={isHexColor(slot.textColor) ? { backgroundColor: slot.textColor } : undefined}
+          className="mt-3 h-6 w-6 rounded-full border border-line"
+        />
+        <TextField
+          className="flex-1"
+          accessibilityLabel={`${label} 글자색 코드`}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          placeholder="#RRGGBB"
+          maxLength={7}
+          value={slot.textColor}
+          onChangeText={(textColor) => onChange({ textColor })}
+          error={errors?.textColor}
+        />
+      </View>
+      <Text className="mb-2 mt-3 font-sans text-sm tracking-tight text-sublabel">정렬</Text>
+      <Segmented
+        items={ALIGN_ITEMS}
+        value={slot.textAlign}
+        onChange={(textAlign) => onChange({ textAlign })}
+        accessibilityLabel={`${label} 정렬`}
       />
       <View className="mt-2 min-h-[30px] flex-row items-center justify-between">
         <Text className="font-sans text-base tracking-tight text-muted">필수 입력</Text>

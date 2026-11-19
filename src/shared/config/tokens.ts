@@ -31,6 +31,7 @@ export const colors = {
   text2: '#2E2E2E',
   text3: '#2D2A32',
   ink: '#000000',
+  slotTextDefault: '#000000', // 새 문구 자리 글자색 — 서버 기본값과 같아야 해 UI 색과 떼어 둔다
   label: '#555555',
   sublabel: '#6A6A6B',
   muted: '#8E8E8E',

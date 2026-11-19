@@ -30,7 +30,7 @@ app/                       expo-router 파일 라우트. 얇게. spec 금지(typ
     (tabs)/                홈·주문·상품·채팅·매장 (탭 안에 Stack을 두지 않습니다)
     orders/·products/·chats/·store/·settings/   상세 화면은 루트 Stack에 둡니다
 src/
-  features/<area>/         auth·home·orders·products·chats·store·reviews·settings·push·uploads
+  features/<area>/         auth·home·orders·products·custom·chats·store·reviews·settings·push·uploads
     api/                   graphql() 문서 + 쿼리 키·queryOptions 팩토리
     model/                 zustand 스토어·zod 스키마·순수 로직
     ui/                    화면 조립 컴포넌트와 부품
@@ -78,6 +78,7 @@ src/
   - 실패는 `ApiError`입니다: 빈 파일·5MB 초과는 `BAD_USER_INPUT`, PUT 연결 실패는 `NETWORK`, PUT 비2xx는 그 status를 담은 `INTERNAL_SERVER_ERROR`.
   - 여러 장은 장마다 따로 올립니다. 실패한 장만 '다시 올리기'가 뜨고, 초안 이미지는 재시도용 원본(`source`)을 들고 있습니다. 올리는 사이 지운 이미지에는 결과를 반영하지 않습니다.
   - 상품 이미지 상한은 6장(`MAX_IMAGES`, BE `MAX_PRODUCT_IMAGES`와 같음, D46)입니다.
+  - 슬롯형 바탕은 `PickedImage.crop`(가운데 정사각)을 먼저 자르고 그 크기로 축소합니다(D62).
 - **여러 mutation을 잇는 저장**은 부분 실패를 전제로 합니다. 호출 하나가 성공할 때마다 진행을 기록하고, 다시 시도하면 끝난 호출을 건너뜁니다.
   - 상품 등록(`runCreateChain`): 숨김 상태로 생성 → 이미지 2장째부터 추가 → 카테고리 → 태그 → 옵션 그룹·아이템 → 노출. 진행(`SubmitProgress`)에 productId·추가한 이미지 수·그룹/아이템 key별 서버 id를 남깁니다. 마지막에 노출하므로 중간에 멈춘 상품은 구매자에게 보이지 않고, 포기하면 만든 상품을 지웁니다(`abandonCreate`).
   - 상품 수정(`pendingSteps`): 정보·카테고리·태그 단계마다 성공한 값을 기준값에 반영하고, 실패하면 남은 차이부터 다시 계산합니다. 토스트에 멈춘 단계를 함께 알립니다.
@@ -128,6 +129,7 @@ src/
 - **접근성 기본**: 터치 타깃 44pt(`size.touchTarget`), 아이콘 버튼에는 `accessibilityLabel`. 안전 영역은 `useSafeAreaInsets`.
 - **문구**는 한국어이며 feature별 상수 1곳에 둡니다. 조사는 `shared/lib/josa.ts`.
 - **원격 이미지는 `expo-image`**(D51)로 그립니다. S3 직접 URL이고 CDN이 없어 디스크 캐시가 필요하므로 공용 `RemoteImage`(`shared/ui`, `cachePolicy="memory-disk"`)를 거치고, RN `Image`는 번들 로고 PNG에만 씁니다.
+- **슬롯 문구 렌더**는 `products/model/slot-layout.ts`가 정본입니다(D61). 구매자 합성 이미지가 같은 규칙을 따르므로 글꼴·줄 높이·크기 탐색을 바꾸면 구매자 쪽과 함께 바꿉니다. 줄 폭 측정은 주입받아 글꼴 엔진과 떨어뜨립니다.
 - 월 달력은 자체 `MonthCalendar`(`shared/ui`), 시간 선택은 `@react-native-community/datetimepicker`(`TimeRow`), 드래그 정렬은 `react-native-sortables`입니다. `react-native-calendars`는 쓰지 않아 뺐습니다(D50).
 
 ## 7. 테스트

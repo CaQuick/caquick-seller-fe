@@ -1,4 +1,5 @@
 import { chatsKeys } from '@/features/chats';
+import { customKeys } from '@/features/custom';
 import { homeKeys } from '@/features/home';
 import { ordersKeys } from '@/features/orders';
 import { productsKeys } from '@/features/products';
@@ -13,6 +14,7 @@ describe('쿼리 키', () => {
   it.each<[string, readonly unknown[], readonly unknown[]]>([
     ['chats.conversations', chatsKeys.conversations(), ['chats', 'conversations']],
     ['chats.messages', chatsKeys.messages('c1'), ['chats', 'messages', 'c1']],
+    ['custom.catalog', customKeys.catalog(), ['custom', 'catalog']],
     ['home.dashboard(오늘)', homeKeys.dashboard(), ['home', 'dashboard', 'today']],
     ['home.dashboard(날짜)', homeKeys.dashboard('2026-10-06'), ['home', 'dashboard', '2026-10-06']],
     ['orders.list', ordersKeys.list({ status: 'PAID' }), ['orders', 'list', { status: 'PAID' }]],

@@ -35,6 +35,7 @@ const PRODUCT: SellerProductDetailQuery['sellerProduct'] = {
   tags: [{ id: 't1', name: '눈' }],
   optionGroups: [],
   customMode: 'NONE',
+  customReadiness: [],
   customTemplate: null,
 };
 

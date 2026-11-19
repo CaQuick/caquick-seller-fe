@@ -61,13 +61,22 @@ const SellerProductDetailDocument = graphql(`
         minSelect
         maxSelect
         isActive
+        threeDCategory
         optionItems {
           id
         }
       }
       customMode
+      customReadiness {
+        mode
+        issues {
+          code
+          message
+        }
+      }
       customTemplate {
         id
+        freeEditEnabled
         textTokens {
           id
         }
