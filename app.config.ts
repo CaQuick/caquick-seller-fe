@@ -19,6 +19,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   owner: 'caquick',
   version: '1.0.0',
   scheme: 'caquickseller',
+  // react-dom(R3F의 peer)이 깔려 있으면 Expo가 web도 대상으로 잡아 `expo export --platform all`이 웹 번들에서 실패한다
+  platforms: ['ios', 'android'],
   orientation: 'portrait',
   userInterfaceStyle: 'light',
   icon: './assets/icon.png',
