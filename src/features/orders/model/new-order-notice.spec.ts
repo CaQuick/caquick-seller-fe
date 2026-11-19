@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { toast } from 'sonner-native';
 
-import { notifyNewOrder, notifyOrder } from './new-order-notice';
+import { newOrderSummary, notifyNewOrder, notifyOrder } from './new-order-notice';
 
 jest.mock('sonner-native', () => ({ toast: jest.fn() }));
 
@@ -67,5 +67,27 @@ describe('notifyOrder', () => {
     expect(notifyOrder('ORDER_CANCELED', 'm50', '주문 취소')).toBe(false);
     expect(notifyOrder('ORDER_CANCELED', 'm1', '주문 취소')).toBe(false);
     expect(notifyOrder('ORDER_CANCELED', 'm0', '주문 취소')).toBe(true);
+  });
+});
+
+describe('newOrderSummary', () => {
+  const submitted = '2026-11-19T01:00:00.000Z'; // KST 10:00
+  const at = (ms: number) => new Date(Date.parse(submitted) + ms).toISOString();
+  const H = 60 * 60 * 1000;
+
+  it.each([
+    ['마감까지 2시간 미만', at(2 * H - 1), ' · 11:59까지 확정'],
+    ['마감까지 정확히 2시간', at(2 * H), ' · 12:00까지 확정'],
+    ['마감까지 2시간 넘게', at(2 * H + 1), ''],
+    ['마감 없음', null, ''],
+  ])('%s', (_, confirmDeadlineAt, tail) => {
+    expect(
+      newOrderSummary({
+        productName: '딸기 케이크',
+        pickupAt: '2026-11-20T03:00:00.000Z',
+        confirmDeadlineAt,
+        updatedAt: submitted,
+      }),
+    ).toBe(`딸기 케이크 · 픽업 11/20 12:00${tail}`);
   });
 });

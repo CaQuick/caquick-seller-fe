@@ -153,6 +153,7 @@ export const SellerOrdersUpdatedDocument = graphql(`
       totalPrice
       productName
       hasCustom
+      confirmDeadlineAt
       updatedAt
     }
   }

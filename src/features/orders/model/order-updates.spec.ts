@@ -31,6 +31,7 @@ const update = (patch: Partial<OrderUpdate> = {}): OrderUpdate => ({
   totalPrice: 40000,
   productName: '케이크',
   hasCustom: true,
+  confirmDeadlineAt: null,
   updatedAt: '2026-10-06T00:00:00.000Z',
   ...patch,
 });

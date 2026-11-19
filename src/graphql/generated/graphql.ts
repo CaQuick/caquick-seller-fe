@@ -938,7 +938,7 @@ export type SellerOrderConversationsQuery = { sellerConversations: { hasMore: bo
 export type SellerOrdersUpdatedSubscriptionVariables = Exact<{ [key: string]: never; }>;
 
 
-export type SellerOrdersUpdatedSubscription = { sellerOrderUpdated: { kind: SellerOrderUpdateKind, orderId: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, productName: string, hasCustom: boolean, updatedAt: string } };
+export type SellerOrdersUpdatedSubscription = { sellerOrderUpdated: { kind: SellerOrderUpdateKind, orderId: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, productName: string, hasCustom: boolean, confirmDeadlineAt: string | null, updatedAt: string } };
 
 export type SellerProductsListQueryVariables = Exact<{
   input?: SellerProductListInput | null | undefined;
@@ -1763,6 +1763,7 @@ export const SellerOrdersUpdatedDocument = new TypedDocumentString(`
     totalPrice
     productName
     hasCustom
+    confirmDeadlineAt
     updatedAt
   }
 }
