@@ -243,31 +243,43 @@ describe('ProductCustomTemplateScreen', () => {
       nativeEvent: { lines: [{ width: 120 }, { width: 80 }] },
     });
     expect(screen.queryByText('생일 축하해')).toBeNull();
-    // 40px에서 200px → 폭 4000·높이 1000 상자에서 800(높이와 폭이 같이 정함), 한 변 285px
-    await fireEvent(measure, 'textLayout', { nativeEvent: { lines: [{ width: 200 }] } });
-    expect(screen.getByText('생일 축하해')).toHaveStyle({
+    // 미리보기 층은 테두리 안쪽이 아니라 크기를 맞춘 rect 상자(114×28.5) 그대로다
+    expect(screen.getByLabelText('이름 위치')).toHaveStyle({ borderWidth: 1.5 });
+    expect(screen.getByTestId('slot-preview-k1')).toHaveStyle({
+      left: -1.5,
+      top: -1.5,
+      right: -1.5,
+      bottom: -1.5,
+    });
+    // 40px에서 100px → 폭 4000·높이 1000 상자에서 높이가 800으로 정하고, 폭 2000을 가운데에(한 변 285px)
+    await fireEvent(measure, 'textLayout', { nativeEvent: { lines: [{ width: 100 }] } });
+    const line = screen.getByText('생일 축하해');
+    expect(line).toHaveStyle({
       fontSize: 22.8,
       lineHeight: 28.5,
+      left: 28.5,
       top: 0,
-      textAlign: 'center',
+      width: 570,
       color: '#1D1D1D',
       fontFamily: 'Pretendard',
       fontWeight: '700',
     });
+    // 잰 폭이 조금 어긋나도 말줄임으로 잘리지 않는다
+    expect(line.props.numberOfLines).toBeUndefined();
 
-    // 정렬은 줄마다 상자 폭 안에서, 색 코드가 틀린 동안은 기본 글자색으로 그린다
+    // 정렬은 줄마다 상자 폭 안에서(폭 6000·상자 8000), 색 코드가 틀린 동안은 기본 글자색으로 그린다
     await fireEvent(
       await screen.findByTestId('slot-measure-k2', { includeHiddenElements: true }),
       'textLayout',
-      { nativeEvent: { lines: [{ width: 400 }] } },
+      { nativeEvent: { lines: [{ width: 200 }] } },
     );
-    expect(screen.getByText('오늘도 행복한 하루 보내')).toHaveStyle({ textAlign: 'left' });
+    expect(screen.getByText('오늘도 행복한 하루 보내')).toHaveStyle({ left: 0, fontSize: 34.2 });
     await fireEvent.press(
       within(screen.getByLabelText('메시지 정렬')).getByRole('tab', { name: '오른쪽' }),
     );
     await fireEvent.changeText(screen.getByLabelText('메시지 글자색 코드'), '#12');
     const preview = screen.getByText('오늘도 행복한 하루 보내');
-    expect(preview).toHaveStyle({ textAlign: 'right' });
+    expect(preview).toHaveStyle({ left: 57 });
     expect(preview).not.toHaveStyle({ color: '#000000' });
   });
 

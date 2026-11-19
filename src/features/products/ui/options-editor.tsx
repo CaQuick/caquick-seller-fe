@@ -301,11 +301,8 @@ function GroupCard({
                 choices
                   ? {
                       label: keyLabel(item.threeDKey),
-                      // 3D 그룹의 켜진 선택지만 경고한다 — 키가 하나도 없는 그룹은 3D와 무관하다
-                      warn:
-                        !item.threeDKey &&
-                        item.isActive !== false &&
-                        group.items.some((x) => x.threeDKey),
+                      // 그룹 경고와 같은 기준 — 켜진 선택지에 키가 하나도 없으면 3D와 무관한 그룹이다
+                      warn: !item.threeDKey && item.isActive !== false && !!threeD?.unlinked,
                       onPress: () => handlers.editKey(group.key, item.key),
                     }
                   : undefined
@@ -472,6 +469,7 @@ function LiveItemRow({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`${item.title} 3D 항목 ${threeD.label ?? '미지정'}`}
+            accessibilityHint={threeD.warn ? '3D 그룹이라 3D 항목을 이어야 해요' : undefined}
             onPress={threeD.onPress}
             hitSlop={6}
             className={cn(

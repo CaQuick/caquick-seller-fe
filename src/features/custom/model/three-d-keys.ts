@@ -31,8 +31,8 @@ export interface KeyOption {
 }
 
 /**
- * itemKey 항목(새 항목이면 null)이 고를 수 있는 3D 키. 같은 그룹 다른 항목의 키가 카테고리를 정하고,
- * 그 항목들이 쓰는 키는 비활성이다. 퇴역한 키는 지금 연결된 것만 남긴다
+ * itemKey 항목(새 항목이면 null)이 고를 수 있는 3D 키. 카테고리는 서버 판정처럼 같은 그룹 다른 켜진 항목의 키가 정한다.
+ * 다른 항목이 쓰는 키는 비활성이고, 꺼진 항목의 키도 다시 켤 때 겹치지 않게 막는다. 퇴역한 키는 지금 연결된 것만 남긴다
  */
 export function keyOptions(
   choices: readonly ThreeDChoice[],
@@ -42,7 +42,9 @@ export function keyOptions(
   const byKey = new Map(choices.map((c) => [c.key, c]));
   const others = items.filter((i) => i.key !== itemKey);
   const category =
-    others.flatMap((i) => (i.threeDKey ? (byKey.get(i.threeDKey) ?? []) : []))[0]?.category ?? null;
+    others.flatMap((i) =>
+      i.threeDKey && i.isActive !== false ? (byKey.get(i.threeDKey) ?? []) : [],
+    )[0]?.category ?? null;
   const current = items.find((i) => i.key === itemKey)?.threeDKey ?? null;
   const used = new Set(others.flatMap((i) => i.threeDKey ?? []));
   const options = choices

@@ -33,6 +33,7 @@ export const OPTIONS_COPY = {
   section: '옵션 그룹',
   hint: '꺼진 옵션은 구매자에게 보이지 않아요. 그룹을 길게 눌러 순서를 바꿉니다',
   threeDGuide: '3D 상품이에요. 크기·맛·모양·디자인 옵션은 선택지마다 3D 항목을 이어 주세요',
+  catalogError: '3D 항목 목록을 불러오지 못했어요',
 } as const;
 
 /** 서버 id를 편집기 key로 쓴다 */

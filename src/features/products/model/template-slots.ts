@@ -107,8 +107,7 @@ export function newSlot(index: number, usedKeys: Iterable<string>): Slot {
     defaultText: '',
     maxLength: String(DEFAULT_MAX_LENGTH),
     isRequired: true,
-    // 서버가 새 자리에 두는 기본색과 같다
-    textColor: colors.ink,
+    textColor: colors.slotTextDefault,
     textAlign: 'CENTER',
     rect: defaultRect(index),
   };

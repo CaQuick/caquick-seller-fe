@@ -68,10 +68,19 @@ describe('keyOptions', () => {
       { category: null, keys: ['shape.heart', 'shape.circle', 'size.mini', 'flavor.choco'] },
     ],
     [
-      '꺼진 항목의 키도 비활성이다',
+      '꺼진 항목의 키는 카테고리를 정하지 않지만 다시 켤 때 겹치지 않게 비활성이다',
       [item('o1', 'flavor.choco', false), item('o2', null)],
       'o2',
-      { category: 'FLAVOR', keys: ['flavor.choco 사용 중'] },
+      {
+        category: null,
+        keys: ['shape.heart', 'shape.circle', 'size.mini', 'flavor.choco 사용 중'],
+      },
+    ],
+    [
+      '켜진 항목이 있으면 꺼진 항목과 다른 카테고리로 고정한다',
+      [item('o1', 'flavor.choco', false), item('o2', 'size.mini'), item('o3', null)],
+      'o3',
+      { category: 'SIZE', keys: ['size.mini 사용 중'] },
     ],
   ])('%s', (_, items, itemKey, expected) => {
     expect(view(keyOptions(CHOICES, items, itemKey))).toEqual(expected);

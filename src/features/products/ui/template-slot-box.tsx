@@ -24,6 +24,9 @@ interface Props {
   onDragging: (dragging: boolean) => void;
 }
 
+/** 점선 두께. absolute 자식은 테두리 안쪽에 놓여 바깥 rect 상자에 맞추려면 이만큼 밀어낸다 */
+const BORDER = 1.5;
+
 /** .products-slot: 점선 박스를 끌면 이동, 오른쪽 아래 모서리를 끌면 크기 조절. 좌표는 비율로 저장한다 */
 export function SlotBox({ slot, label, side, onRect, onDragging }: Props) {
   const { key } = slot;
@@ -48,11 +51,14 @@ export function SlotBox({ slot, label, side, onRect, onDragging }: Props) {
     <GestureDetector gesture={move}>
       <View
         accessibilityLabel={`${label} 위치`}
-        style={toPx(slot.rect, side)}
-        className="absolute rounded-badge border-[1.5px] border-dashed border-primary"
+        style={{ ...toPx(slot.rect, side), borderWidth: BORDER }}
+        className="absolute rounded-badge border-dashed border-primary"
       >
         <SlotTextPreview slot={slot} side={side} />
-        <View className="absolute -top-5 left-[-1.5px] h-[18px] justify-center rounded-xs bg-primary px-1.5">
+        <View
+          style={{ left: -BORDER }}
+          className="absolute -top-5 h-[18px] justify-center rounded-xs bg-primary px-1.5"
+        >
           <Text numberOfLines={1} className="font-sans text-2xs font-semibold text-surface">
             {label}
           </Text>
@@ -89,7 +95,11 @@ function SlotTextPreview({ slot, side }: { slot: Slot; side: number }) {
     : null;
   const k = side / SCALE;
   return (
-    <View pointerEvents="none" className="absolute inset-0">
+    <View
+      testID={`slot-preview-${slot.key}`}
+      pointerEvents="none"
+      style={{ position: 'absolute', left: -BORDER, top: -BORDER, right: -BORDER, bottom: -BORDER }}
+    >
       {/* 줄바꿈 없이 재도록 넓은 틀에 두고, 글자는 내용 폭만 차지한다. 화면 낭독에서도 숨긴다 */}
       <View aria-hidden style={{ position: 'absolute', width: MEASURE_SIZE * 100, opacity: 0 }}>
         <Text
@@ -103,20 +113,18 @@ function SlotTextPreview({ slot, side }: { slot: Slot; side: number }) {
           {text}
         </Text>
       </View>
+      {/* 비례로 늘린 폭은 실제와 조금 다를 수 있다 — 넓은 틀에 규칙의 x부터 그려 줄바꿈·말줄임이 생기지 않게 */}
       {layout?.lines.map((line, i) => (
         <Text
           key={i}
-          numberOfLines={1}
           style={{
             ...FONT,
             position: 'absolute',
-            left: 0,
-            right: 0,
+            left: (line.x - slot.rect.x) * k,
             top: (line.y - slot.rect.y) * k,
+            width: side * 2,
             fontSize: layout.fontSize * k,
             lineHeight: layout.lineHeight * k,
-            textAlign:
-              slot.textAlign === 'LEFT' ? 'left' : slot.textAlign === 'RIGHT' ? 'right' : 'center',
             color: isHexColor(slot.textColor) ? slot.textColor : undefined,
           }}
         >

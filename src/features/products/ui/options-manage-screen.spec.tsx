@@ -157,6 +157,7 @@ function open() {
 }
 
 const sheet = (id: string) => within(screen.getByTestId(id));
+const WARN_HINT = '3D 그룹이라 3D 항목을 이어야 해요';
 
 describe('ProductOptionsScreen', () => {
   beforeEach(() => {
@@ -362,9 +363,13 @@ describe('ProductOptionsScreen', () => {
       const calls = await open3d();
       expect(await screen.findByText('3D · 크기')).toBeTruthy();
       expect(screen.getByText('3D 항목 미지정 1개')).toBeTruthy();
-      expect(screen.getByRole('button', { name: '고구마 3D 항목 미지정' })).toBeTruthy();
+      expect(
+        screen.getByRole('button', { name: '고구마 3D 항목 미지정' }).props.accessibilityHint,
+      ).toBeUndefined();
+      const unlinked = screen.getByRole('button', { name: '1호 3D 항목 미지정' });
+      expect(unlinked.props.accessibilityHint).toBe(WARN_HINT);
 
-      await fireEvent.press(screen.getByRole('button', { name: '1호 3D 항목 미지정' }));
+      await fireEvent.press(unlinked);
       const keys = sheet('three-d-key-sheet');
       expect(keys.getByText('이 그룹은 크기 항목만 이을 수 있어요')).toBeTruthy();
       expect(keys.getByRole('button', { name: '도시락' })).toBeDisabled();
@@ -376,6 +381,50 @@ describe('ProductOptionsScreen', () => {
         ]),
       );
       await waitFor(() => expect(screen.queryByText('3D 항목 미지정 1개')).toBeNull());
+    });
+
+    it('꺼진 선택지만 키가 있는 그룹은 3D와 무관하게 보고 카테고리도 고정하지 않는다', async () => {
+      serve([], {
+        customMode: 'THREE_D',
+        groups: [
+          {
+            ...GROUPS[0]!,
+            optionItems: [
+              { ...item('o1', '0호', 0, false), threeDKey: 'size.mini' },
+              item('o2', '1호', 5000),
+            ],
+          },
+        ],
+      });
+      await open();
+      const chip = await screen.findByRole('button', { name: '1호 3D 항목 미지정' });
+      expect(chip.props.accessibilityHint).toBeUndefined();
+      expect(screen.queryByText('3D 항목 미지정 1개')).toBeNull();
+      expect(screen.queryByText('3D · 크기')).toBeNull();
+
+      await fireEvent.press(chip);
+      const keys = sheet('three-d-key-sheet');
+      expect(keys.queryByText('이 그룹은 크기 항목만 이을 수 있어요')).toBeNull();
+      expect(keys.getByRole('button', { name: '하트' })).toBeEnabled();
+      // 다시 켤 때 겹치지 않게 꺼진 선택지의 키는 막는다
+      expect(keys.getByRole('button', { name: '도시락' })).toBeDisabled();
+    });
+
+    it('3D 항목 목록을 못 받으면 편집기 대신 다시 시도를 보이고, 받으면 3D 칸을 그린다', async () => {
+      serve([], { customMode: 'THREE_D', groups: THREE_D_GROUPS });
+      server.use(
+        graphql.query('SellerCustomCatalog', () => HttpResponse.json({ errors: [FAIL] }), {
+          once: true,
+        }),
+      );
+      await open();
+      expect(await screen.findByText(OPTIONS_COPY.catalogError)).toBeTruthy();
+      expect(screen.getByText(OPTIONS_COPY.threeDGuide)).toBeTruthy();
+      expect(screen.queryByRole('button', { name: '케이크 맛에 옵션 추가' })).toBeNull();
+
+      await fireEvent.press(screen.getByRole('button', { name: '다시 시도' }));
+      expect(await screen.findByText('3D · 크기')).toBeTruthy();
+      expect(screen.getByRole('button', { name: '케이크 맛에 옵션 추가' })).toBeTruthy();
     });
 
     it('연결을 끊으면 키를 null로 보낸다', async () => {
