@@ -3,8 +3,10 @@ import { groupThreeD, keyOptions, type ThreeDChoice, threeDCategoryLabel } from 
 const choice = (key: string, category: ThreeDChoice['category'], selectable = true) => ({
   key,
   category,
+  value: key.split('.')[1]!,
   label: key,
   defaultPriceDelta: 0,
+  renderScale: null,
   selectable,
 });
 const CHOICES: ThreeDChoice[] = [

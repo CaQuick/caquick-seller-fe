@@ -38,6 +38,22 @@ const SellerOrdersListDocument = graphql(`
   }
 `);
 
+graphql(`
+  fragment SellerOrderThreeDItemFields on ThreeDDesignItem {
+    kind
+    x
+    y
+    size
+    effect {
+      type
+      intensity
+    }
+    text
+    color
+    decoId
+  }
+`);
+
 const SellerOrderDetailDocument = graphql(`
   query SellerOrderDetail($orderId: ID!) {
     sellerOrder(orderId: $orderId) {
@@ -77,15 +93,43 @@ const SellerOrderDetailDocument = graphql(`
           optionTitle
           priceDelta
         }
+        customMode
+        customPreviewImageUrl
+        customBaseImageUrl
+        customImages {
+          id
+          kind
+          imageUrl
+        }
+        threeDDesign {
+          schemaVersion
+          basic {
+            shape
+            size
+            design
+            flavor
+            sheetColor
+          }
+          top {
+            ...SellerOrderThreeDItemFields
+          }
+          side {
+            ...SellerOrderThreeDItemFields
+          }
+        }
         customTexts {
           id
-          tokenKey
+          label
           defaultText
           valueText
           sortOrder
         }
         freeEdits {
           id
+          posX
+          posY
+          width
+          height
           descriptionText
           sortOrder
           attachments {

@@ -103,3 +103,15 @@ jest.mock('expo-location', () => ({
     Promise.resolve({ coords: { latitude: 37.5326, longitude: 126.6406 }, timestamp: 0 }),
   ),
 }));
+
+/**
+ * Skia: CanvasKit을 올린 환경(@jest-environment ./src/test/skia-environment.js)에서는 실제로 그리고,
+ * 그 밖에서는 API 껍데기만 있다. Canvas는 View로 그려지고 useFonts는 글꼴을 주지 않는다
+ */
+jest.mock('@shopify/react-native-skia', () =>
+  jest
+    .requireActual<{
+      Mock: (canvasKit: unknown) => object;
+    }>('@shopify/react-native-skia/lib/commonjs/mock')
+    .Mock((globalThis as { CanvasKit?: unknown }).CanvasKit),
+);

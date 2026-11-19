@@ -66,7 +66,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-updates',
     [
       'expo-image-picker',
-      { photosPermission: '상품·매장 사진을 올리기 위해 사진 보관함에 접근합니다.' },
+      { photosPermission: '상품·매장·채팅 사진을 올리기 위해 사진 보관함에 접근합니다.' },
     ],
     [
       'expo-location',

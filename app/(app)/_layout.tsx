@@ -24,7 +24,8 @@ export default function AppLayout() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="orders/[id]" options={{ title: '주문 상세' }} />
+      <Stack.Screen name="orders/[id]/index" options={{ title: '주문 상세' }} />
+      <Stack.Screen name="orders/[id]/design" options={{ title: '3D 디자인' }} />
       <Stack.Screen name="products/new" options={{ headerShown: false }} />
       <Stack.Screen name="products/[id]/index" options={{ title: '상품 상세' }} />
       <Stack.Screen name="products/[id]/edit" options={{ title: '상품 수정' }} />

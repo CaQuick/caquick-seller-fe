@@ -107,6 +107,24 @@ export type CursorInput = {
   limit?: number | null | undefined;
 };
 
+/**
+ * 주문 커스텀 이미지 종류. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다.
+ * 3D 옆면은 옆면 고도 asin(0.4) 정사영이고 좌·우는 정면을 보는 사람 기준이다.
+ */
+export type CustomImageKindType =
+  /** 슬롯형 합성 이미지(바탕 + 문구, 구매자가 본 그대로). 대표 이미지다. */
+  | 'SLOT_COMPOSITE'
+  /** 3D 옆면 뒤(정면 반대). */
+  | 'THREE_D_BACK'
+  /** 3D 옆면 정면(yaw 0). */
+  | 'THREE_D_FRONT'
+  /** 3D 옆면 왼쪽. */
+  | 'THREE_D_LEFT'
+  /** 3D 옆면 오른쪽. */
+  | 'THREE_D_RIGHT'
+  /** 3D 윗면(위에서 내려다본 정사각). 대표 이미지다. */
+  | 'THREE_D_TOP';
+
 /** 상품의 커스텀 방식. 방식이 있는 상품은 구매자가 꾸민 내용 없이 주문할 수 없다. */
 export type CustomModeType =
   /** 커스텀 없음. 옵션만 고르고 주문한다. */
@@ -828,6 +846,13 @@ export type StoreReviewsInput = {
   storeId: string | number;
 };
 
+/** 3D 디자인 항목 종류. 값은 늘어날 수 있으니 모르는 값을 받아도 화면이 죽지 않게 처리한다. */
+export type ThreeDItemKindType =
+  /** 꾸미기 이미지. */
+  | 'DECO'
+  /** 글자. */
+  | 'TEXT';
+
 /** 3D 옵션 카테고리. 옵션 항목의 threeDKey가 가리키는 카탈로그 선택지의 종류다. */
 export type ThreeDOptionCategoryType =
   /** 시트 디자인. 고르지 않으면 장식 없는 시트로 그린다. */
@@ -910,7 +935,7 @@ export type SellerChatsBuyerLatestOrderQuery = { sellerOrderList: { items: Array
 export type SellerCustomCatalogQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type SellerCustomCatalogQuery = { customThreeDCatalog: { revision: number, textColorPresets: Array<string>, optionChoices: Array<{ key: string, category: ThreeDOptionCategoryType, label: string, defaultPriceDelta: number, selectable: boolean }> } };
+export type SellerCustomCatalogQuery = { customThreeDCatalog: { revision: number, textColorPresets: Array<string>, optionChoices: Array<{ key: string, category: ThreeDOptionCategoryType, value: string, label: string, defaultPriceDelta: number, renderScale: number | null, selectable: boolean }>, sheetColors: Array<{ key: string, hex: string }>, decos: Array<{ key: string, label: string, imageUrl: string }> } };
 
 export type SellerHomeStoreQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -941,12 +966,14 @@ export type SellerOrdersListQueryVariables = Exact<{
 
 export type SellerOrdersListQuery = { sellerOrderList: { totalCount: number, hasMore: boolean, nextCursor: string | null, items: Array<{ id: string, orderNumber: string, status: OrderStatusType, pickupAt: string, buyerName: string, totalPrice: number, firstItemName: string | null, firstItemImageUrl: string | null, firstItemCustomImageUrl: string | null, hasCustom: boolean }> } };
 
+export type SellerOrderThreeDItemFieldsFragment = { kind: ThreeDItemKindType, x: number, y: number, size: number, text: string | null, color: string | null, decoId: string | null, effect: { type: string, intensity: number } };
+
 export type SellerOrderDetailQueryVariables = Exact<{
   orderId: string | number;
 }>;
 
 
-export type SellerOrderDetailQuery = { sellerOrder: { id: string, orderNumber: string, accountId: string, status: OrderStatusType, pickupAt: string, buyerName: string, buyerPhone: string, requestNote: string | null, paymentMethod: PaymentMethodType | null, subtotalPrice: number, discountPrice: number, totalPrice: number, submittedAt: string | null, confirmedAt: string | null, madeAt: string | null, pickedUpAt: string | null, canceledAt: string | null, noShowAt: string | null, confirmDeadlineAt: string | null, autoPickupAt: string | null, canMarkNoShow: boolean, commissionRateBps: number, expectedPayoutAmount: number | null, settlementBaseAmount: number | null, createdAt: string, updatedAt: string, items: Array<{ id: string, productName: string, quantity: number, optionItems: Array<{ id: string, groupName: string, optionTitle: string, priceDelta: number }>, customTexts: Array<{ id: string, tokenKey: string, defaultText: string, valueText: string | null, sortOrder: number }>, freeEdits: Array<{ id: string, descriptionText: string, sortOrder: number, attachments: Array<{ id: string, imageUrl: string, sortOrder: number }> }> }>, statusHistories: Array<{ id: string, toStatus: OrderStatusType, changedAt: string, note: string | null }>, cancellation: { actorType: OrderActorType, reasonLabel: string, refundAmount: number, refundStatus: RefundStatusType | null } | null, pickupChanges: Array<{ id: string, fromPickupAt: string, toPickupAt: string, changedAt: string, note: string | null }> } };
+export type SellerOrderDetailQuery = { sellerOrder: { id: string, orderNumber: string, accountId: string, status: OrderStatusType, pickupAt: string, buyerName: string, buyerPhone: string, requestNote: string | null, paymentMethod: PaymentMethodType | null, subtotalPrice: number, discountPrice: number, totalPrice: number, submittedAt: string | null, confirmedAt: string | null, madeAt: string | null, pickedUpAt: string | null, canceledAt: string | null, noShowAt: string | null, confirmDeadlineAt: string | null, autoPickupAt: string | null, canMarkNoShow: boolean, commissionRateBps: number, expectedPayoutAmount: number | null, settlementBaseAmount: number | null, createdAt: string, updatedAt: string, items: Array<{ id: string, productName: string, quantity: number, customMode: CustomModeType, customPreviewImageUrl: string | null, customBaseImageUrl: string | null, optionItems: Array<{ id: string, groupName: string, optionTitle: string, priceDelta: number }>, customImages: Array<{ id: string, kind: CustomImageKindType, imageUrl: string }>, threeDDesign: { schemaVersion: number, basic: { shape: string, size: string, design: string | null, flavor: string | null, sheetColor: string }, top: Array<{ kind: ThreeDItemKindType, x: number, y: number, size: number, text: string | null, color: string | null, decoId: string | null, effect: { type: string, intensity: number } }>, side: Array<{ kind: ThreeDItemKindType, x: number, y: number, size: number, text: string | null, color: string | null, decoId: string | null, effect: { type: string, intensity: number } }> } | null, customTexts: Array<{ id: string, label: string, defaultText: string, valueText: string | null, sortOrder: number }>, freeEdits: Array<{ id: string, posX: number, posY: number, width: number, height: number, descriptionText: string, sortOrder: number, attachments: Array<{ id: string, imageUrl: string, sortOrder: number }> }> }>, statusHistories: Array<{ id: string, toStatus: OrderStatusType, changedAt: string, note: string | null }>, cancellation: { actorType: OrderActorType, reasonLabel: string, refundAmount: number, refundStatus: RefundStatusType | null } | null, pickupChanges: Array<{ id: string, fromPickupAt: string, toPickupAt: string, changedAt: string, note: string | null }> } };
 
 export type SellerUpdateOrderStatusMutationVariables = Exact<{
   input: SellerUpdateOrderStatusInput;
@@ -1488,6 +1515,21 @@ export class TypedDocumentString<TResult, TVariables>
     return this.value;
   }
 }
+export const SellerOrderThreeDItemFieldsFragmentDoc = new TypedDocumentString(`
+    fragment SellerOrderThreeDItemFields on ThreeDDesignItem {
+  kind
+  x
+  y
+  size
+  effect {
+    type
+    intensity
+  }
+  text
+  color
+  decoId
+}
+    `, {"fragmentName":"SellerOrderThreeDItemFields"}) as unknown as TypedDocumentString<SellerOrderThreeDItemFieldsFragment, unknown>;
 export const SellerReviewMediaFieldsFragmentDoc = new TypedDocumentString(`
     fragment SellerReviewMediaFields on ReviewMedia {
   mediaType
@@ -1659,9 +1701,20 @@ export const SellerCustomCatalogDocument = new TypedDocumentString(`
     optionChoices {
       key
       category
+      value
       label
       defaultPriceDelta
+      renderScale
       selectable
+    }
+    sheetColors {
+      key
+      hex
+    }
+    decos {
+      key
+      label
+      imageUrl
     }
     textColorPresets
   }
@@ -1778,15 +1831,43 @@ export const SellerOrderDetailDocument = new TypedDocumentString(`
         optionTitle
         priceDelta
       }
+      customMode
+      customPreviewImageUrl
+      customBaseImageUrl
+      customImages {
+        id
+        kind
+        imageUrl
+      }
+      threeDDesign {
+        schemaVersion
+        basic {
+          shape
+          size
+          design
+          flavor
+          sheetColor
+        }
+        top {
+          ...SellerOrderThreeDItemFields
+        }
+        side {
+          ...SellerOrderThreeDItemFields
+        }
+      }
       customTexts {
         id
-        tokenKey
+        label
         defaultText
         valueText
         sortOrder
       }
       freeEdits {
         id
+        posX
+        posY
+        width
+        height
         descriptionText
         sortOrder
         attachments {
@@ -1817,7 +1898,19 @@ export const SellerOrderDetailDocument = new TypedDocumentString(`
     }
   }
 }
-    `) as unknown as TypedDocumentString<SellerOrderDetailQuery, SellerOrderDetailQueryVariables>;
+    fragment SellerOrderThreeDItemFields on ThreeDDesignItem {
+  kind
+  x
+  y
+  size
+  effect {
+    type
+    intensity
+  }
+  text
+  color
+  decoId
+}`) as unknown as TypedDocumentString<SellerOrderDetailQuery, SellerOrderDetailQueryVariables>;
 export const SellerUpdateOrderStatusDocument = new TypedDocumentString(`
     mutation SellerUpdateOrderStatus($input: SellerUpdateOrderStatusInput!) {
   sellerUpdateOrderStatus(input: $input) {

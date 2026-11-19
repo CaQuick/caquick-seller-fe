@@ -273,6 +273,11 @@ describe('paymentBreakdown', () => {
       productName: '케이크',
       quantity,
       optionItems: deltas.map(option),
+      customMode: 'NONE' as const,
+      customPreviewImageUrl: null,
+      customBaseImageUrl: null,
+      customImages: [],
+      threeDDesign: null,
       customTexts: [],
       freeEdits: [],
     });

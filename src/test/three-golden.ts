@@ -10,8 +10,8 @@ export const GOLDEN_REF = '9ac455f';
 export const GOLDEN_FIXTURE = 'src/features/custom/model/three/__fixtures__/three-golden.json';
 export const GOLDEN_TOLERANCE = 1e-9;
 
-/** 형상 계산이 타는 패키지. 구매자 lock과 같은 버전이어야 같은 모양이 나온다 */
-export const PINNED_PACKAGES = ['three', 'polygon-clipping'] as const;
+/** 구매자 lock과 같은 버전이어야 하는 패키지. three·polygon-clipping은 형상, R3F는 색 관리·톤 매핑 기본값이 같아야 같은 그림이 나온다 */
+export const PINNED_PACKAGES = ['three', 'polygon-clipping', '@react-three/fiber'] as const;
 
 export const installedVersions = (root: string) =>
   Object.fromEntries(

@@ -28,17 +28,19 @@ export interface DecalPixels {
   height: number;
 }
 
+/** 구매자 Canvas 2D처럼 ASCII 공백(\t\n\f\r)을 공백으로 바꾼 한 줄. 폭 측정과 래스터가 같은 문자열을 쓴다 */
+export const decalLabel = (text: string) => text.replace(/[\t\n\f\r]/g, ' ');
+
 /**
  * 아이템 텍스처의 픽셀 크기. 글자 박스는 좌우 0.3em 여백, 최소 2em이다.
- * measureText는 래스터와 같은 글꼴(700, TEXT_FONT_PX)로 잰 한 줄 폭이다.
- * 구매자 Canvas 2D처럼 ASCII 공백(\t\n\f\r)은 공백으로 재고 그린다(줄바꿈도 한 줄).
+ * measureText는 래스터와 같은 글꼴(700, TEXT_FONT_PX)로 잰 decalLabel의 폭이다.
  */
 export function decalPixelSize(
   item: DesignItem,
   measureText: (text: string) => number,
 ): DecalPixels {
   if (item.kind !== 'TEXT') return { width: DECO_CANVAS, height: DECO_CANVAS };
-  const box = Math.max(measureText(item.text) + TEXT_FONT_PX * 0.6, TEXT_FONT_PX * 2);
+  const box = Math.max(measureText(decalLabel(item.text)) + TEXT_FONT_PX * 0.6, TEXT_FONT_PX * 2);
   return {
     width: Math.ceil(box + DECAL_PAD * 2),
     height: Math.ceil(TEXT_FONT_PX * 1.25 + DECAL_PAD * 2),
