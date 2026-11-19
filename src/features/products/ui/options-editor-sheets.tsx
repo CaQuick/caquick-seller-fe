@@ -279,6 +279,8 @@ interface KeySheetProps {
     options: KeyOption[];
     category: ThreeDOptionCategoryType | null;
     isNew: boolean;
+    /** 항목에 저장된 키가 있다(카탈로그에 없거나 그룹과 종류가 달라 선택지에 안 보여도 끊을 수 있게) */
+    linked: boolean;
   } | null;
   onSelect: (choice: ThreeDChoice) => void;
   /** 이어진 키를 끊는다(기존 항목) */
@@ -292,7 +294,6 @@ export function ThreeDKeySheet({ ref, target, onSelect, onUnlink, onManual }: Ke
   const close = () => ref.current?.dismiss();
   const options = target?.options ?? [];
   const categories = [...new Set(options.map((o) => o.choice.category))];
-  const linked = options.some((o) => o.selected);
   return (
     <AppBottomSheet ref={ref} title="3D 항목">
       <View testID="three-d-key-sheet">
@@ -328,7 +329,7 @@ export function ThreeDKeySheet({ ref, target, onSelect, onUnlink, onManual }: Ke
             </View>
           </View>
         ))}
-        {target?.isNew || linked ? (
+        {target?.isNew || target?.linked ? (
           <Button
             title={target?.isNew ? '3D 항목 없이 직접 입력' : '3D 연결 끊기'}
             variant="secondary"

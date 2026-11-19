@@ -94,6 +94,7 @@ export function OptionsEditor(props: OptionsEditorProps) {
       ? {
           ...keyOptions(props.threeD.choices, keyGroup.items, keyTarget.itemKey),
           isNew: keyTarget.itemKey == null,
+          linked: !!keyGroup.items.find((i) => i.key === keyTarget.itemKey)?.threeDKey,
         }
       : null;
 

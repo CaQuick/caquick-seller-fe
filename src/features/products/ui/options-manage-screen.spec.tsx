@@ -427,6 +427,30 @@ describe('ProductOptionsScreen', () => {
       expect(screen.getByRole('button', { name: '케이크 맛에 옵션 추가' })).toBeTruthy();
     });
 
+    it('카탈로그에 없는 키로 이어진 항목도 연결을 끊을 수 있다', async () => {
+      const groups: Group[] = [
+        {
+          ...GROUPS[0]!,
+          optionItems: [
+            { ...item('o1', '0호', 0), threeDKey: 'size.ghost' },
+            item('o2', '1호', 5000),
+          ],
+        },
+        GROUPS[1]!,
+      ];
+      const calls = serve([], { customMode: 'THREE_D', groups });
+      await open();
+      await fireEvent.press(await screen.findByRole('button', { name: '0호 3D 항목 size.ghost' }));
+      await fireEvent.press(
+        sheet('three-d-key-sheet').getByRole('button', { name: '3D 연결 끊기' }),
+      );
+      await waitFor(() =>
+        expect(calls.SellerProductUpdateOptionItem).toEqual([
+          { input: { optionItemId: 'o1', threeDKey: null } },
+        ]),
+      );
+    });
+
     it('연결을 끊으면 키를 null로 보낸다', async () => {
       const calls = await open3d();
       await fireEvent.press(await screen.findByRole('button', { name: '0호 3D 항목 도시락' }));
