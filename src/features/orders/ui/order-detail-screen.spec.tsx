@@ -1,8 +1,9 @@
+import { BottomSheetModal } from '@gorhom/bottom-sheet';
 import { notifyManager } from '@tanstack/react-query';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import { type Sink } from 'graphql-ws';
 import { graphql, HttpResponse } from 'msw';
-import { type ReactNode } from 'react';
+import { isValidElement, type ReactNode } from 'react';
 import { Linking, Text } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -180,6 +181,21 @@ function open(conversationItems: Conversations['items'] = []) {
 }
 
 const button = (name: string) => screen.getByRole('button', { name });
+
+// 목 BottomSheetModal은 열리지 않아도 내용을 그리므로, 어느 시트를 열었는지는 present를 부른 시트의 제목으로 본다
+const presentSpy = jest.spyOn(BottomSheetModal.prototype, 'present');
+function headerOf(node: ReactNode): string | undefined {
+  if (Array.isArray(node)) return node.map(headerOf).find(Boolean);
+  if (!isValidElement<{ accessibilityRole?: string; children?: ReactNode }>(node)) return undefined;
+  const { accessibilityRole, children } = node.props;
+  if (accessibilityRole !== 'header') return headerOf(children);
+  return typeof children === 'string' ? children : undefined;
+}
+const presented = () =>
+  presentSpy.mock.contexts.map((sheet) =>
+    headerOf((sheet as { props: { children: ReactNode } }).props.children),
+  );
+
 const HOUR = 3600_000;
 const DAY = 24 * HOUR;
 
@@ -188,6 +204,7 @@ describe('OrderDetailScreen', () => {
   afterAll(() => notifyManager.setScheduler((cb) => setTimeout(cb, 0)));
   beforeEach(() => {
     mockSinks.length = 0;
+    presentSpy.mockClear();
     jest.mocked(toast).mockClear();
     jest.mocked(toast.success).mockClear();
     jest.mocked(toast.error).mockClear();
@@ -339,7 +356,8 @@ describe('OrderDetailScreen', () => {
     const updates = mutationHandler();
     const inputs = cancelHandler();
     await open();
-    await screen.findByRole('button', { name: '거절' });
+    await fireEvent.press(await screen.findByRole('button', { name: '거절' }));
+    expect(presented()).toEqual(['주문을 거절할까요?']);
     expect(
       screen.getByText(
         '결제 금액 38,000원 전액이 구매자에게 환불돼요. 환불 송금은 케이퀵이 진행해요.',
@@ -361,11 +379,13 @@ describe('OrderDetailScreen', () => {
     await waitFor(() => expect(screen.getByLabelText('거절 메모')).toHaveDisplayValue(''));
   });
 
-  it('제작 완료 뒤 취소는 사정을 골라야 하고, 구매자 사정이면 0~결제액 환불 금액을 보낸다', async () => {
+  it('제작 완료 뒤 취소는 다른 처리에서 시트를 열고, 사정을 골라야 하며 구매자 사정이면 0~결제액 환불 금액을 보낸다', async () => {
     detailHandler(() => order({ status: 'MADE' }));
     const inputs = cancelHandler();
     await open();
-    await screen.findByRole('button', { name: '다른 처리' });
+    await fireEvent.press(await screen.findByRole('button', { name: '다른 처리' }));
+    await fireEvent.press(button('주문 취소, 사정에 따라 환불 금액이 정해져요'));
+    expect(presented()).toEqual(['다른 처리', '주문을 취소할까요?']);
     await fireEvent.press(button('일정 불가'));
     expect(button('취소 확정')).toBeDisabled();
 
@@ -384,6 +404,33 @@ describe('OrderDetailScreen', () => {
     expect(inputs).toEqual([
       { orderId: '1', reason: 'SCHEDULE_UNAVAILABLE', fault: 'BUYER', refundAmount: 0 },
     ]);
+  });
+
+  it('결제 기록이 없는 주문은 환불이 없다고 안내하고, 구매자 사정 금액을 0원으로 막는다', async () => {
+    detailHandler(() =>
+      order({
+        status: 'CONFIRMED',
+        paymentMethod: null,
+        confirmDeadlineAt: null,
+        expectedPayoutAmount: null,
+      }),
+    );
+    const inputs = cancelHandler();
+    await open();
+    await screen.findByRole('button', { name: '다른 처리' });
+    await fireEvent.press(button('기타'));
+    await fireEvent.press(button('판매자 사정'));
+    expect(screen.getByText('환불할 결제 금액이 없어요')).toBeTruthy();
+    expect(screen.queryByText(/전액이 구매자에게 환불돼요/)).toBeNull();
+
+    await fireEvent.press(button('구매자 사정'));
+    await fireEvent.changeText(screen.getByLabelText('환불 금액'), '1');
+    expect(screen.getByText('0원부터 0원까지 입력할 수 있어요')).toBeTruthy();
+    expect(button('취소 확정')).toBeDisabled();
+    await fireEvent.changeText(screen.getByLabelText('환불 금액'), '0');
+    await fireEvent.press(button('취소 확정'));
+    await waitFor(() => expect(inputs).toHaveLength(1));
+    expect(inputs[0]).toEqual({ orderId: '1', reason: 'OTHER', fault: 'BUYER', refundAmount: 0 });
   });
 
   it('판매자 사정 취소는 금액 없이 전액 환불로 보낸다', async () => {
@@ -436,6 +483,30 @@ describe('OrderDetailScreen', () => {
     expect(inputs).toEqual([{ orderId: '1', toStatus: 'PICKED_UP' }]);
   });
 
+  it('노쇼 가능 여부는 다른 처리를 연 시각으로 다시 판정한다', async () => {
+    const pickupAt = new Date(Date.now() + 60_000).toISOString();
+    detailHandler(() =>
+      order({
+        status: 'CONFIRMED',
+        pickupAt,
+        confirmDeadlineAt: null,
+        autoPickupAt: new Date(Date.parse(pickupAt) + DAY).toISOString(),
+      }),
+    );
+    await open();
+    await fireEvent.press(await screen.findByRole('button', { name: '다른 처리' }));
+    expect(screen.queryByRole('button', { name: /^노쇼, / })).toBeNull();
+
+    // 다시 열기 전에 픽업 시각이 지난다
+    await act(async () => {
+      jest.advanceTimersByTime(2 * 60_000);
+      await Promise.resolve();
+    });
+    await fireEvent.press(button('다른 처리'));
+    await fireEvent.press(button('노쇼, 구매자가 픽업 시간에 오지 않았어요'));
+    expect(presented()).toEqual(['다른 처리', '다른 처리', '노쇼로 처리할까요?']);
+  });
+
   it('노쇼 구간이면 확인 시트를 거쳐 노쇼로 바꾸고, 서버가 막으면 그 문구를 띄운다', async () => {
     const pickupAt = new Date(Date.now() - HOUR).toISOString();
     detailHandler(() =>
@@ -452,6 +523,7 @@ describe('OrderDetailScreen', () => {
     await open();
     await fireEvent.press(await screen.findByRole('button', { name: '다른 처리' }));
     await fireEvent.press(button('노쇼, 구매자가 픽업 시간에 오지 않았어요'));
+    expect(presented()).toEqual(['다른 처리', '노쇼로 처리할까요?']);
     await fireEvent.press(button('노쇼 처리'));
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(

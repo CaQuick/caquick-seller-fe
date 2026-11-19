@@ -76,7 +76,9 @@ export function toCancelInput(mode: CancelMode, form: CancelForm, total: number)
 }
 
 const fullRefund = (total: number) =>
-  `결제 금액 ${formatKrw(total)} 전액이 구매자에게 환불돼요. 환불 송금은 케이퀵이 진행해요.`;
+  total > 0
+    ? `결제 금액 ${formatKrw(total)} 전액이 구매자에게 환불돼요. 환불 송금은 케이퀵이 진행해요.`
+    : '환불할 결제 금액이 없어요';
 
 /** 시트 아래 환불 안내. 정할 수 없으면 null, 금액이 틀리면 error */
 export function refundNotice(

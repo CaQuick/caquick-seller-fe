@@ -106,6 +106,8 @@ export function OrderDetailScreen() {
   const actions = orderActions(order.status);
   const cancelMode = actions.cancel;
   const noShow = noShowWindow(order, now);
+  // 환불 상한은 확인된 결제액이다. 결제 도입 전 주문은 결제 기록이 없어 0
+  const refundable = order.paymentMethod ? order.totalPrice : 0;
   const switchTo = (sheet: typeof cancelSheet) => {
     moreSheet.current?.dismiss();
     sheet.current?.present();
@@ -162,7 +164,7 @@ export function OrderDetailScreen() {
           key={`${order.status}-${cancelKey}`}
           ref={cancelSheet}
           mode={cancelMode}
-          total={order.totalPrice}
+          total={refundable}
           loading={mutation.isPending}
           onSubmit={(cancel) => mutation.mutate({ cancel, done: CANCEL_COPY[cancelMode].done })}
         />

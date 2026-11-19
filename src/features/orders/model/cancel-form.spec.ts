@@ -107,6 +107,13 @@ describe('toCancelInput', () => {
         : { reason: 'OUT_OF_MATERIALS', note: '연락 두절', fault: 'BUYER', refundAmount: expected },
     );
   });
+
+  it('결제 기록이 없으면(상한 0) 구매자 사정 금액은 0원만 보낸다', () => {
+    const input = (refundAmount: string) =>
+      toCancelInput('cancel', form({ fault: 'BUYER', refundAmount }), 0);
+    expect(input('0')).toEqual({ reason: 'OUT_OF_MATERIALS', fault: 'BUYER', refundAmount: 0 });
+    expect(input('1')).toBeNull();
+  });
 });
 
 describe('refundNotice', () => {
@@ -150,4 +157,26 @@ describe('refundNotice', () => {
   ])('%s', (_, mode, patch, text, error) => {
     expect(refundNotice(mode, form(patch), TOTAL)).toEqual(text === null ? null : { text, error });
   });
+
+  const NONE = '환불할 결제 금액이 없어요';
+  it.each<
+    [string, Parameters<typeof refundNotice>[0], Partial<CancelForm>, string | null, boolean]
+  >([
+    ['거절', 'reject', {}, NONE, false],
+    ['판매자 사정', 'cancel', { fault: 'SELLER' }, NONE, false],
+    ['구매자 사정 미입력', 'cancel', { fault: 'BUYER' }, null, false],
+    ['구매자 사정 0원', 'cancel', { fault: 'BUYER', refundAmount: '0' }, NONE, false],
+    [
+      '구매자 사정 1원',
+      'cancel',
+      { fault: 'BUYER', refundAmount: '1' },
+      '0원부터 0원까지 입력할 수 있어요',
+      true,
+    ],
+  ])(
+    '결제 기록이 없으면(상한 0) 전액 환불 대신 환불 없음을 안내한다: %s',
+    (_, mode, patch, text, error) => {
+      expect(refundNotice(mode, form(patch), 0)).toEqual(text === null ? null : { text, error });
+    },
+  );
 });

@@ -27,7 +27,7 @@ const Label = ({ children }: { children: string }) => (
 interface Props {
   ref: RefObject<BottomSheetModal | null>;
   mode: CancelMode;
-  /** 결제 금액(환불 상한) */
+  /** 확인된 결제 금액(환불 상한). 결제 기록이 없으면 0 */
   total: number;
   loading: boolean;
   onSubmit: (input: CancelInput) => void;
