@@ -113,6 +113,22 @@ describe('useCanvasGeneration', () => {
     expect(app.remove).toHaveBeenCalled();
   });
 
+  it('세대가 오르면 뷰어가 캔버스를 새로 만든다', async () => {
+    const app = listen('android');
+    await render(<CakeViewer render={RENDER} request={{ yaw: 0 }} onError={jest.fn()} />);
+    const viewer = screen.getByTestId('cake-viewer');
+    await fireEvent(viewer, 'layout', { nativeEvent: { layout: { width: 300, height: 300 } } });
+    const first = viewer.children[0];
+    expect(first).toBeTruthy();
+    await app.emit('inactive');
+    await app.emit('active');
+    expect(viewer.children[0]).toBe(first);
+    await app.emit('background');
+    await app.emit('active');
+    expect(viewer.children[0]).not.toBe(first);
+    expect(canvasStyle(viewer)).toMatchObject({ width: 300 });
+  });
+
   it('iOS는 돌아와도 캔버스를 그대로 둔다', async () => {
     const app = listen('ios');
     const hook = await renderHook(() => useCanvasGeneration());

@@ -21,7 +21,7 @@ const text = (key: string): DecalSpec => ({
   item: { kind: 'TEXT', x: 0.5, y: 0.5, size: 10, effect, text: 'A', color: '#1D1D1D' },
   deco: null,
 });
-const deco = (key: string, imageUrl: string | null): DecalSpec => ({
+const deco = (key: string, imageUrl: string): DecalSpec => ({
   key,
   face: 'side',
   item: { kind: 'DECO', x: 0.5, y: 0.5, size: 20, effect, decoId: 'number-1' },
@@ -38,7 +38,15 @@ describe('useDecalTextures', () => {
   beforeEach(() => jest.mocked(loadDecoImage).mockReset().mockResolvedValue(pixel()));
 
   it('같은 그림은 한 번만 그려 key별 텍스처·크기를 내주고, 떠나면 텍스처를 내린다', async () => {
-    const decals = [text('a'), text('a'), deco('d', 'https://cdn/1.png'), deco('x', null)];
+    jest
+      .mocked(loadDecoImage)
+      .mockImplementation((url) => Promise.resolve(url.includes('broken') ? null : pixel()));
+    const decals = [
+      text('a'),
+      text('a'),
+      deco('d', 'https://cdn/1.png'),
+      deco('x', 'https://cdn/broken.png'),
+    ];
     const onError = jest.fn();
     const hook = await renderHook(() => useDecalTextures(decals, fonts, onError));
     await waitFor(() => expect(hook.result.current.textures.size).toBe(3));
@@ -46,13 +54,32 @@ describe('useDecalTextures', () => {
     expect([...pixels.keys()]).toEqual(['a', 'd', 'x']);
     expect(pixels.get('d')).toEqual({ width: 256, height: 256 });
     expect([...textures.values()].every((t) => t instanceof THREE.DataTexture)).toBe(true);
-    // 이미지가 없는 꾸미기는 받지 않고 대체 상자로 그린다
-    expect(jest.mocked(loadDecoImage).mock.calls).toEqual([['https://cdn/1.png']]);
+    // 이미지를 받지 못한 꾸미기도 대체 상자로 그려 붙인다
+    expect(jest.mocked(loadDecoImage).mock.calls).toEqual([
+      ['https://cdn/1.png'],
+      ['https://cdn/broken.png'],
+    ]);
     expect(onError).not.toHaveBeenCalled();
 
     const disposed = [...textures.values()].map((t) => jest.spyOn(t, 'dispose'));
     await hook.unmount();
     for (const spy of disposed) expect(spy).toHaveBeenCalled();
+  });
+
+  it('데칼이 바뀌면 이전 텍스처를 내리고 새 그림만 남긴다', async () => {
+    const hook = await renderHook(
+      ({ decals }: { decals: DecalSpec[] }) => useDecalTextures(decals, fonts, jest.fn()),
+      { initialProps: { decals: [text('a'), text('b')] } },
+    );
+    await waitFor(() => expect(hook.result.current.textures.size).toBe(2));
+    const before = [...hook.result.current.textures.values()];
+    const disposed = before.map((t) => jest.spyOn(t, 'dispose'));
+
+    await hook.rerender({ decals: [text('c')] });
+    for (const spy of disposed) expect(spy).toHaveBeenCalled();
+    await waitFor(() => expect([...hook.result.current.textures.keys()]).toEqual(['c']));
+    expect([...hook.result.current.pixels.keys()]).toEqual(['c']);
+    expect(before).not.toContain(hook.result.current.textures.get('c'));
   });
 
   it('이미지를 받는 사이 화면을 떠나면 그리지 않는다', async () => {

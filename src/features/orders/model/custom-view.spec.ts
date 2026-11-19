@@ -84,8 +84,15 @@ describe('designView', () => {
       { kind: 'capture', reason: 'catalogError' },
     ],
     [
-      '모르는 시트 색이면',
+      '카탈로그에 없는 시트 색이면',
       { ...DESIGN, basic: { ...DESIGN.basic, sheetColor: 'gold' } },
+      ready,
+      false,
+      { kind: 'capture', reason: 'catalogMiss' },
+    ],
+    [
+      '앱이 모르는 모양이면',
+      { ...DESIGN, basic: { ...DESIGN.basic, shape: 'moon' } },
       ready,
       false,
       { kind: 'capture', reason: 'unsupported' },

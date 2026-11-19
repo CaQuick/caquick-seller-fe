@@ -1,4 +1,4 @@
-import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
+import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import { graphql, HttpResponse } from 'msw';
 import { Pressable, Text } from 'react-native';
 
@@ -54,6 +54,7 @@ const item = (id: string, patch: Partial<Item> = {}): Item => ({
   freeEdits: [],
   ...patch,
 });
+const NUMBER_1 = { key: 'number-1', label: '1', imageUrl: 'https://cdn/number-1.png' };
 const CATALOG = {
   revision: 1,
   textColorPresets: [],
@@ -69,12 +70,16 @@ const CATALOG = {
     },
   ],
   sheetColors: [{ key: 'pink', hex: '#FFC2CF' }],
-  decos: [],
+  decos: [] as (typeof NUMBER_1)[],
 };
 
 const FAIL = { message: '서버 오류', classification: 'INTERNAL_SERVER_ERROR' };
 
-function serve(items: Item[], { catalogFails = false, orderFails = false } = {}) {
+function serve(
+  items: Item[],
+  { catalogFails = false, orderFails = false, catalogs = [CATALOG] as (typeof CATALOG)[] } = {},
+) {
+  let catalogCalls = 0;
   server.use(
     orderFails
       ? gqlError('SellerOrderDetail', FAIL)
@@ -84,15 +89,21 @@ function serve(items: Item[], { catalogFails = false, orderFails = false } = {})
     catalogFails
       ? gqlError('SellerCustomCatalog', FAIL)
       : graphql.query('SellerCustomCatalog', () =>
-          HttpResponse.json({ data: { customThreeDCatalog: CATALOG } }),
+          HttpResponse.json({
+            data: { customThreeDCatalog: catalogs[Math.min(catalogCalls++, catalogs.length - 1)] },
+          }),
         ),
   );
+  return { catalogCalls: () => catalogCalls };
 }
 
 function open(url = '/orders/7/design?itemId=b') {
   const queryClient = createTestQueryClient();
   return renderRouter(
-    { 'orders/[id]/design': OrderDesignScreen },
+    {
+      'orders/[id]/index': () => <Text>주문 상세</Text>,
+      'orders/[id]/design': OrderDesignScreen,
+    },
     {
       initialUrl: url,
       wrapper: ({ children }) => <Providers queryClient={queryClient}>{children}</Providers>,
@@ -177,6 +188,61 @@ describe('OrderDesignScreen', () => {
     expect(await screen.findByText(notice)).toBeTruthy();
     expect(screen.getByText('윗면 · 1/5')).toBeTruthy();
     expect(mockViewer).not.toHaveBeenCalled();
+  });
+
+  describe('카탈로그에 없는 꾸미기', () => {
+    const withDeco = item('b', {
+      threeDDesign: {
+        ...DESIGN,
+        side: [
+          {
+            kind: 'DECO',
+            x: 0.5,
+            y: 0.5,
+            size: 20,
+            effect: { type: 'none', intensity: 0 },
+            text: null,
+            color: null,
+            decoId: 'number-1',
+          },
+        ],
+      },
+    });
+
+    it('받아 둔 카탈로그가 묵었으면 한 번 다시 받아 3D로 그린다', async () => {
+      const api = serve([withDeco], { catalogs: [CATALOG, { ...CATALOG, decos: [NUMBER_1] }] });
+      await open();
+      expect(await screen.findByText('3D 0.000')).toBeTruthy();
+      expect(mockViewer.mock.lastCall![0].render.decals[0]!.deco).toEqual({
+        imageUrl: NUMBER_1.imageUrl,
+        label: '1',
+      });
+      expect(api.catalogCalls()).toBe(2);
+      expect(screen.queryByText(/구매자 캡처로 보여 드려요/)).toBeNull();
+    });
+
+    it('다시 받아도 없으면 앱 업데이트가 아닌 안내와 캡처를 보여 주고 더 받지 않는다', async () => {
+      const api = serve([withDeco]);
+      await open();
+      expect(
+        await screen.findByText('3D 정보에 없는 항목이 있어 구매자 캡처로 보여 드려요'),
+      ).toBeTruthy();
+      expect(screen.getByText('윗면 · 1/5')).toBeTruthy();
+      // renderRouter가 가짜 타이머를 켠다 — 시간을 흘려도 더 받지 않는다
+      await act(() => jest.advanceTimersByTimeAsync(1000));
+      expect(api.catalogCalls()).toBe(2);
+      expect(mockViewer).not.toHaveBeenCalled();
+    });
+  });
+
+  it('이전 화면이 없으면 뒤로 가기가 주문 상세로 간다', async () => {
+    serve([item('b')]);
+    const view = open();
+    await view;
+    await screen.findByText('3D 0.000');
+    await fireEvent.press(screen.getByRole('button', { name: '뒤로 가기' }));
+    await waitFor(() => expect(view.getPathname()).toBe('/orders/7'));
+    expect(screen.getByText('주문 상세')).toBeTruthy();
   });
 
   it('카탈로그를 못 받으면 캡처로 대신한다', async () => {

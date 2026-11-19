@@ -40,7 +40,7 @@ const decal = (
   key,
   face,
   item: item(kind),
-  deco: kind === 'DECO' ? { imageUrl: null, label: '1' } : null,
+  deco: kind === 'DECO' ? { imageUrl: 'https://cdn/1.png', label: '1' } : null,
 });
 const render = (design: DesignId | null, decals: DecalSpec[] = []): CakeRender => ({
   shape: 'heart',

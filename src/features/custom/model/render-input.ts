@@ -18,8 +18,8 @@ export interface DecalSpec {
   key: string;
   face: CakeFace;
   item: DesignItem;
-  /** 꾸미기 이미지. 카탈로그에 없으면 imageUrl null(라벨 상자로 대신) */
-  deco: { imageUrl: string | null; label: string } | null;
+  /** 꾸미기 이미지. 받지 못하면 label을 적은 상자로 대신한다 */
+  deco: { imageUrl: string; label: string } | null;
 }
 
 export interface CakeRender {
@@ -32,8 +32,11 @@ export interface CakeRender {
   decals: DecalSpec[];
 }
 
-/** unsupported·invalid는 디자인 파서와 같고, tooMany는 항목·텍스처 상한을 넘은 경우다 */
-export type RenderFailure = 'unsupported' | 'invalid' | 'tooMany';
+/**
+ * unsupported·invalid는 디자인 파서와 같다. catalogMiss는 시트 색·크기·꾸미기 키가 카탈로그에 없는 경우(퇴역 항목도
+ * 남으므로 캐시가 묵었거나 서버 문제), tooMany는 항목·텍스처 상한을 넘은 경우다
+ */
+export type RenderFailure = 'unsupported' | 'invalid' | 'catalogMiss' | 'tooMany';
 
 export type CakeRenderResult =
   { ok: true; render: CakeRender } | { ok: false; reason: RenderFailure };
@@ -46,8 +49,8 @@ const rasterKey = (item: DesignItem) =>
   );
 
 /**
- * 주문의 threeDDesign을 카탈로그로 풀어 그릴 값으로 만든다. 시트 색·크기를 카탈로그에서 못 찾으면
- * 비슷한 값으로 바꿔 그리지 않고 unsupported로 돌려준다
+ * 주문의 threeDDesign을 카탈로그로 풀어 그릴 값으로 만든다. 시트 색·크기·꾸미기를 카탈로그에서 못 찾으면
+ * 비슷한 값이나 대체 상자로 그리지 않고 catalogMiss로 돌려준다
  */
 export function resolveCakeRender(raw: unknown, catalog: RenderCatalog): CakeRenderResult {
   const parsed = parseThreeDDesign(raw);
@@ -57,24 +60,24 @@ export function resolveCakeRender(raw: unknown, catalog: RenderCatalog): CakeRen
   const scale = catalog.optionChoices.find(
     (c) => c.category === 'SIZE' && c.value === basic.size,
   )?.renderScale;
-  if (!color || !scale) return { ok: false, reason: 'unsupported' };
+  if (!color || !scale) return { ok: false, reason: 'catalogMiss' };
 
-  const decals = [
-    ...top.map((item) => ({ face: 'top' as const, item })),
-    ...side.map((item) => ({ face: 'side' as const, item })),
-  ].map(({ face, item }): DecalSpec => {
-    const deco =
-      item.kind === 'DECO' ? catalog.decos.find((d) => d.key === item.decoId) : undefined;
-    return {
-      key: rasterKey(item),
-      face,
-      item,
-      deco:
-        item.kind === 'DECO'
-          ? { imageUrl: deco?.imageUrl ?? null, label: deco?.label ?? item.decoId }
-          : null,
-    };
-  });
+  const decals: DecalSpec[] = [];
+  for (const [face, items] of [
+    ['top', top],
+    ['side', side],
+  ] as const)
+    for (const item of items) {
+      const deco =
+        item.kind === 'DECO' ? catalog.decos.find((d) => d.key === item.decoId) : undefined;
+      if (item.kind === 'DECO' && !deco) return { ok: false, reason: 'catalogMiss' };
+      decals.push({
+        key: rasterKey(item),
+        face,
+        item,
+        deco: deco ? { imageUrl: deco.imageUrl, label: deco.label } : null,
+      });
+    }
   if (decals.length > MAX_ITEMS || new Set(decals.map((d) => d.key)).size > MAX_TEXTURES)
     return { ok: false, reason: 'tooMany' };
   return { ok: true, render: { shape: basic.shape, design: basic.design, color, scale, decals } };

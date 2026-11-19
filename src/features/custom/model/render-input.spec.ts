@@ -51,10 +51,7 @@ const design = (
 
 describe('resolveCakeRender', () => {
   it('시트 색·크기 배율을 카탈로그에서 찾고, 윗면 → 옆면 순서로 데칼을 만든다', () => {
-    const result = resolveCakeRender(
-      design({}, [text('A')], [deco('number-1'), deco('number-9')]),
-      CATALOG,
-    );
+    const result = resolveCakeRender(design({}, [text('A')], [deco('number-1')]), CATALOG);
     expect(result).toEqual({
       ok: true,
       render: {
@@ -68,8 +65,6 @@ describe('resolveCakeRender', () => {
             face: 'side',
             deco: { imageUrl: 'https://cdn/number-1.png', label: '1' },
           }),
-          // 카탈로그에 없는 꾸미기는 이미지 없이 id를 적은 상자로
-          expect.objectContaining({ face: 'side', deco: { imageUrl: null, label: 'number-9' } }),
         ],
       },
     });
@@ -90,9 +85,16 @@ describe('resolveCakeRender', () => {
     ['카탈로그에 없는 시트 색', design({ sheetColor: 'gold' })],
     ['카탈로그에 없는 크기', design({ size: 'jumbo' })],
     ['배율이 없는 크기', design({ size: 'old' })],
+    ['윗면의 카탈로그에 없는 꾸미기', design({}, [deco('number-9')])],
+    ['옆면의 카탈로그에 없는 꾸미기', design({}, [], [deco('number-1'), deco('number-9')])],
+  ])('%s → catalogMiss(비슷한 값이나 대체 상자로 그리지 않는다)', (_, raw) => {
+    expect(resolveCakeRender(raw, CATALOG)).toEqual({ ok: false, reason: 'catalogMiss' });
+  });
+
+  it.each([
     ['모르는 모양', design({ shape: 'moon' })],
     ['다음 스키마 버전', { ...design(), schemaVersion: 2 }],
-  ])('%s → unsupported(비슷한 값으로 그리지 않는다)', (_, raw) => {
+  ])('앱이 모르는 값(%s)은 unsupported', (_, raw) => {
     expect(resolveCakeRender(raw, CATALOG)).toEqual({ ok: false, reason: 'unsupported' });
   });
 

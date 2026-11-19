@@ -54,12 +54,13 @@ export const areaStyle = ({
 
 /** 3D 대신 구매자 캡처를 보여 주는 이유 */
 export type CaptureReason =
-  'noDesign' | 'unsupported' | 'invalid' | 'tooMany' | 'catalogError' | 'glError';
+  'noDesign' | 'unsupported' | 'invalid' | 'catalogMiss' | 'tooMany' | 'catalogError' | 'glError';
 
 export const CAPTURE_NOTICE: Record<CaptureReason, string> = {
   noDesign: '저장된 3D 디자인이 없어 구매자 캡처로 보여 드려요',
   unsupported: '앱을 업데이트하면 이 디자인을 3D로 볼 수 있어요',
   invalid: '디자인 정보를 읽을 수 없어 구매자 캡처로 보여 드려요',
+  catalogMiss: '3D 정보에 없는 항목이 있어 구매자 캡처로 보여 드려요',
   tooMany: '꾸미기가 많아 구매자 캡처로 보여 드려요',
   catalogError: '3D 정보를 불러오지 못해 구매자 캡처로 보여 드려요',
   glError: '3D를 그리지 못해 구매자 캡처로 보여 드려요',

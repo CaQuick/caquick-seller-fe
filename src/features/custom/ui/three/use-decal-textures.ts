@@ -35,7 +35,7 @@ export function useDecalTextures(
     const stop = runSequential(
       [...jobs.values()],
       async (job, stopped) => {
-        const image = job.deco?.imageUrl ? await loadDecoImage(job.deco.imageUrl) : null;
+        const image = job.deco ? await loadDecoImage(job.deco.imageUrl) : null;
         if (stopped()) return;
         const texture = decalTexture(
           rasterizeDecal(job.item, job.pixels, { fonts, image, label: job.deco?.label }),

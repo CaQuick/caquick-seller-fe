@@ -140,7 +140,7 @@ src/
   - three·polygon-clipping·`@react-three/fiber`는 구매자 lock과 같은 정확한 버전으로 고정하고, Dependabot이 올리지 않게 막아 두었습니다. 구매자와 함께 손으로 올립니다. 설치본이 구매자 lock과 다르면 생성기가 멈추고 spec도 실패합니다. three는 ESM 전용이라 jest가 `three.module.js`를 직접 변환합니다.
   - 주문의 `threeDDesign`은 `parseThreeDDesign`(`custom/model/design-json.ts`)으로만 읽습니다. v1이 아니거나 모르는 모양·디자인·효과·항목 종류면 `unsupported`, 깨진 값이면 `invalid`를 돌려주고 화면은 구매자 캡처로 대신합니다. 모르는 값을 비슷한 값으로 바꿔 그리지 않습니다.
 - **3D 렌더러**(`features/custom`, D75~D79)는 형상 코드 위에 그리기만 다시 쓴 것입니다.
-  - `resolveCakeRender`가 디자인을 카탈로그(시트 색·크기 배율·꾸미기 이미지)로 풀고, 못 찾거나 상한(항목 50·텍스처 40)을 넘으면 캡처로 대신할 이유를 돌려줍니다. 주문 화면은 `designView`로 3D·로딩·캡처를 고릅니다.
+  - `resolveCakeRender`가 디자인을 카탈로그(시트 색·크기 배율·꾸미기 이미지)로 풀고, 못 찾거나(`catalogMiss`) 상한(항목 50·텍스처 40)을 넘으면 캡처로 대신할 이유를 돌려줍니다. 주문 화면은 `designView`로 3D·로딩·캡처를 고르고, `catalogMiss`면 묵은 캐시일 수 있어 카탈로그를 한 번 다시 받은 뒤에 판정합니다.
   - 장면(`ui/three/cake-scene.tsx`)은 구매자 CakeCanvas·SheetDesign·ItemDecal의 카메라·조명·재질 값을 그대로 둔 R3F JSX입니다. 회전 입력은 RNGH Pan → `Spin`, 그리기는 `frameloop="demand"`입니다.
   - 데칼 텍스처는 Skia 오프스크린(`model/texture/decal-raster.ts`)에 그리고 효과는 Skia 이미지 필터(`effect-filter.ts`)입니다. 효과 계수는 구매자 CSS 값을 그대로 쓰되 Chrome canvas와 픽셀로 맞춘 해석(blur = 표준편차)을 따릅니다(D76).
   - three·expo-gl은 `CakeViewer`가 `React.lazy`로 불러 주문 3D 화면을 열 때 평가합니다. 캔버스 안 오류는 경계가 받아 캡처로 바꿉니다.
