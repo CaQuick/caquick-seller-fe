@@ -43,6 +43,14 @@ jest.mock('graphql-ws', () => ({
 type Order = SellerOrderDetailQuery['sellerOrder'];
 type Conversations = SellerOrderConversationsQuery['sellerConversations'];
 
+const NO_CUSTOM_IMAGES = {
+  customPreviewImageUrl: null,
+  customBaseImageUrl: null,
+  customImages: [],
+  threeDDesign: null,
+};
+const AREA = { posX: 1000, posY: 2000, width: 3000, height: 1500 };
+
 const order = (patch: Partial<Order> = {}): Order => ({
   id: '1',
   orderNumber: 'ORD-20261005-K7MQ4P',
@@ -79,20 +87,23 @@ const order = (patch: Partial<Order> = {}): Order => ({
         { id: 'o1', groupName: '사이즈', optionTitle: '1호 15cm', priceDelta: 5000 },
         { id: 'o2', groupName: '시트 맛', optionTitle: '초코', priceDelta: 0 },
       ],
+      ...NO_CUSTOM_IMAGES,
+      customMode: 'SLOT',
       customTexts: [
-        { id: 't2', tokenKey: '하단 문구', defaultText: '', valueText: '2026.10.08', sortOrder: 2 },
+        { id: 't2', label: '하단 문구', defaultText: '', valueText: '2026.10.08', sortOrder: 2 },
         {
           id: 't1',
-          tokenKey: '상단 문구',
+          label: '상단 문구',
           defaultText: '축하해',
           valueText: '생일 축하해 다은',
           sortOrder: 1,
         },
-        { id: 't3', tokenKey: '편지', defaultText: '사랑해', valueText: null, sortOrder: 3 },
+        { id: 't3', label: '편지', defaultText: '사랑해', valueText: null, sortOrder: 3 },
       ],
       freeEdits: [
         {
           id: 'f1',
+          ...AREA,
           descriptionText: '크림은 연한 핑크로 부탁드려요',
           sortOrder: 1,
           attachments: [{ id: 'a1', imageUrl: 'https://img/ref.jpg', sortOrder: 1 }],
@@ -225,8 +236,8 @@ describe('OrderDetailScreen', () => {
     expect(screen.getByText('생일 축하해 다은')).toBeTruthy();
     expect(screen.getByText('문구 없음')).toBeTruthy();
     expect(screen.queryByText('사랑해')).toBeNull();
-    expect(screen.getByLabelText('자유 편집 이미지-1')).toBeTruthy();
-    expect(screen.queryByLabelText('자유 편집 이미지-2')).toBeNull();
+    expect(screen.getByLabelText('참고 사진-1')).toBeTruthy();
+    expect(screen.queryByLabelText('참고 사진-2')).toBeNull();
     expect(screen.getByText('크림은 연한 핑크로 부탁드려요')).toBeTruthy();
     expect(screen.getByText('33,000원')).toBeTruthy();
     expect(screen.getByText('+5,000원')).toBeTruthy();
@@ -260,12 +271,14 @@ describe('OrderDetailScreen', () => {
             productName: '레터링 케이크',
             quantity: 1,
             optionItems: [],
+            ...NO_CUSTOM_IMAGES,
+            customMode: 'SLOT',
             customTexts: [
-              { id: 't1', tokenKey: '문구', defaultText: '축하해', valueText: '', sortOrder: 1 },
+              { id: 't1', label: '문구', defaultText: '축하해', valueText: '', sortOrder: 1 },
             ],
             freeEdits: [
-              { id: 'f1', descriptionText: '왼쪽에 하트', sortOrder: 1, attachments: [] },
-              { id: 'f2', descriptionText: '', sortOrder: 2, attachments: [] },
+              { id: 'f1', ...AREA, descriptionText: '왼쪽에 하트', sortOrder: 1, attachments: [] },
+              { id: 'f2', ...AREA, descriptionText: '', sortOrder: 2, attachments: [] },
             ],
           },
         ],
@@ -276,7 +289,7 @@ describe('OrderDetailScreen', () => {
     expect(screen.getByText('왼쪽에 하트')).toBeTruthy();
     expect(screen.getByText('요청 사항 1')).toBeTruthy();
     expect(screen.queryByText('요청 사항 2')).toBeNull();
-    expect(screen.queryByText(/^자유 편집 이미지/)).toBeNull();
+    expect(screen.queryByText(/^참고 사진/)).toBeNull();
   });
 
   it('전화 아이콘은 숫자만 남긴 tel: 링크를 열고, 실패하면 알린다', async () => {

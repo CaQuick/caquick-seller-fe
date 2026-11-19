@@ -112,7 +112,7 @@ describe('3D 형상 골든(구매자 편집기 기준)', () => {
   const actual = buildGolden(seller);
 
   // 구매자와 함께 올리지 않은 버전 변경(Dependabot 등)은 fixture를 다시 만들어도 생성기가 막는다
-  it('fixture는 기준 커밋으로 만들었고 three·polygon-clipping 설치본이 구매자 lock과 같다', () => {
+  it('fixture는 기준 커밋으로 만들었고 고정 패키지(three·polygon-clipping·R3F) 설치본이 구매자 lock과 같다', () => {
     expect(ref).toBe(GOLDEN_REF);
     expect(installedVersions(root)).toEqual(buyerVersions);
   });

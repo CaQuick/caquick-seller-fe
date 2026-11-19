@@ -344,7 +344,7 @@ function OrderBody({ order, onReschedule }: { order: Order; onReschedule?: () =>
       <SectionHeader title="주문 상품" count={`${order.items.length}건`} />
       <View className="gap-3">
         {order.items.map((item) => (
-          <OrderItemCard key={item.id} item={item} />
+          <OrderItemCard key={item.id} orderId={order.id} item={item} />
         ))}
       </View>
 

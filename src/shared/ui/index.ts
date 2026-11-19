@@ -10,6 +10,7 @@ export { Empty, ErrorState } from './empty';
 export { Fab } from './fab';
 export { Icon, type IconName } from './icon';
 export { ImageDropzone, ImageThumb } from './image-picker';
+export { ImageViewer } from './image-viewer';
 export { MenuGroup, MenuRow } from './menu';
 export { MonthCalendar } from './month-calendar';
 export { RemoteImage } from './remote-image';

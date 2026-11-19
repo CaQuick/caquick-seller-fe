@@ -80,17 +80,13 @@ const GROUPS: Group[] = [
 const CATALOG = {
   revision: 1,
   textColorPresets: [],
+  sheetColors: [],
+  decos: [],
   optionChoices: [
-    { key: 'size.mini', category: 'SIZE', label: '도시락', defaultPriceDelta: 0, selectable: true },
-    { key: 'size.no1', category: 'SIZE', label: '1호', defaultPriceDelta: 5000, selectable: true },
-    {
-      key: 'shape.heart',
-      category: 'SHAPE',
-      label: '하트',
-      defaultPriceDelta: 1000,
-      selectable: true,
-    },
-  ],
+    { key: 'size.mini', category: 'SIZE', value: 'mini', label: '도시락', renderScale: 0.82 },
+    { key: 'size.no1', category: 'SIZE', value: 'no1', label: '1호', renderScale: 1 },
+    { key: 'shape.heart', category: 'SHAPE', value: 'heart', label: '하트', renderScale: null },
+  ].map((c, i) => ({ ...c, defaultPriceDelta: [0, 5000, 1000][i], selectable: true })),
 };
 const THREE_D_GROUPS: Group[] = [
   {

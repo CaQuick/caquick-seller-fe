@@ -2,9 +2,8 @@ import { type CustomTextAlignType } from '@/graphql/generated/graphql';
 
 /**
  * 슬롯 문구를 바탕 위에 그리는 규칙. 구매자 합성 이미지가 같은 규칙을 따라야 판매자 미리보기와 같은 모습이 된다.
- * 단위는 모두 바탕 한 변을 10000으로 본 값이다.
+ * 단위는 모두 바탕 한 변을 10000으로 본 값이고, 글꼴은 Pretendard 700(shared/lib/skia-text)이다.
  */
-export const SLOT_FONT = { family: 'Pretendard', weight: '700' } as const;
 export const LINE_HEIGHT = 1.25;
 const SIZE_STEP = 0.5;
 

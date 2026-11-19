@@ -12,9 +12,20 @@ const SellerCustomCatalogDocument = graphql(`
       optionChoices {
         key
         category
+        value
         label
         defaultPriceDelta
+        renderScale
         selectable
+      }
+      sheetColors {
+        key
+        hex
+      }
+      decos {
+        key
+        label
+        imageUrl
       }
       textColorPresets
     }

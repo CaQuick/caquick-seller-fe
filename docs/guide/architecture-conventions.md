@@ -37,11 +37,11 @@ src/
     index.ts               밖에 내놓는 것만
   shared/
     api/                   config·errors·graphql-client·rest-client·session·ws-client
-    ui/                    Button·TextField·Sheet·Screen 같은 공용 부품
-    lib/                   kst·format·josa·zod-locale·upload·storage(SecureStore)·cn·enum-view
+    ui/                    Button·TextField·Sheet·Screen·ImageViewer 같은 공용 부품
+    lib/                   kst·format·josa·zod-locale·upload·storage(SecureStore)·cn·enum-view·skia-text
     config/                env.ts(EXPO_PUBLIC_*)·tokens.ts(색·간격·반경·자간)
   graphql/generated/       codegen 산출물(커밋)
-  test/                    setup·mocks·msw·render·factories
+  test/                    setup·mocks·msw·render·factories·skia(CanvasKit 환경·글꼴)
 ```
 
 - **shared → features 금지.** 공용이 도메인을 알면 공용이 아닙니다.
@@ -132,16 +132,26 @@ src/
 - **문구**는 한국어이며 feature별 상수 1곳에 둡니다. 조사는 `shared/lib/josa.ts`.
 - **원격 이미지는 `expo-image`**(D51)로 그립니다. S3 직접 URL이고 CDN이 없어 디스크 캐시가 필요하므로 공용 `RemoteImage`(`shared/ui`, `cachePolicy="memory-disk"`)를 거치고, RN `Image`는 번들 로고 PNG에만 씁니다.
 - **슬롯 문구 렌더**는 `products/model/slot-layout.ts`가 정본입니다(D61). 구매자 합성 이미지가 같은 규칙을 따르므로 글꼴·줄 높이·크기 탐색을 바꾸면 구매자 쪽과 함께 바꿉니다. 줄 폭 측정은 주입받아 글꼴 엔진과 떨어뜨립니다.
+  - 미리보기는 Skia 문단으로 재고 그립니다(`slot-preview.ts`, D81). 글꼴 공급자는 3D 데칼과 같은 `usePretendardFonts`(`shared/lib/skia-text`)이고, 읽는 동안은 비워 둡니다.
+- **전체 화면 이미지**는 공용 `ImageViewer`(`shared/ui`)로 엽니다(D80). 주문 캡처·합성 이미지·참고 사진이 같은 화면을 씁니다.
 - 월 달력은 자체 `MonthCalendar`(`shared/ui`), 시간 선택은 `@react-native-community/datetimepicker`(`TimeRow`), 드래그 정렬은 `react-native-sortables`입니다. `react-native-calendars`는 쓰지 않아 뺐습니다(D50).
 - **3D 케이크 형상**(`features/custom/model/three`)은 구매자 편집기(caquick-fe-v2 `src/screens/custom`)의 외곽선·둘레 투영·장식·데칼 지오메트리·회전 코드를 복사한 것입니다(D64). 두 앱이 같은 주문을 같은 모양으로 그려야 하므로 상수·수학을 여기서 바꾸지 않습니다.
   - `golden.spec`이 구매자 코드로 뽑은 fixture(`__fixtures__/three-golden.json`)와 비교합니다. 정점·행렬 같은 큰 배열은 값마다 float32로 맞춘 비트 해시가 같아야 하고(정점 하나의 차이도 잡습니다), 집계값과 값 그대로 둔 배열(둘레 표본·투영·회전 프레임)은 1e-9 안이어야 합니다. 구매자 쪽이 바뀌면 같은 변경을 옮기고 `FT_DIR=<caquick-fe-v2> pnpm tsx scripts/three-golden.ts <ref>`로 fixture를 다시 만듭니다. 생성기는 구매자 레포가 있어야 해서 CI에서 돌지 않습니다.
-  - three·polygon-clipping은 구매자 lock과 같은 정확한 버전으로 고정하고, Dependabot이 올리지 않게 막아 두었습니다. 구매자와 함께 손으로 올립니다. 설치본이 구매자 lock과 다르면 생성기가 멈추고 spec도 실패합니다. three는 ESM 전용이라 jest가 `three.module.js`를 직접 변환합니다.
+  - three·polygon-clipping·`@react-three/fiber`는 구매자 lock과 같은 정확한 버전으로 고정하고, Dependabot이 올리지 않게 막아 두었습니다. 구매자와 함께 손으로 올립니다. 설치본이 구매자 lock과 다르면 생성기가 멈추고 spec도 실패합니다. three는 ESM 전용이라 jest가 `three.module.js`를 직접 변환합니다.
   - 주문의 `threeDDesign`은 `parseThreeDDesign`(`custom/model/design-json.ts`)으로만 읽습니다. v1이 아니거나 모르는 모양·디자인·효과·항목 종류면 `unsupported`, 깨진 값이면 `invalid`를 돌려주고 화면은 구매자 캡처로 대신합니다. 모르는 값을 비슷한 값으로 바꿔 그리지 않습니다.
+- **3D 렌더러**(`features/custom`, D75~D79)는 형상 코드 위에 그리기만 다시 쓴 것입니다.
+  - `resolveCakeRender`가 디자인을 카탈로그(시트 색·크기 배율·꾸미기 이미지)로 풀고, 못 찾거나(`catalogMiss`) 상한(항목 50·텍스처 40)을 넘으면 캡처로 대신할 이유를 돌려줍니다. 주문 화면은 `designView`로 3D·로딩·캡처를 고르고, `catalogMiss`면 묵은 캐시일 수 있어 카탈로그를 한 번 다시 받은 뒤에 판정합니다.
+  - 장면(`ui/three/cake-scene.tsx`)은 구매자 CakeCanvas·SheetDesign·ItemDecal의 카메라·조명·재질 값을 그대로 둔 R3F JSX입니다. 회전 입력은 RNGH Pan → `Spin`, 그리기는 `frameloop="demand"`입니다.
+  - 데칼 텍스처는 Skia 오프스크린(`model/texture/decal-raster.ts`)에 그리고 효과는 Skia 이미지 필터(`effect-filter.ts`)입니다. 효과 계수는 구매자 CSS 값을 그대로 쓰되 Chrome canvas와 픽셀로 맞춘 해석(blur = 표준편차)을 따릅니다(D76).
+  - three·expo-gl은 `CakeViewer`가 `React.lazy`로 불러 주문 3D 화면을 열 때 평가합니다. 캔버스 안 오류는 경계가 받아 캡처로 바꿉니다.
+  - Metro는 `three`를 require·import 모두 ESM 입구(`three.module.js`) 하나로 풉니다(`metro.config.js`). require 입구 `three.cjs`는 Node 전용 `process.emitWarning`을 불러 RN에서 죽는데, R3F 번들이 CommonJS라 그대로 두면 이 입구로 갑니다. `src/test/metro-config.spec.ts`가 Metro 해석기로 확인합니다.
 
 ## 7. 테스트
 
 - `*.spec.ts(x)`를 소스 옆에 둡니다. `app/` 안에는 두지 않습니다(§2). `it`은 한국어 평서형입니다.
 - **jest-expo** preset, 환경은 `react-native-env`(Node 기반)라 Node 24의 fetch가 MSW(`msw/node`)에 닿습니다. 앱 런타임에서는 MSW를 쓰지 않습니다.
+- **Skia**는 전역 mock(`src/test/mocks`)이 CanvasKit 위의 JS 구현을 줍니다. 실제 픽셀을 그려 보는 spec만 첫 주석 `@jest-environment ./src/test/skia-environment.js`로 CanvasKit(wasm)을 올립니다(초기화가 무거워 전역으로 두지 않습니다). 글꼴은 `src/test/skia.ts`의 `pretendardFonts()`로 앱이 번들하는 Pretendard 700을 씁니다. `Canvas`는 View로 그려지고 `useFonts`는 글꼴을 주지 않습니다.
+- **R3F 장면**은 `@react-three/test-renderer`로 장면 그래프(메시·재질·카메라·프레임 진행)를 봅니다. 네이티브 `Canvas`는 jest에서 GL 컨텍스트가 없어 장면을 그리지 않습니다.
 - **RNTL 14는 전부 async**입니다: `await render(...)`, `await fireEvent.press(...)`, `await screen.findByText(...)`. 공용 렌더는 `src/test/render.tsx`(새 QueryClient·retry false·쿼리와 뮤테이션 gcTime 0·GestureHandlerRoot·BottomSheetModalProvider), 라우팅 검증은 `expo-router/testing-library`의 `renderRouter`.
 - **네트워크는 MSW**로 계약 기반 mock(응답 모양은 codegen 타입을 따르고, 헬퍼는 `src/test/msw/graphql.ts`). fetch를 직접 stub하지 않습니다. `onUnhandledRequest: 'error'`.
 - **네이티브 모듈 페이크**는 `src/test/mocks/index.ts`에만 둡니다(SecureStore Map·notifications·updates·file-system `File`). jest-expo가 비워 두는 것만 채우고, `afterEach`가 비웁니다.

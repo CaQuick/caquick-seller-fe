@@ -1,8 +1,12 @@
-import { useMemo, useState } from 'react';
+import { Canvas, Paragraph } from '@shopify/react-native-skia';
+import { useMemo } from 'react';
 import { Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { layoutSlotText, SLOT_FONT, slotLines } from '../model/slot-layout';
+import { colors } from '@/shared/config/tokens';
+import { usePretendardFonts } from '@/shared/lib/skia-text';
+
+import { slotPreviewLines } from '../model/slot-preview';
 import {
   cleanText,
   isHexColor,
@@ -75,62 +79,30 @@ export function SlotBox({ slot, label, side, onRect, onDragging }: Props) {
   );
 }
 
-/** 줄 폭은 이 크기로 한 번 재고 비례로 늘린다 */
-const MEASURE_SIZE = 40;
-const FONT = { fontFamily: SLOT_FONT.family, fontWeight: SLOT_FONT.weight } as const;
-
-/** 기본 문구를 슬롯 렌더 규칙대로 그린다. 줄 폭은 숨긴 글자의 onTextLayout으로 잰다 */
+/** 기본 문구를 슬롯 렌더 규칙대로 Skia로 그린다(구매자 합성 이미지와 같은 글꼴·측정). 글꼴을 읽는 동안은 비워 둔다 */
 function SlotTextPreview({ slot, side }: { slot: Slot; side: number }) {
+  const fonts = usePretendardFonts();
   const text = cleanText(slot.defaultText);
-  const [measured, setMeasured] = useState<{ text: string; widths: number[] } | null>(null);
-  const lines = slotLines(text);
-  const widths = measured?.text === text ? measured.widths : null;
-  const layout = widths
-    ? layoutSlotText(
-        text,
-        slot.rect,
-        slot.textAlign,
-        (line, size) => (widths[lines.indexOf(line)]! * size) / MEASURE_SIZE,
-      )
-    : null;
-  const k = side / SCALE;
+  const color = isHexColor(slot.textColor) ? slot.textColor : colors.slotTextDefault;
+  const lines = useMemo(
+    () =>
+      fonts ? slotPreviewLines(fonts, text, slot.rect, slot.textAlign, color, side / SCALE) : [],
+    [fonts, text, slot.rect, slot.textAlign, color, side],
+  );
   return (
     <View
       testID={`slot-preview-${slot.key}`}
       pointerEvents="none"
       style={{ position: 'absolute', left: -BORDER, top: -BORDER, right: -BORDER, bottom: -BORDER }}
     >
-      {/* 줄바꿈 없이 재도록 넓은 틀에 두고, 글자는 내용 폭만 차지한다. 화면 낭독에서도 숨긴다 */}
-      <View aria-hidden style={{ position: 'absolute', width: MEASURE_SIZE * 100, opacity: 0 }}>
-        <Text
-          testID={`slot-measure-${slot.key}`}
-          style={{ ...FONT, fontSize: MEASURE_SIZE, alignSelf: 'flex-start' }}
-          onTextLayout={(e) => {
-            const reported = e.nativeEvent.lines.map((l) => l.width);
-            if (reported.length === lines.length) setMeasured({ text, widths: reported });
-          }}
-        >
-          {text}
-        </Text>
-      </View>
-      {/* 비례로 늘린 폭은 실제와 조금 다를 수 있다 — 넓은 틀에 규칙의 x부터 그려 줄바꿈·말줄임이 생기지 않게 */}
-      {layout?.lines.map((line, i) => (
-        <Text
-          key={i}
-          style={{
-            ...FONT,
-            position: 'absolute',
-            left: (line.x - slot.rect.x) * k,
-            top: (line.y - slot.rect.y) * k,
-            width: side * 2,
-            fontSize: layout.fontSize * k,
-            lineHeight: layout.lineHeight * k,
-            color: isHexColor(slot.textColor) ? slot.textColor : undefined,
-          }}
-        >
-          {line.text}
-        </Text>
-      ))}
+      {lines.length > 0 ? (
+        <Canvas style={{ flex: 1 }}>
+          {/* 넓은 틀에 규칙의 x부터 그려 줄바꿈이 생기지 않게 한다 */}
+          {lines.map((line, i) => (
+            <Paragraph key={i} paragraph={line.paragraph} x={line.x} y={line.y} width={side * 2} />
+          ))}
+        </Canvas>
+      ) : null}
     </View>
   );
 }
