@@ -144,6 +144,7 @@ src/
   - 장면(`ui/three/cake-scene.tsx`)은 구매자 CakeCanvas·SheetDesign·ItemDecal의 카메라·조명·재질 값을 그대로 둔 R3F JSX입니다. 회전 입력은 RNGH Pan → `Spin`, 그리기는 `frameloop="demand"`입니다.
   - 데칼 텍스처는 Skia 오프스크린(`model/texture/decal-raster.ts`)에 그리고 효과는 Skia 이미지 필터(`effect-filter.ts`)입니다. 효과 계수는 구매자 CSS 값을 그대로 쓰되 Chrome canvas와 픽셀로 맞춘 해석(blur = 표준편차)을 따릅니다(D76).
   - three·expo-gl은 `CakeViewer`가 `React.lazy`로 불러 주문 3D 화면을 열 때 평가합니다. 캔버스 안 오류는 경계가 받아 캡처로 바꿉니다.
+  - Metro는 `three`를 require·import 모두 ESM 입구(`three.module.js`) 하나로 풉니다(`metro.config.js`). require 입구 `three.cjs`는 Node 전용 `process.emitWarning`을 불러 RN에서 죽는데, R3F 번들이 CommonJS라 그대로 두면 이 입구로 갑니다. `src/test/metro-config.spec.ts`가 Metro 해석기로 확인합니다.
 
 ## 7. 테스트
 

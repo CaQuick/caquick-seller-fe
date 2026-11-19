@@ -16,6 +16,8 @@ const config: KnipConfig = {
     'pretendard',
     // babel.config.js의 preset — expo가 의존성으로 함께 설치한다
     'babel-preset-expo',
+    // Metro 해석기 — expo가 함께 설치하고, metro-config.spec이 앱 번들과 같은 해석으로 확인한다
+    'metro-resolver',
     // src/test/mocks의 jest.mock 대상(@native-html/render의 하위 의존성) — 직접 import하지 않는다
     'stringify-entities',
   ],
