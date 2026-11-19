@@ -32,6 +32,34 @@ describe('Spin', () => {
     expect(spin.angle).toBe(angle);
   });
 
+  // 마지막 이동 뒤 100ms까지는 끌던 손을 뗀 것으로, 그보다 늦으면 멈춘 채 뗀 것으로 본다
+  it.each([
+    [100, true],
+    [101, false],
+  ])('마지막 이동 %ims 뒤에 떼면 관성이 남는지: %s', (wait, coasting) => {
+    const spin = new Spin();
+    spin.start(0, 0);
+    spin.drag(60, 16, W);
+    spin.end(16 + wait);
+    expect(spin.step(1 / 60)).toBe(coasting);
+  });
+
+  // 같은 시각에 이벤트가 몰려도 속도가 터지지 않도록 이동 간격은 1ms 아래로 잡지 않는다
+  it.each([
+    [0, 1],
+    [0.5, 1],
+    [2, 2],
+  ])('%sms 간격 이동 직후 떼면 %ims 간격의 속도로 돈다', (gap, ms) => {
+    const spin = new Spin();
+    spin.start(0, 0);
+    spin.drag(W / 100, gap, W);
+    spin.end(gap);
+    spin.step(1 / 60);
+
+    const turn = (Math.PI * 2) / 100;
+    expect(spin.angle).toBeCloseTo(turn + ((turn / (ms / 1000)) * 0.5) / 60, 12);
+  });
+
   it('누르기 전 끌기·떼기는 무시하고, 다시 그릴 콜백을 걸지 않아도 동작한다', () => {
     const spin = new Spin();
     spin.drag(100, 16, W);

@@ -1,15 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import * as THREE from 'three';
-
 import {
   buildGolden,
+  digest,
   GOLDEN_FIXTURE,
   GOLDEN_REF,
   goldenMeasure,
   goldenMismatches,
   type GoldenItem,
+  installedVersions,
   type ThreeApi,
 } from '@/test/three-golden';
 
@@ -53,10 +53,12 @@ import {
 } from './side-projection';
 import { Spin } from './spin';
 
-const fixture = JSON.parse(
-  readFileSync(join(__dirname, '../../../../..', GOLDEN_FIXTURE), 'utf8'),
-) as Record<string, unknown>;
-const { ref, threeRevision, ...expected } = fixture;
+const root = join(__dirname, '../../../../..');
+const fixture = JSON.parse(readFileSync(join(root, GOLDEN_FIXTURE), 'utf8')) as Record<
+  string,
+  unknown
+>;
+const { ref, buyerVersions, ...expected } = fixture;
 
 const toDesignItem = ({ kind, x, y, size, text }: GoldenItem): DesignItem => {
   const base = { x, y, size, effect: { type: 'none' as const, intensity: 50 } };
@@ -109,12 +111,13 @@ const seller: ThreeApi = {
 describe('3D 형상 골든(구매자 편집기 기준)', () => {
   const actual = buildGolden(seller);
 
-  it('fixture는 기준 커밋과 지금 설치된 three 판으로 만들었다', () => {
+  // 구매자와 함께 올리지 않은 버전 변경(Dependabot 등)은 fixture를 다시 만들어도 생성기가 막는다
+  it('fixture는 기준 커밋으로 만들었고 three·polygon-clipping 설치본이 구매자 lock과 같다', () => {
     expect(ref).toBe(GOLDEN_REF);
-    expect(threeRevision).toBe(THREE.REVISION);
+    expect(installedVersions(root)).toEqual(buyerVersions);
   });
 
-  it('형상 정점·둘레 투영·데칼 지오메트리·회전 감쇠가 구매자 값과 1e-9 안에서 같다', () => {
+  it('형상 정점·둘레 투영·데칼 지오메트리·회전 감쇠가 구매자 값과 같다(float32 비트 해시 + 집계 1e-9)', () => {
     expect(Object.keys(expected)).toEqual(Object.keys(actual));
     expect(goldenMismatches(actual, expected)).toEqual([]);
   });
@@ -162,6 +165,18 @@ describe('3D 형상 골든(구매자 편집기 기준)', () => {
     );
     expect(paths.length).toBeGreaterThan(0);
     expect(paths.filter((path) => !path.includes(section))).toEqual([]);
+  });
+});
+
+describe('digest', () => {
+  // 집계값 허용치(1e-9·|합|)는 정점 하나의 1e-6 차이를 놓친다 — 해시가 잡는다
+  it.each([1e-6, 3e-6])('하트 본체 정점 하나를 %s 옮기면 해시만 어긋난다', (delta) => {
+    const position = createSheetBodyGeometry('heart').getAttribute('position').array;
+    const moved = Float32Array.from(position);
+    moved[1000] = position[1000]! + delta;
+
+    const paths = goldenMismatches(digest(moved), digest(position)).map((m) => m.split(':')[0]);
+    expect(paths).toEqual(['$.hash']);
   });
 });
 

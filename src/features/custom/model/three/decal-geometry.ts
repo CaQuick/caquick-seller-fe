@@ -31,6 +31,7 @@ export interface DecalPixels {
 /**
  * 아이템 텍스처의 픽셀 크기. 글자 박스는 좌우 0.3em 여백, 최소 2em이다.
  * measureText는 래스터와 같은 글꼴(700, TEXT_FONT_PX)로 잰 한 줄 폭이다.
+ * 구매자 Canvas 2D처럼 ASCII 공백(\t\n\f\r)은 공백으로 재고 그린다(줄바꿈도 한 줄).
  */
 export function decalPixelSize(
   item: DesignItem,

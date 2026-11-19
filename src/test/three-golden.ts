@@ -1,11 +1,25 @@
 // 3D 형상 골든 문서. 구매자 편집기 코드(scripts/three-golden.ts)와 판매자 이식본(three/golden.spec.ts)이
-// 같은 입력으로 이 문서를 만들고, spec이 저장된 구매자 문서와 1e-9 안에서 비교한다.
+// 같은 입력으로 이 문서를 만들고, spec이 저장된 구매자 문서와 비교한다(값마다 float32 비트 해시 + 집계 1e-9).
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import type * as THREE from 'three';
 
 /** 구매자 레포(caquick-fe-v2) 기준 커밋 */
 export const GOLDEN_REF = '9ac455f';
 export const GOLDEN_FIXTURE = 'src/features/custom/model/three/__fixtures__/three-golden.json';
 export const GOLDEN_TOLERANCE = 1e-9;
+
+/** 형상 계산이 타는 패키지. 구매자 lock과 같은 버전이어야 같은 모양이 나온다 */
+export const PINNED_PACKAGES = ['three', 'polygon-clipping'] as const;
+
+export const installedVersions = (root: string) =>
+  Object.fromEntries(
+    PINNED_PACKAGES.map((name) => {
+      const manifest = readFileSync(join(root, 'node_modules', name, 'package.json'), 'utf8');
+      return [name, (JSON.parse(manifest) as { version: string }).version];
+    }),
+  );
 
 const SHAPES = [
   'heart',
@@ -110,8 +124,19 @@ const DECALS: { face: Face; design: Design; item: GoldenItem }[] = [
   { face: 'top', design: 'drip', item: { kind: 'DECO', x: 0.2, y: 0.8, size: 20, text: '' } },
 ];
 
-/** 큰 배열은 개수·합·제곱합·위치 가중합과 고른 간격 표본 8개로 줄인다 */
-function digest(values: ArrayLike<number>) {
+/**
+ * 값마다 float32로 맞춘 비트의 FNV-1a. 값 하나만 바뀌어도 해시가 바뀐다(단계마다 전단사).
+ * 정점 속성은 원래 float32라 비트 그대로다. 플랫폼 사이 double 1ulp 차이가 float32 반올림을 바꿀 확률은 값마다 약 4e-9다.
+ */
+function float32Hash(values: ArrayLike<number>) {
+  let hash = 0x811c9dc5;
+  for (const word of new Uint32Array(Float32Array.from(values).buffer))
+    hash = Math.imul(hash ^ word, 0x01000193) >>> 0;
+  return hash.toString(16).padStart(8, '0');
+}
+
+/** 큰 배열은 float32 해시와 개수·합·제곱합·위치 가중합·고른 간격 표본 8개로 줄인다 */
+export function digest(values: ArrayLike<number>) {
   let sum = 0;
   let sq = 0;
   let weighted = 0;
@@ -126,7 +151,7 @@ function digest(values: ArrayLike<number>) {
     { length: picks },
     (_, k) => values[Math.round((k * (values.length - 1)) / Math.max(1, picks - 1))]!,
   );
-  return { n: values.length, sum, sq, weighted, at };
+  return { n: values.length, hash: float32Hash(values), sum, sq, weighted, at };
 }
 
 function geometryDigest(geometry: THREE.BufferGeometry) {
@@ -164,12 +189,11 @@ function shapeGolden(api: ThreeApi, shape: Shape) {
       const { x, z, nx, nz } = api.sampleWall(shape, u);
       return [x, z, nx, nz];
     }),
-    projections: digest(
-      PROJECTIONS.flatMap(([u, v, yaw]) => {
-        const point = api.projectSidePoint(shape, u!, v!, yaw!);
-        return [point.x, point.y, point.facing, point.visible ? 1 : 0];
-      }),
-    ),
+    // 투영 135점은 값 그대로 1e-9로 본다
+    projections: PROJECTIONS.flatMap(([u, v, yaw]) => {
+      const point = api.projectSidePoint(shape, u!, v!, yaw!);
+      return [point.x, point.y, point.facing, point.visible ? 1 : 0];
+    }),
     wave: geometryDigest(api.wave(shape)),
     heartPlacements: digest(placementValues(heart.placements)),
     heartMatrices: digest(api.wallMatrices(shape, heart.placements).flat()),
@@ -215,12 +239,21 @@ function spinGolden(api: ThreeApi) {
   for (let i = 0; i < 120; i++) frame(i % 3 === 0 ? 1 / 30 : 1 / 60);
   spin.set(1.2);
   frame(1 / 60);
-  // 1ms 안의 연속 이동, 멈춘 채 손 떼기(관성 없음)
+  // 1ms 안의 연속 이동 직후 떼기(1ms 하한 속도로 관성), 마지막 이동 100ms 뒤(관성)·101ms 뒤(멈춤) 떼기
   spin.start(0, 5000);
   spin.drag(-80, 5016, 390);
   spin.drag(-90, 5016.5, 390);
-  spin.end(5300);
+  spin.end(5016.5);
   frame(1 / 60);
+  for (const [time, wait] of [
+    [5500, 100],
+    [5800, 101],
+  ] as const) {
+    spin.start(0, time);
+    spin.drag(60, time + 16, 390);
+    spin.end(time + 16 + wait);
+    frame(1 / 60);
+  }
   spin.start(0, 6000);
   spin.drag(200, 6016, 390);
   spin.end(6020);
@@ -249,7 +282,7 @@ export function buildGolden(api: ThreeApi) {
   };
 }
 
-/** 숫자는 |a−b| ≤ 1e-9·max(1, |b|), 나머지는 같은 모양·같은 값이어야 한다. 어긋난 경로를 모두 돌려준다 */
+/** 숫자는 |a−b| ≤ 1e-9·max(1, |b|), 나머지(해시 포함)는 같은 모양·같은 값이어야 한다. 어긋난 경로를 모두 돌려준다 */
 export function goldenMismatches(actual: unknown, expected: unknown, path = '$'): string[] {
   if (typeof expected === 'number') {
     return typeof actual === 'number' &&

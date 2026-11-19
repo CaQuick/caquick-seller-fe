@@ -6,7 +6,8 @@
  *
  * 사용: FT_DIR=<caquick-fe-v2 체크아웃> pnpm tsx scripts/three-golden.ts [ref]   (기본 ref는 GOLDEN_REF)
  *   원본은 고치지 않고 export만 덧붙여 비공개 함수와 컴포넌트를 꺼낸다. 컴포넌트 안 계산(배치·행렬·본체·데칼)은
- *   React 훅·R3F·DOM을 계산에 필요한 만큼만 흉내 낸 채 컴포넌트를 함수로 불러 얻는다. three는 이 레포의 것을 쓴다.
+ *   React 훅·R3F·DOM을 계산에 필요한 만큼만 흉내 낸 채 컴포넌트를 함수로 불러 얻는다. three는 이 레포의 것을 쓰므로
+ *   설치본이 구매자 lock과 다른 버전이면 멈춘다.
  */
 import { execFileSync } from 'node:child_process';
 import {
@@ -31,6 +32,8 @@ import {
   GOLDEN_REF,
   goldenMeasure,
   type GoldenItem,
+  installedVersions,
+  PINNED_PACKAGES,
   type ThreeApi,
 } from '../src/test/three-golden';
 
@@ -67,10 +70,29 @@ const EXPORTS: Record<string, string[]> = {
   'CakeCanvas.tsx': ['Spin', 'SheetMesh', 'BEVEL'],
 };
 
+/** 구매자 lock(v9) 루트 importer에 적힌 설치 버전 */
+function lockVersion(lock: string, name: string) {
+  const match = new RegExp(
+    `\\n {6}'?${name}'?:\\n {8}specifier: .+\\n {8}version: ([^\\s(]+)`,
+  ).exec(lock);
+  if (!match) throw new Error(`구매자 lock에 ${name}이 없다`);
+  return match[1]!;
+}
+
 async function main(ftDir: string, ref: string) {
+  const sha = execFileSync('git', ['-C', ftDir, 'rev-parse', '--short', ref]).toString().trim();
+  const lock = execFileSync('git', ['-C', ftDir, 'show', `${sha}:pnpm-lock.yaml`]).toString();
+  const buyerVersions = Object.fromEntries(
+    PINNED_PACKAGES.map((name) => [name, lockVersion(lock, name)]),
+  );
+  const installed = installedVersions('.');
+  if (JSON.stringify(buyerVersions) !== JSON.stringify(installed))
+    throw new Error(
+      `구매자 lock ${JSON.stringify(buyerVersions)} ≠ 설치본 ${JSON.stringify(installed)}. 같은 버전으로 맞춘 뒤 다시 만든다`,
+    );
+
   const tmp = mkdtempSync(path.join(tmpdir(), 'three-golden-'));
   try {
-    const sha = execFileSync('git', ['-C', ftDir, 'rev-parse', '--short', ref]).toString().trim();
     execFileSync('sh', [
       '-c',
       'git -C "$1" archive "$2" src/screens/custom | tar -x -C "$3"',
@@ -202,7 +224,7 @@ async function main(ftDir: string, ref: string) {
       createSpin: () => new canvas.Spin(),
     };
 
-    const golden = { ref: sha, threeRevision: THREE.REVISION, ...buildGolden(api) };
+    const golden = { ref: sha, buyerVersions, ...buildGolden(api) };
     const out = path.resolve(GOLDEN_FIXTURE);
     mkdirSync(path.dirname(out), { recursive: true });
     writeFileSync(out, `${stringify(golden, 0)}\n`);
