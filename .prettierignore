@@ -6,3 +6,5 @@ src/graphql/generated
 schema/schema.graphql
 expo-env.d.ts
 assets
+# 골든 fixture는 생성기(scripts/three-golden.ts)가 쓴 한 줄 형식 그대로 둔다
+src/features/custom/model/three/__fixtures__

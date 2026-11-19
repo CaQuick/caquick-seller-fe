@@ -73,6 +73,10 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: '@types/jest'
         update-types: ['version-update:semver-major']
+      # 3D 형상은 구매자 lock과 같은 버전이어야 같은 모양이 나온다(golden.spec이 비교) — 구매자와 함께 손으로 올린다
+      - dependency-name: 'three'
+      - dependency-name: '@types/three'
+      - dependency-name: 'polygon-clipping'
       # 메이저는 수동 마이그레이션 PR로 — 플러그인·설정 변경이 따라온다
       - dependency-name: 'typescript'
         update-types: ['version-update:semver-major']
