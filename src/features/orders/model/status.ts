@@ -1,7 +1,9 @@
 import { type OrderStatusType, type SellerOrderDetailQuery } from '@/graphql/generated/graphql';
 import { enumView } from '@/shared/lib/enum-view';
+import { formatPickupKst } from '@/shared/lib/kst';
 import { type StatusTone, type TimelineItem } from '@/shared/ui';
 
+import { type CancelMode } from './cancel-form';
 import { formatDateTime } from './format';
 
 type OrderDetail = SellerOrderDetailQuery['sellerOrder'];
@@ -33,11 +35,16 @@ export const STATUS_SEGMENTS: readonly OrderStatusType[] = [
   'CANCELED',
 ];
 
+/** '다른 처리' 시트의 상태 변경 */
+export type OtherStatus = Extract<OrderStatusType, 'PICKED_UP' | 'NO_SHOW'>;
+
 export interface OrderActions {
   /** 다음 단계로 보내는 주 버튼 */
   next?: { to: OrderStatusType; label: string; done: string };
-  /** 제작 완료 뒤에는 앱에서 취소하지 않는다(만든 케이크 취소는 구매자·관리자 경로) */
-  cancellable: boolean;
+  /** 접수는 '거절' 보조 버튼, 확정·제작 완료는 '다른 처리' 안의 취소 */
+  cancel?: CancelMode;
+  /** '다른 처리' 시트에 둘 상태 변경 */
+  others: readonly OtherStatus[];
   /** 종료 상태 안내 */
   notice?: string;
 }
@@ -45,36 +52,72 @@ export interface OrderActions {
 export const orderActions = enumView<OrderActions>(
   {
     PENDING_PAYMENT: {
-      cancellable: false,
+      others: [],
       notice: '입금 확인 전 주문이에요. 입금이 확인되면 처리할 수 있어요.',
     },
     SUBMITTED: {
       next: { to: 'CONFIRMED', label: '주문 확정', done: '주문을 확정했어요' },
-      cancellable: true,
+      cancel: 'reject',
+      others: [],
     },
     CONFIRMED: {
       next: { to: 'MADE', label: '제작 완료', done: '제작 완료로 바꿨어요' },
-      cancellable: true,
+      cancel: 'cancel',
+      others: ['PICKED_UP', 'NO_SHOW'],
     },
     MADE: {
       next: { to: 'PICKED_UP', label: '픽업 완료', done: '픽업 완료로 바꿨어요' },
-      cancellable: false,
+      cancel: 'cancel',
+      others: ['NO_SHOW'],
     },
     PICKED_UP: {
-      cancellable: false,
+      others: [],
       notice: '픽업이 끝난 주문이에요. 더 할 수 있는 작업이 없어요.',
     },
     NO_SHOW: {
-      cancellable: false,
+      others: [],
       notice: '노쇼로 처리된 주문이에요. 더 할 수 있는 작업이 없어요.',
     },
     CANCELED: {
-      cancellable: false,
-      notice: '취소된 주문이에요. 구매자에게 사유가 전달되었고 결제는 취소되었어요.',
+      others: [],
+      notice: '취소된 주문이에요. 더 할 수 있는 작업이 없어요.',
     },
   } satisfies Record<OrderStatusType, OrderActions>,
-  { cancellable: false, notice: '앱을 최신 버전으로 업데이트하면 이 주문을 처리할 수 있어요.' },
+  { others: [], notice: '앱을 최신 버전으로 업데이트하면 이 주문을 처리할 수 있어요.' },
 );
+
+/** 자동 전이 예정 안내. BE가 접수에만 확정 마감, 확정·제작 완료에만 자동 픽업 시각을 준다 */
+export function autoTransitionNotice(
+  order: Pick<OrderDetail, 'confirmDeadlineAt' | 'autoPickupAt'>,
+): string | null {
+  if (order.confirmDeadlineAt)
+    return `${formatPickupKst(order.confirmDeadlineAt)}까지 확정하지 않으면 자동 취소되고 전액 환불돼요`;
+  if (order.autoPickupAt) return `${formatPickupKst(order.autoPickupAt)}에 자동으로 픽업 완료돼요`;
+  return null;
+}
+
+/**
+ * 노쇼 처리 가능 여부와 막힌 이유. 구간은 픽업 시각 ≤ now < 자동 픽업 완료 시각이고,
+ * 화면을 열어 둔 사이 시각이 바뀌므로 조회 시점의 canMarkNoShow보다 지금 시각으로 판정한다
+ */
+export function noShowWindow(
+  order: Pick<OrderDetail, 'canMarkNoShow' | 'pickupAt' | 'autoPickupAt'>,
+  now: Date,
+): { enabled: boolean; reason: string } {
+  const enabled = { enabled: true, reason: '구매자가 픽업 시간에 오지 않았어요' };
+  if (!order.autoPickupAt)
+    return order.canMarkNoShow
+      ? enabled
+      : { enabled: false, reason: '지금은 노쇼로 처리할 수 없어요' };
+  if (now.getTime() < Date.parse(order.pickupAt))
+    return {
+      enabled: false,
+      reason: `픽업 시각(${formatPickupKst(order.pickupAt)})부터 처리할 수 있어요`,
+    };
+  if (now.getTime() >= Date.parse(order.autoPickupAt))
+    return { enabled: false, reason: '자동 픽업 완료 시각이 지나 처리할 수 없어요' };
+  return enabled;
+}
 
 const FLOW = ['SUBMITTED', 'CONFIRMED', 'MADE', 'PICKED_UP'] as const;
 

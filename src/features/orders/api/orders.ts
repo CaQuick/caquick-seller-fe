@@ -27,6 +27,8 @@ const SellerOrdersListDocument = graphql(`
         totalPrice
         firstItemName
         firstItemImageUrl
+        firstItemCustomImageUrl
+        hasCustom
       }
       totalCount
       hasMore
@@ -45,6 +47,8 @@ const SellerOrderDetailDocument = graphql(`
       pickupAt
       buyerName
       buyerPhone
+      requestNote
+      paymentMethod
       subtotalPrice
       discountPrice
       totalPrice
@@ -54,6 +58,12 @@ const SellerOrderDetailDocument = graphql(`
       pickedUpAt
       canceledAt
       noShowAt
+      confirmDeadlineAt
+      autoPickupAt
+      canMarkNoShow
+      commissionRateBps
+      expectedPayoutAmount
+      settlementBaseAmount
       createdAt
       updatedAt
       items {
@@ -89,6 +99,12 @@ const SellerOrderDetailDocument = graphql(`
         toStatus
         changedAt
         note
+      }
+      cancellation {
+        actorType
+        reasonLabel
+        refundAmount
+        refundStatus
       }
     }
   }
@@ -129,12 +145,15 @@ const SellerOrderConversationsDocument = graphql(`
 export const SellerOrdersUpdatedDocument = graphql(`
   subscription SellerOrdersUpdated {
     sellerOrderUpdated {
+      kind
       orderId
       status
       pickupAt
       buyerName
       totalPrice
       productName
+      hasCustom
+      confirmDeadlineAt
       updatedAt
     }
   }

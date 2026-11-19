@@ -49,6 +49,8 @@ const summary = (id: string, patch: Partial<Summary> = {}): Summary => ({
   totalPrice: 38000,
   firstItemName: `케이크 ${id}`,
   firstItemImageUrl: null,
+  firstItemCustomImageUrl: null,
+  hasCustom: false,
   ...patch,
 });
 const page = (items: Summary[], nextCursor: string | null = null): Page => ({
@@ -124,6 +126,30 @@ describe('OrdersScreen', () => {
     expect(calls).toHaveLength(1);
     await act(() => Promise.resolve(navigation.back()));
     await waitFor(() => expect(calls).toHaveLength(2));
+  });
+
+  it('커스텀 주문은 커스텀 칩을 달고 썸네일에 커스텀 대표 이미지를 쓴다', async () => {
+    listHandler(() =>
+      page([
+        summary('1', {
+          hasCustom: true,
+          firstItemImageUrl: 'https://img/product.jpg',
+          firstItemCustomImageUrl: 'https://img/custom.jpg',
+        }),
+        summary('2', { firstItemImageUrl: 'https://img/plain.jpg' }),
+      ]),
+    );
+    await open();
+    await screen.findByText('케이크 1');
+    const uris = (name: string) =>
+      row(name)
+        .queryAll((n) => Array.isArray(n.props.source))
+        .flatMap((n) => (n.props.source as { uri: string }[]).map((src) => src.uri));
+    expect(row('케이크 1')).toHaveAccessibleName(/^케이크 1, 커스텀, 접수,/);
+    expect(uris('케이크 1')).toContain('https://img/custom.jpg');
+    expect(uris('케이크 1')).not.toContain('https://img/product.jpg');
+    expect(row('케이크 2')).not.toHaveTextContent(/커스텀/);
+    expect(uris('케이크 2')).toContain('https://img/plain.jpg');
   });
 
   it('당겨서 새로고침하면 다시 받는다', async () => {

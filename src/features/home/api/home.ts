@@ -28,6 +28,7 @@ const SellerHomeDashboardDocument = graphql(`
         orderCount
       }
       remainingCapacity
+      pendingPaymentQuantity
       activeProductCount
       unansweredConversationCount
     }
@@ -44,6 +45,8 @@ const SellerHomeRecentOrdersDocument = graphql(`
         buyerName
         firstItemName
         firstItemImageUrl
+        firstItemCustomImageUrl
+        hasCustom
       }
     }
   }

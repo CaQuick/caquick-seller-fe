@@ -45,7 +45,10 @@ function DashboardSection() {
   if (data) {
     return (
       <>
-        <HeroCard remainingCapacity={data.remainingCapacity ?? null} />
+        <HeroCard
+          remainingCapacity={data.remainingCapacity ?? null}
+          pendingPaymentQuantity={data.pendingPaymentQuantity}
+        />
         <KpiGrid kpis={toKpis(data)} />
       </>
     );

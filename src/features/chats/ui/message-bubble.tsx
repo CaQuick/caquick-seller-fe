@@ -1,13 +1,15 @@
+import { router } from 'expo-router';
 import { type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { colors } from '@/shared/config/tokens';
 import { formatTimeKst } from '@/shared/lib/kst';
 import { cn } from '@/shared/lib/cn';
-import { Icon } from '@/shared/ui';
+import { Icon, RemoteImage } from '@/shared/ui';
 
 import { type Message } from '../api/messages';
 import { CHATS_COPY } from '../model/copy';
+import { formatPickup } from '../model/format';
 import { type BubbleKind, bubbleKind, messageBody } from '../model/message-list';
 import { type PendingMessage } from '../model/use-chat-room';
 import { HtmlBody } from './html-body';
@@ -56,10 +58,63 @@ const Time = ({ iso }: { iso: string }) => (
   <Text className="font-sans text-2xs text-muted">{formatTimeKst(iso)}</Text>
 );
 
-/** 말풍선: 구매자 좌 흰 배경 · 판매자 우 primary · 자동응답 좌 연보라 + 라벨 · 시스템 가운데 */
+type OrderCard = NonNullable<Message['orderCard']>;
+
+/** 구매자가 보낸 주문 문의 카드. 누르면 그 주문 상세로 간다 */
+function OrderCardBody({ card }: { card: OrderCard }) {
+  const pickup = formatPickup(card.pickupAt);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${CHATS_COPY.orderCard}: ${card.productName}, ${card.orderNumber}, ${pickup}`}
+      onPress={() => router.push({ pathname: '/orders/[id]', params: { id: card.orderId } })}
+      className="w-56 gap-2"
+    >
+      <Text className="font-sans text-2xs font-semibold text-purple-text">
+        {CHATS_COPY.orderCard}
+      </Text>
+      <View className="flex-row items-center gap-2.5">
+        {card.thumbnailUrl ? (
+          <RemoteImage
+            uri={card.thumbnailUrl}
+            style={{ width: 48, height: 48 }}
+            className="rounded-md bg-gray-bg"
+          />
+        ) : (
+          <View className="h-12 w-12 items-center justify-center rounded-md bg-gray-bg">
+            <Icon name="orders" size={20} color={colors.placeholder} />
+          </View>
+        )}
+        <View className="flex-1">
+          <Text
+            numberOfLines={2}
+            className="font-sans text-md font-semibold tracking-tight text-text"
+          >
+            {card.productName}
+          </Text>
+          <Text numberOfLines={1} className="mt-0.5 font-sans text-xs text-muted">
+            {card.orderNumber}
+          </Text>
+          <Text className="font-sans text-xs text-muted">{pickup}</Text>
+        </View>
+      </View>
+      <Text className="font-sans text-xs font-medium text-primary-strong">
+        {CHATS_COPY.orderLink}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** 말풍선: 구매자 좌 흰 배경 · 판매자 우 primary · 자동응답 좌 연보라 + 라벨 · 시스템 가운데 · 주문 카드 */
 export function MessageBubble({ message }: { message: Message }) {
   const kind = bubbleKind(message);
   const body = messageBody(message);
+  if (kind !== 'system' && message.bodyFormat === 'ORDER_CARD' && message.orderCard)
+    return (
+      <Bubble kind={kind} aside={<Time iso={message.createdAt} />}>
+        <OrderCardBody card={message.orderCard} />
+      </Bubble>
+    );
   if (kind === 'system')
     return (
       <Text className="self-center rounded-sm bg-gray-bg px-2.5 py-[3px] font-sans text-xs text-muted">

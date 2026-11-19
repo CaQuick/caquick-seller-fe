@@ -47,6 +47,7 @@ export function applyOrderUpdate(
               pickupAt: update.pickupAt,
               buyerName: update.buyerName,
               totalPrice: update.totalPrice,
+              hasCustom: update.hasCustom,
             }
           : item,
       ),

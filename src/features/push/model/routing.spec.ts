@@ -16,13 +16,28 @@ describe('parsePushData', () => {
       { kind: 'ORDER_SUBMITTED', orderId: '12' },
       { kind: 'ORDER_SUBMITTED', orderId: '12' },
     ],
+    [
+      '주문 취소',
+      { kind: 'ORDER_CANCELED', orderId: '12' },
+      { kind: 'ORDER_CANCELED', orderId: '12' },
+    ],
+    [
+      '확정 마감 임박',
+      { kind: 'ORDER_CONFIRM_REMINDER', orderId: '12' },
+      { kind: 'ORDER_CONFIRM_REMINDER', orderId: '12' },
+    ],
     ["주문 id '0'도 버리지 않는다", { kind: 'ORDER_SUBMITTED', orderId: '0' }, order],
     ['새 문의', { kind: 'BUYER_MESSAGE', conversationId: 'c9' }, message],
     ['주문 id 없음', { kind: 'ORDER_SUBMITTED' }, null],
+    ['취소에 주문 id 없음', { kind: 'ORDER_CANCELED' }, null],
+    ['마감 임박 주문 id 빈 문자열', { kind: 'ORDER_CONFIRM_REMINDER', orderId: '' }, null],
     ['주문 id 빈 문자열', { kind: 'ORDER_SUBMITTED', orderId: '' }, null],
-    ['주문 id가 숫자', { kind: 'ORDER_SUBMITTED', orderId: 12 }, null],
+    ['주문 id가 숫자', { kind: 'ORDER_CANCELED', orderId: 12 }, null],
+    ['취소에 대화 id만', { kind: 'ORDER_CANCELED', conversationId: 'c9' }, null],
     ['문의에 주문 id만', { kind: 'BUYER_MESSAGE', orderId: '12' }, null],
     ['모르는 kind', { kind: 'REVIEW', orderId: '12' }, null],
+    ['kind가 문자열이 아님', { kind: ['ORDER_CANCELED'], orderId: '12' }, null],
+    ['프로토타입 이름', { kind: 'toString', orderId: '12' }, null],
     ['data 없음', undefined, null],
     ['null', null, null],
     ['문자열', 'ORDER_SUBMITTED', null],
@@ -32,8 +47,17 @@ describe('parsePushData', () => {
 });
 
 describe('hrefFor', () => {
-  it('새 주문은 주문 상세, 새 문의는 대화방으로 보낸다', () => {
-    expect(hrefFor(order)).toEqual({ pathname: '/orders/[id]', params: { id: '0' } });
+  it.each<PushTarget['kind']>(['ORDER_SUBMITTED', 'ORDER_CANCELED', 'ORDER_CONFIRM_REMINDER'])(
+    '%s는 주문 상세로 보낸다',
+    (kind) => {
+      expect(hrefFor({ kind, orderId: '0' } as PushTarget)).toEqual({
+        pathname: '/orders/[id]',
+        params: { id: '0' },
+      });
+    },
+  );
+
+  it('새 문의는 대화방으로 보낸다', () => {
     expect(hrefFor(message)).toEqual({
       pathname: '/chats/[conversationId]',
       params: { conversationId: 'c9' },
@@ -42,8 +66,13 @@ describe('hrefFor', () => {
 });
 
 describe('staleKeysFor', () => {
-  it('새 주문은 주문 목록과 홈을, 새 문의는 대화 목록·그 대화·홈을 다시 받게 한다', () => {
-    expect(staleKeysFor(order)).toEqual([['orders', 'list'], ['home']]);
+  it('주문 알림은 주문 목록·그 주문·홈을, 새 문의는 대화 목록·그 대화·홈을 다시 받게 한다', () => {
+    expect(staleKeysFor(order)).toEqual([['orders', 'list'], ['orders', 'detail', '0'], ['home']]);
+    expect(staleKeysFor({ kind: 'ORDER_CANCELED', orderId: '5' })).toEqual([
+      ['orders', 'list'],
+      ['orders', 'detail', '5'],
+      ['home'],
+    ]);
     expect(staleKeysFor(message)).toEqual([
       ['chats', 'conversations'],
       ['chats', 'messages', 'c9'],

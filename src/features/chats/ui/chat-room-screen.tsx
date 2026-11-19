@@ -16,7 +16,7 @@ import { colors } from '@/shared/config/tokens';
 import { Empty, ErrorState, Screen, SkeletonRows, showToast } from '@/shared/ui';
 
 import { type Conversation, type ConversationPages } from '../api/conversations';
-import { type Message, buyerOrderQueryOptions } from '../api/messages';
+import { type Message, buyerLatestOrderQueryOptions } from '../api/messages';
 import { chatsKeys } from '../api/queryKeys';
 import { findConversation } from '../model/conversation-merge';
 import { CHATS_COPY } from '../model/copy';
@@ -65,8 +65,11 @@ export function ChatRoomScreen() {
   );
   const requestRead = useMarkRead(conversationId, setConversation);
   const room = useChatRoom(conversationId, requestRead);
-  const nickname = conversation?.buyerNickname?.trim();
-  const order = useQuery({ ...buyerOrderQueryOptions(nickname ?? ''), enabled: !!nickname });
+  const buyerAccountId = conversation?.accountId;
+  const order = useQuery({
+    ...buyerLatestOrderQueryOptions(buyerAccountId ?? ''),
+    enabled: buyerAccountId !== undefined,
+  });
 
   const notFound =
     room.query.error instanceof ApiError && room.query.error.classification === 'NOT_FOUND';

@@ -1,4 +1,4 @@
-# 생성 파일 — 수정하지 않는다. caquick-be local@b2ee9d3b7353182fdfa5ad5d70d22f4364cbeb2d 의 src/features/**/*.graphql 77개를 경로순으로 합쳤다.
+# 생성 파일 — 수정하지 않는다. caquick-be local@bc9118825bee19bb885a0e12074d17fefd93dbe5 의 src/features/**/*.graphql 77개를 경로순으로 합쳤다.
 # 갱신: pnpm schema:pull [ref]
 
 # ---- src/features/audit-log/audit-log.types.graphql ----
@@ -5283,6 +5283,10 @@ type SellerOrderUpdate {
   productName: String!
   """커스텀 주문 여부(첫 품목의 커스텀 방식이 NONE이 아니면 true)."""
   hasCustom: Boolean!
+  """
+  확정 마감 시각. 이때까지 확정하지 않으면 자동 취소된다. 접수(SUBMITTED) 상태가 아니거나 결제 도입 전 주문이면 null.
+  """
+  confirmDeadlineAt: DateTime
   """주문 행의 updated_at. 폐기 규칙의 비교 키다."""
   updatedAt: DateTime!
 }

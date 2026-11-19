@@ -20,6 +20,8 @@ export const HOME_COPY = {
   noFilteredOrders: '해당 상태의 주문이 없어요',
   addProduct: '상품 등록',
   untitledItem: '상품 정보 없음',
+  custom: '커스텀',
+  pendingPayment: (n: number) => `입금 대기 ${formatCount(n, '개')} 포함`,
 } as const;
 
 /** 최근 주문 필터(D29) — null은 전체 */

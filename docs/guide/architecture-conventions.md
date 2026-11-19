@@ -98,7 +98,8 @@ src/
 - **로그인 성공** 뒤 푸시 토큰을 등록합니다(`sellerRegisterPushToken`). **로그아웃**은 푸시 토큰 해제(best effort) → `/auth/seller/logout` → SecureStore 삭제 → ws dispose → queryClient clear 순서입니다.
 - **푸시 토큰**(`features/push`): 권한 팝업은 로그인 직후에만 띄우고, 앱 시작과 설정에서 권한을 켜고 돌아온 때는 묻지 않고 다시 등록합니다(`ensurePushToken`, 겹친 호출은 하나로). EAS `projectId`가 없으면 등록을 건너뛰고 경고 로그만 남깁니다(D48). 해제는 `onBeforeLogout` 콜백입니다.
 - **푸시·구독 중복 제거**: 앱이 열려 있으면 같은 사건이 구독과 포그라운드 푸시로 두 번 옵니다. 시스템 배너는 끄고(D39) 인앱 토스트 하나만 띄웁니다.
-  - 새 주문: `(app)` 레이아웃의 전역 구독(`useNewOrderNotices`)과 포그라운드 푸시가 모두 `notifyNewOrder(orderId)`를 부르고, 최근 orderId 50개를 기억해 먼저 온 쪽만 토스트를 띄웁니다. 구독이 끊겨 있으면 푸시가 대신 알립니다.
+  - 새 주문: `(app)` 레이아웃의 전역 구독(`useNewOrderNotices`, `kind` SUBMITTED만)과 포그라운드 푸시가 모두 `notifyNewOrder(orderId)`를 부르고 먼저 온 쪽만 토스트를 띄웁니다. 구독이 끊겨 있으면 푸시가 대신 알립니다.
+  - 주문 취소·확정 마감 임박: 포그라운드 푸시만 `notifyOrder(kind, orderId)`로 알립니다. 주문 알림 토스트는 최근 `${kind}:${orderId}` 50개를 기억해, 같은 주문이라도 종류가 다르면 막지 않습니다.
   - 문의: 채팅 탭과 그 대화방에서는 목록·방 구독이 화면을 갱신하므로 푸시 토스트를 띄우지 않습니다(`shouldToastMessage`, 경로 기준).
   - 캐시 무효화는 토스트 여부와 관계없이 푸시마다 합니다(`staleKeysFor`).
 - **비밀번호 변경 성공**은 BE가 기존 토큰을 무효화하므로 로그아웃과 같은 로컬 정리를 한 뒤 로그인 화면으로 보냅니다.
